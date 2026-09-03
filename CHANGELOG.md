@@ -5,6 +5,11 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ## [Unreleased]
 
+- Add a keyless **Live Global Events** globe layer backed by NASA EONET and
+  GDACS, including severity-colored source cards, cached/partial/stale proxy
+  behavior, share-link persistence, voice aliases, analyst records, and
+  complete in-app attribution.
+
 ### Changed
 
 - Rebranded the public application, package metadata, setup messaging, and

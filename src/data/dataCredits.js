@@ -67,6 +67,20 @@ export const DATA_CREDITS = [
     html: 'Earthquakes: Data courtesy of the U.S. Geological Survey',
   },
   {
+    key: 'eonet',
+    html:
+      'Live natural events: ' +
+      '<a href="https://eonet.gsfc.nasa.gov/" target="_blank" rel="noopener">NASA EONET</a> ' +
+      '(near-real-time event metadata)',
+  },
+  {
+    key: 'gdacs',
+    html:
+      'Global disaster alerts: ' +
+      '<a href="https://www.gdacs.org/" target="_blank" rel="noopener">GDACS</a> ' +
+      '(European Commission / United Nations cooperation framework)',
+  },
+  {
     key: 'overpass',
     html:
       'Road geometry (traffic): ' +

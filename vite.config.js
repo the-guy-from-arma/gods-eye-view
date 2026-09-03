@@ -18,6 +18,7 @@
  *  13. Weather effects — camera-local Open-Meteo observations without news/geocoding overhead
  *  14. Rocket launches — recent Launch Library 2 mission metadata
  *  15. Radio Browser — public-domain station directory and click counting
+ *  16. Live events — keyless NASA EONET + GDACS global event alerts
  *
  * Also exposes Cesium and Google 3D Tiles API keys to the
  * client via `import.meta.env.*` defines.
@@ -75,6 +76,11 @@ import {
   validTerrainResult,
 } from './src/data/terrainHeightsProxy.js';
 import { VOICE_MODELS, isKnownVoiceTier, resolveVoiceModel } from './src/voice/voiceCost.js';
+import {
+  mergeLiveEvents,
+  normalizeEonetPayload,
+  normalizeGdacsPayload,
+} from './src/data/liveEventsCore.js';
 
 /** Resolve __dirname for ESM context. */
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1758,6 +1764,121 @@ function rocketLaunchesProxy() {
 
   return {
     name: 'rocket-launches-proxy',
+    configureServer(server) {
+      install(server.middlewares);
+    },
+    configurePreviewServer(server) {
+      install(server.middlewares);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Keyless live global events (NASA EONET + GDACS)
+// ---------------------------------------------------------------------------
+export const LIVE_EVENTS_CACHE_TTL_MS = 5 * 60_000;
+export const LIVE_EVENTS_STALE_MS = 24 * 60 * 60_000;
+
+function liveEventsProxy() {
+  const maxResponseBytes = 6 * 1024 * 1024;
+  let cache = null;
+  let inFlight = null;
+
+  async function fetchSource(name, url, normalize) {
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(20_000),
+        headers: {
+          Accept: 'application/json, application/geo+json',
+          'User-Agent': 'ThunderLinkGodsEye/0.1 (+https://github.com/the-guy-from-arma/gods-eye-view)',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const body = await readResponseTextCapped(response, maxResponseBytes);
+      const events = normalize(JSON.parse(body));
+      if (!events.length) throw new Error('no usable events');
+      return { name, ok: true, events };
+    } catch (error) {
+      return { name, ok: false, events: [], error: String(error?.message || error) };
+    }
+  }
+
+  async function refresh() {
+    const [eonet, gdacs] = await Promise.all([
+      fetchSource(
+        'eonet',
+        'https://eonet.gsfc.nasa.gov/api/v3/events/geojson?status=open&days=30&limit=250',
+        normalizeEonetPayload,
+      ),
+      fetchSource(
+        'gdacs',
+        'https://www.gdacs.org/contentdata/xml/gdacsAPP_Home.geojson',
+        normalizeGdacsPayload,
+      ),
+    ]);
+    const events = mergeLiveEvents(eonet.events, gdacs.events).slice(0, 500);
+    if (!events.length) throw new Error('NASA EONET and GDACS are both unavailable');
+    const sources = {
+      eonet: { ok: eonet.ok, count: eonet.events.length, ...(eonet.ok ? {} : { error: eonet.error }) },
+      gdacs: { ok: gdacs.ok, count: gdacs.events.length, ...(gdacs.ok ? {} : { error: gdacs.error }) },
+    };
+    const payload = {
+      status: eonet.ok && gdacs.ok ? 'ready' : 'partial',
+      retrievedAt: new Date().toISOString(),
+      sources,
+      events,
+    };
+    cache = { at: Date.now(), payload };
+    return payload;
+  }
+
+  function install(middlewares) {
+    middlewares.use('/api/live-events', async (req, res) => {
+      if (req.method !== 'GET') {
+        res.writeHead(405, { 'Content-Type': 'application/json', Allow: 'GET' });
+        res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+        return;
+      }
+      const now = Date.now();
+      if (cache && now - cache.at <= LIVE_EVENTS_CACHE_TTL_MS) {
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=60',
+          'X-Live-Events': 'HIT',
+        });
+        res.end(JSON.stringify(cache.payload));
+        return;
+      }
+      const stale = cache;
+      const shared = Boolean(inFlight);
+      if (!inFlight) inFlight = refresh().finally(() => { inFlight = null; });
+      try {
+        const payload = await inFlight;
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=60',
+          'X-Live-Events': shared ? 'INFLIGHT' : 'MISS',
+        });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        if (stale && now - stale.at <= LIVE_EVENTS_STALE_MS) {
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+            'X-Live-Events': 'STALE',
+          });
+          res.end(JSON.stringify({ ...stale.payload, status: 'stale' }));
+          return;
+        }
+        console.warn(`[live-events-proxy] refresh failed: ${error?.message || error}`);
+        res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify({ error: 'Live event sources are temporarily unavailable' }));
+      }
+    });
+  }
+
+  return {
+    name: 'live-events-proxy',
     configureServer(server) {
       install(server.middlewares);
     },
@@ -7682,6 +7803,7 @@ export default defineConfig(({ mode }) => {
       tomtomProxy(),
       firmsProxy(),
       rocketLaunchesProxy(),
+      liveEventsProxy(),
       terrainHeightsProxy(),
       adsbdbProxy(),
       overpassProxy(),
