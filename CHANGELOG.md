@@ -5,6 +5,12 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ## [Unreleased]
 
+### Changed
+
+- Rebranded the public application, package metadata, setup messaging, and
+  project documentation as ThunderLink God's Eye while preserving the original
+  MIT license, upstream attribution, and stable internal protocol identifiers.
+
 ## [0.1.1] — 2026-09-01 — Installation and live-data fixes
 
 ### Changed

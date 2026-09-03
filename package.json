@@ -1,18 +1,18 @@
 {
-  "name": "gods-eye-view",
+  "name": "thunderlink-gods-eye",
   "private": true,
   "version": "0.1.1",
-  "description": "A real-time intelligence console for planet Earth — photorealistic 3D globe, live aircraft/ships/satellites/earthquakes/CCTV, and hands-free voice control. Runs in a browser.",
+  "description": "ThunderLink God's Eye — a real-time intelligence console for planet Earth with a photorealistic 3D globe and live open-source data.",
   "type": "module",
   "license": "MIT",
   "author": "Bilawal Sidhu",
-  "homepage": "https://github.com/bilawalsidhu/gods-eye-view#readme",
+  "homepage": "https://gods-eye-view-production-dc0e.up.railway.app",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bilawalsidhu/gods-eye-view.git"
+    "url": "https://github.com/the-guy-from-arma/gods-eye-view.git"
   },
   "bugs": {
-    "url": "https://github.com/bilawalsidhu/gods-eye-view/issues"
+    "url": "https://github.com/the-guy-from-arma/gods-eye-view/issues"
   },
   "engines": {
     "node": ">=24.14.0 <25 || >=26 <27"

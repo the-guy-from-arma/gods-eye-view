@@ -1,5 +1,5 @@
 /**
- * Vite configuration for God's Eye View — a cinematic geospatial app.
+ * Vite configuration for ThunderLink God's Eye — a cinematic geospatial app.
  *
  * Registers the dev-server proxy middlewares that bypass CORS and add
  * caching/auth for upstream APIs:
@@ -1575,7 +1575,7 @@ function celestrakProxy() {
       signal: AbortSignal.timeout(20000),
       // CelesTrak 403s bulk groups (e.g. `active`) unless the request carries a
       // descriptive User-Agent with a contact point.
-      headers: { 'User-Agent': 'gods-eye-view-celestrak-proxy/1.0 (+https://github.com/bilawalsidhu/gods-eye-view)' },
+      headers: { 'User-Agent': 'thunderlink-gods-eye-celestrak-proxy/1.0 (+https://github.com/the-guy-from-arma/gods-eye-view)' },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const body = await res.text();
@@ -2571,7 +2571,7 @@ async function fetchOverpassPayload(body, maxResponseBytes = OVERPASS_MAX_RESPON
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'gods-eye-view-overpass-proxy/1.0',
+          'User-Agent': 'thunderlink-gods-eye-overpass-proxy/1.0',
         },
         body,
         signal: controller.signal,
@@ -2814,7 +2814,7 @@ function overpassProxy() {
           try {
             const upstreamRes = await fetch(upstream, {
               signal: controller.signal,
-              headers: { 'User-Agent': 'gods-eye-view/dev (local)' },
+              headers: { 'User-Agent': 'thunderlink-gods-eye/dev (local)' },
             });
             if (!upstreamRes.ok) return fail('no route found');
             const ctype = upstreamRes.headers.get('content-type') || '';
@@ -2876,7 +2876,7 @@ async function fetchAdsbLolPointFallback(req) {
         {
           headers: {
             Accept: 'application/json',
-            'User-Agent': 'gods-eye-view-adsblol-regional-fallback/1.0',
+            'User-Agent': 'thunderlink-gods-eye-adsblol-regional-fallback/1.0',
           },
           signal: controller.signal,
         },
@@ -3356,7 +3356,7 @@ function gbfsProxy() {
               method: 'GET',
               headers: {
                 Accept: 'application/json',
-                'User-Agent': 'gods-eye-view-gbfs-proxy/1.0',
+                'User-Agent': 'thunderlink-gods-eye-gbfs-proxy/1.0',
               },
               signal: controller.signal,
             });
@@ -4432,7 +4432,7 @@ export async function fetchCctvImageFromUpstream(url, {
   }, timeoutMs);
   try {
     const upstream = await fetchImpl(url, {
-      headers: { 'User-Agent': 'gods-eye-view-cctv-proxy/1.0' },
+      headers: { 'User-Agent': 'thunderlink-gods-eye-cctv-proxy/1.0' },
       signal: controller.signal,
     });
     const contentType = upstream.headers.get('content-type') || '';
@@ -4522,7 +4522,7 @@ function cctvProxy() {
       sv.searchParams.set('key', streetViewKey);
 
       const svResp = await fetch(sv.toString(), {
-        headers: { 'User-Agent': 'gods-eye-view-cctv-proxy/1.0' },
+        headers: { 'User-Agent': 'thunderlink-gods-eye-cctv-proxy/1.0' },
         signal: AbortSignal.timeout(CCTV_FRAME_FETCH_TIMEOUT_MS),
       });
       const svType = svResp.headers.get('content-type') || '';
@@ -4609,7 +4609,7 @@ function cctvProxy() {
             }
 
             try {
-              const upstreamHeaders = { 'User-Agent': 'gods-eye-view-cctv-proxy/1.0' };
+              const upstreamHeaders = { 'User-Agent': 'thunderlink-gods-eye-cctv-proxy/1.0' };
               const requestRange = req.headers?.range;
               if (requestRange) upstreamHeaders.Range = requestRange;
               const upstream = await fetch(mediaUrl, {
@@ -4774,7 +4774,7 @@ function adsbLolProxy() {
             return;
           }
           const upstream = await fetch('https://api.adsb.lol/v2/mil', {
-            headers: { 'User-Agent': 'gods-eye-view-adsblol-proxy/1.0' },
+            headers: { 'User-Agent': 'thunderlink-gods-eye-adsblol-proxy/1.0' },
           });
           const body = await upstream.text();
           if (upstream.ok) {
@@ -5044,7 +5044,7 @@ export function openAiRealtimeProxy() {
           body: JSON.stringify({
             model: process.env.OPENAI_HUD_SUMMARY_MODEL || OPENAI_HUD_SUMMARY_MODEL_DEFAULT,
             instructions: [
-              "Write one concise intelligence-HUD summary for God's Eye View.",
+              "Write one concise intelligence-HUD summary for ThunderLink God's Eye.",
               'Use only the supplied place, street, nearby-place, and enabled-layer text labels.',
               'Prefer the clearest named place and include a relevant enabled layer only when useful.',
               'Do not infer from coordinates or invent a place.',
@@ -5168,7 +5168,7 @@ export function openAiRealtimeProxy() {
             output: { voice },
           },
           instructions: [
-            "You are GEV Voice Control, a concise voice controller for a Cesium geospatial app called God's Eye View.",
+            "You are ThunderLink Voice Control, a concise voice controller for a Cesium geospatial app called ThunderLink God's Eye.",
             'Have a natural spoken conversation with the user while the mic session is active.',
             'Do not require a wake phrase. Treat direct commands like "zoom into London" or "open datacenters" as GEV control requests.',
             'Only control the app by calling the provided tools. Never invent tool names or arguments.',
@@ -7108,8 +7108,8 @@ function fetchRegionalPlace(point) {
     });
     const payload = await fetchRegionalJson(`https://nominatim.openstreetmap.org/reverse?${params}`, {
       headers: {
-        'User-Agent': 'GodsEyeView/0.1 (+https://github.com/bilawalsidhu/gods-eye-view)',
-        Referer: 'https://github.com/bilawalsidhu/gods-eye-view',
+        'User-Agent': 'ThunderLinkGodsEye/0.1 (+https://github.com/the-guy-from-arma/gods-eye-view)',
+        Referer: 'https://github.com/the-guy-from-arma/gods-eye-view',
       },
     });
     return normalizeRegionalPlace(payload);

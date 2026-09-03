@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════
-   GOD'S EYE VIEW — Dark Sci-Fi UI
+   THUNDERLINK GOD'S EYE — Dark Sci-Fi UI
    Apple meets Blade Runner
    ═══════════════════════════════════════════════ */
 
@@ -464,6 +464,12 @@ body.cockpit-mode #cockpit-cloud-effects.active {
   filter: drop-shadow(0 0 12px rgba(0, 246, 255, 0.5));
 }
 
+#title-bar .title-wordmark {
+  display: grid;
+  gap: 3px;
+  line-height: 1;
+}
+
 #title-bar .title-logo::before,
 #title-bar .title-logo::after {
   --radio-broadcast-opacity: .28;
@@ -859,6 +865,7 @@ body.cockpit-mode #cockpit-cloud-effects.active {
   letter-spacing: 6px;
   color: var(--text-primary);
   margin-bottom: 12px;
+  line-height: 1.55;
 }
 
 .loader-status {
