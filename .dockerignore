@@ -1,0 +1,9 @@
+.git
+.github
+.gev-cache
+.env
+.env.*
+node_modules
+dist
+work
+npm-debug.log*

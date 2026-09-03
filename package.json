@@ -34,6 +34,7 @@
   "scripts": {
     "doctor": "node scripts/setup-doctor.mjs",
     "dev": "vite",
+    "start": "HOST=0.0.0.0 vite",
     "dev:secure": "./scripts/dev-secure.sh",
     "opensky:import": "./scripts/opensky-import-client.sh",
     "build": "vite build",
