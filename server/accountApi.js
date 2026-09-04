@@ -120,6 +120,7 @@ export function createAccountApi(options = {}) {
   const env = options.env || process.env;
   const connectionString = env.DATABASE_URL;
   const ownerEmail = cleanEmail(env.OWNER_EMAIL);
+  const ownerSetupToken = String(env.OWNER_SETUP_TOKEN || '');
   const resendKey = env.RESEND_API_KEY || '';
   const emailFrom = env.EMAIL_FROM || '';
   const pool = options.pool || (connectionString ? new Pool({ connectionString }) : null);
@@ -276,12 +277,37 @@ export function createAccountApi(options = {}) {
 
       if (url.pathname === '/api/account/register' && req.method === 'POST') {
         if (!authLimit(`register:${remoteKey}`)) return json(res, 429, { error: 'Try again later' });
-        if (!resendKey || !emailFrom) return json(res, 503, { error: 'Email verification is not configured yet' });
         const body = await readJson(req);
         const email = cleanEmail(body.email);
         const password = String(body.password || '');
         if (!EMAIL_RE.test(email)) return json(res, 400, { error: 'Enter a valid email address' });
         if (password.length < 12 || password.length > 256) return json(res, 400, { error: 'Password must be 12–256 characters' });
+        const suppliedSetupDigest = tokenDigest(String(body.ownerSetupToken || ''));
+        const expectedSetupDigest = tokenDigest(ownerSetupToken);
+        const ownerClaim = Boolean(
+          ownerEmail
+          && ownerSetupToken
+          && email === ownerEmail
+          && crypto.timingSafeEqual(Buffer.from(suppliedSetupDigest), Buffer.from(expectedSetupDigest))
+        );
+        if (ownerClaim) {
+          const existing = await pool.query('SELECT id, email_verified_at FROM gev_users WHERE email = $1', [email]);
+          if (existing.rows[0]?.email_verified_at) return json(res, 409, { error: 'Owner account is already configured' });
+          const digest = await passwordDigest(password);
+          const result = existing.rows[0]
+            ? await pool.query('UPDATE gev_users SET password_digest = $1, email_verified_at = NOW() WHERE id = $2 RETURNING id, email', [digest, existing.rows[0].id])
+            : await pool.query('INSERT INTO gev_users (email, password_digest, email_verified_at) VALUES ($1, $2, NOW()) RETURNING id, email', [email, digest]);
+          const row = result.rows[0];
+          const rawSession = crypto.randomBytes(32).toString('base64url');
+          await pool.query(`INSERT INTO gev_sessions (user_id, token_digest, expires_at)
+            VALUES ($1, $2, NOW() + INTERVAL '${SESSION_DAYS} days')`, [row.id, tokenDigest(rawSession)]);
+          const user = { id: String(row.id), email: row.email, verified: true, role: 'owner' };
+          await record(req, 'account_register', { ownerSetup: true }, user);
+          return json(res, 201, { ok: true, user, message: 'Owner account secured.' }, {
+            'Set-Cookie': cookie('gev_session', rawSession, req, SESSION_DAYS * 86400),
+          });
+        }
+        if (!resendKey || !emailFrom) return json(res, 503, { error: 'Email verification is not configured yet. The owner can use the one-time setup code.' });
         const digest = await passwordDigest(password);
         const client = await pool.connect();
         let rawToken;

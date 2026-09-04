@@ -29,7 +29,9 @@ function activityLabel(event) {
   return { when, who, summary: `${event.event_type}${details ? ` · ${details}` : ''}` };
 }
 
-export function initAccounts() {
+export function initAccounts(options = {}) {
+  const onAuthenticated = typeof options.onAuthenticated === 'function' ? options.onAuthenticated : null;
+  const accessRequired = options.required === true;
   const chip = document.getElementById('account-chip');
   const dialog = document.getElementById('account-dialog');
   const close = dialog?.querySelector('[data-account-close]');
@@ -39,12 +41,14 @@ export function initAccounts() {
   const status = dialog?.querySelector('[data-account-status]');
   const chipLabel = chip?.querySelector('[data-account-chip-label]');
   const submit = form?.querySelector('[data-account-submit]');
+  const ownerSetupField = form?.querySelector('[data-owner-setup-field]');
   const tabs = [...(dialog?.querySelectorAll('[data-account-tab]') || [])];
   const activityButton = dialog?.querySelector('[data-account-activity]');
   const activityPanel = dialog?.querySelector('[data-account-activity-panel]');
   const eventsHost = dialog?.querySelector('[data-account-events]');
   let mode = 'login';
   let user = null;
+  let authenticationHandled = false;
 
   if (!chip || !dialog || !form || !status) return null;
 
@@ -64,6 +68,17 @@ export function initAccounts() {
     if (user.role !== 'owner') activityPanel.hidden = true;
   };
 
+  const continueAfterAuthentication = async () => {
+    if (!user || authenticationHandled) return;
+    authenticationHandled = true;
+    try {
+      await onAuthenticated?.(user);
+    } catch (error) {
+      authenticationHandled = false;
+      setStatus(error?.message || 'Command console failed to start', true);
+    }
+  };
+
   const setMode = (next) => {
     mode = next;
     tabs.forEach((tab) => {
@@ -72,7 +87,8 @@ export function initAccounts() {
     });
     submit.textContent = mode === 'register' ? 'CREATE & VERIFY' : 'SIGN IN';
     form.elements.password.autocomplete = mode === 'register' ? 'new-password' : 'current-password';
-    setStatus(mode === 'register' ? 'A verification link will be sent to your email.' : '');
+    ownerSetupField.hidden = mode !== 'register';
+    setStatus(mode === 'register' ? 'Use the one-time owner code, or receive an email verification link.' : '');
   };
 
   const loadEvents = async () => {
@@ -99,9 +115,14 @@ export function initAccounts() {
     dialog.hidden = false;
     dialog.querySelector('input:not([hidden]), button:not([hidden])')?.focus();
   });
-  close?.addEventListener('click', () => { dialog.hidden = true; chip.focus(); });
+  close?.addEventListener('click', () => {
+    if (accessRequired && !user) return;
+    dialog.hidden = true;
+    chip.focus();
+  });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !dialog.hidden) {
+      if (accessRequired && !user) return;
       dialog.hidden = true;
       chip.focus();
     }
@@ -112,17 +133,30 @@ export function initAccounts() {
     event.preventDefault();
     submit.disabled = true;
     setStatus(mode === 'register' ? 'Creating account…' : 'Signing in…');
-    const body = JSON.stringify({ email: form.elements.email.value, password: form.elements.password.value });
+    const body = JSON.stringify({
+      email: form.elements.email.value,
+      password: form.elements.password.value,
+      ownerSetupToken: mode === 'register' ? form.elements.ownerSetupToken.value : '',
+    });
     try {
       const payload = await api(`/api/account/${mode === 'register' ? 'register' : 'login'}`, { method: 'POST', body });
       form.elements.password.value = '';
+      form.elements.ownerSetupToken.value = '';
       if (mode === 'register') {
-        setStatus(payload.message);
-        setMode('login');
+        if (payload.user) {
+          user = payload.user;
+          setStatus('Owner account secured.');
+          paint();
+          await continueAfterAuthentication();
+        } else {
+          setMode('login');
+          setStatus(payload.message);
+        }
       } else {
         user = payload.user;
         setStatus('Signed in.');
         paint();
+        await continueAfterAuthentication();
       }
     } catch (error) {
       setStatus(error.message, true);
@@ -136,6 +170,7 @@ export function initAccounts() {
     user = null;
     paint();
     setStatus('Signed out.');
+    if (accessRequired) location.reload();
   });
   activityButton?.addEventListener('click', () => {
     activityPanel.hidden = !activityPanel.hidden;
@@ -168,13 +203,14 @@ export function initAccounts() {
       dialog.hidden = false;
       setStatus('Email verified. You can sign in now.');
     }
+    if (user) void continueAfterAuthentication();
   }).catch(() => {
     chip.classList.add('account-unavailable');
     setStatus('Accounts are waiting for the Railway Postgres connection.', true);
   });
   sendActivity('page_view', { path: location.pathname });
   paint();
-  return { getUser: () => user, sendActivity };
+  return { getUser: () => user, sendActivity, continueAfterAuthentication };
 }
 
 export { sendActivity };

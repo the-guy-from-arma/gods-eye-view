@@ -35,11 +35,9 @@ import { installScopeMask } from './scopeMask.js';
 import { initFirstRunExperience } from './firstRunExperience.js';
 import { initKeySetup } from './keySetup.js';
 import { loadPhotorealisticTileset } from './mapStartup.js';
-import { initAccounts } from './account.js';
 import { initPublicSafetyPreview } from './publicSafetyPreview.js';
 
 initLogoGaze();
-initAccounts();
 initPublicSafetyPreview();
 
 /**
@@ -76,8 +74,10 @@ function describeError(error) {
 async function init() {
   const loadingScreen = document.getElementById('loading-screen');
   const loaderStatus = loadingScreen.querySelector('.loader-status');
+  const bootPhase = (name, message) => window.__thunderlinkBoot?.phase?.(name, message);
 
   try {
+    bootPhase('runtime', 'LOADING COMMAND RUNTIME');
     loaderStatus.textContent = 'Configuring viewer...';
 
     // A direct Google key provides Google 3D plus GEV place search. Cesium ion
@@ -174,6 +174,7 @@ async function init() {
       viewer.scene.globe.show = true;
     }
 
+    bootPhase('globe', 'GEOSPATIAL ENGINE ONLINE');
     loaderStatus.textContent = 'Initializing systems...';
 
     const mapStackController = new MapStackController(viewer, {
@@ -232,6 +233,7 @@ async function init() {
     }
     // Restoration starts only after the complete production registry is sealed.
     dataManager.finalizeRegistrations(LAYER_STATE_REGISTRY);
+    bootPhase('feeds', 'DATA SYSTEMS REGISTERED');
     if (import.meta.env.DEV) {
       window.__gevQaRegisterLayer = (targetManager, layerModule) => {
         if (targetManager !== dataManager) throw new Error('QA layer manager mismatch');
@@ -257,6 +259,8 @@ async function init() {
       styleManager.initialRestorePromise,
       new Promise((resolve) => setTimeout(resolve, 1000)),
     ]).finally(() => {
+      bootPhase('ready', 'COMMAND CONSOLE READY');
+      document.body.classList.remove('auth-booting');
       loadingScreen.classList.add('hidden');
       // Reveal only after the loading cover has yielded. transitionend can be
       // absent under reduced motion, so a bounded fallback makes this reliable.
@@ -336,6 +340,7 @@ async function init() {
 
   } catch (error) {
     console.error("ThunderLink God's Eye initialization failed:", error);
+    window.__thunderlinkBoot?.fail?.(`Error: ${describeError(error)}`);
     loaderStatus.textContent = `Error: ${describeError(error)}`;
     loaderStatus.style.color = '#ff4444';
   }

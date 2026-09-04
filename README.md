@@ -225,6 +225,8 @@ The original conversational AI voice remains available as an explicit `?voice=ai
 
 ThunderLink can use a Railway Postgres service for verified operator accounts, secure sessions, public-safety jurisdiction metadata, and a sanitized activity log. Attach Postgres so Railway injects `DATABASE_URL`, then configure `OWNER_EMAIL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `PUBLIC_APP_URL`. The verified account matching `OWNER_EMAIL` receives owner access and can inspect recent activity from the Account panel; no plaintext owner password is stored in an environment variable.
 
+Production starts at the account lock and does not initialize Cesium or any live data layer until a verified session exists. The first owner may be bootstrapped with `OWNER_SETUP_TOKEN`: choose **Create Account**, enter `OWNER_EMAIL`, a new password, and that one-time code. Remove the variable after the owner is claimed. Later registrations always use email verification.
+
 The activity log records meaningful UI actions, submitted location searches, and filter changes. It deliberately rejects password, secret, token, API-key, microphone-audio, and voice-recording fields. The Public Safety radio tab exposes country → state/province → county → city → department → service filters backed by `gev_public_safety_sources`, but playback stays marked **COMING SOON** until an authorized provider or agency-owned source is connected.
 
 Twenty-eight tools, four jobs — the commands below come straight from the product's voice test suite and tool playbook:

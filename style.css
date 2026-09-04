@@ -31,6 +31,13 @@
 }
 
 /* ThunderLink accounts and public-safety preview */
+body.auth-pending > :not(#account-dialog):not(script) { visibility: hidden !important; }
+body.auth-pending #account-dialog { visibility: visible; }
+body.auth-pending #account-chip { display: none; }
+body.auth-pending .account-close { visibility: hidden; pointer-events: none; }
+body.auth-pending { background: #02060a; }
+#account-signed-in[hidden], #account-signed-out[hidden] { display: none !important; }
+
 #account-chip {
   position: fixed;
   z-index: 120;
@@ -979,6 +986,34 @@ body.cockpit-mode #cockpit-cloud-effects.active {
   color: var(--text-dim);
   animation: pulse 2s ease-in-out infinite;
 }
+
+.boot-sequence {
+  display: grid;
+  gap: 7px;
+  width: min(350px, calc(100vw - 48px));
+  margin: 22px auto 0;
+  text-align: left;
+}
+.boot-sequence span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: rgba(141, 176, 184, .34);
+  font: 500 9px/1.2 var(--font-mono);
+  letter-spacing: .14em;
+  transition: color .24s ease, text-shadow .24s ease;
+}
+.boot-sequence i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(92, 202, 221, .25);
+  border-radius: 50%;
+  transition: background .24s ease, box-shadow .24s ease;
+}
+.boot-sequence span.active { color: #9df4ff; text-shadow: 0 0 12px rgba(52, 224, 255, .25); }
+.boot-sequence span.active i { border-color: #43e5ff; background: #43e5ff; box-shadow: 0 0 10px rgba(67, 229, 255, .8); }
+.boot-sequence span.current i { animation: boot-indicator 1s ease-in-out infinite; }
+@keyframes boot-indicator { 50% { opacity: .3; transform: scale(.72); } }
 
 @keyframes pulse {
   0%, 100% { opacity: 0.4; }
