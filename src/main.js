@@ -35,8 +35,12 @@ import { installScopeMask } from './scopeMask.js';
 import { initFirstRunExperience } from './firstRunExperience.js';
 import { initKeySetup } from './keySetup.js';
 import { loadPhotorealisticTileset } from './mapStartup.js';
+import { initAccounts } from './account.js';
+import { initPublicSafetyPreview } from './publicSafetyPreview.js';
 
 initLogoGaze();
+initAccounts();
+initPublicSafetyPreview();
 
 /**
  * Extract a human-readable error message from any thrown value.

@@ -221,6 +221,12 @@ The original conversational AI voice remains available as an explicit `?voice=ai
 - **🎬 Cinematic framing.** *"Show me the planes overhead"* pulls the camera back, angles it, and frames the live traffic like a director.
 - **🔒 Honest and secure.** The agent only confirms actions that succeeded. Your `OPENAI_API_KEY` never touches the browser; the client only gets a short-lived session token.
 
+### Operator accounts and audit log
+
+ThunderLink can use a Railway Postgres service for verified operator accounts, secure sessions, public-safety jurisdiction metadata, and a sanitized activity log. Attach Postgres so Railway injects `DATABASE_URL`, then configure `OWNER_EMAIL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `PUBLIC_APP_URL`. The verified account matching `OWNER_EMAIL` receives owner access and can inspect recent activity from the Account panel; no plaintext owner password is stored in an environment variable.
+
+The activity log records meaningful UI actions, submitted location searches, and filter changes. It deliberately rejects password, secret, token, API-key, microphone-audio, and voice-recording fields. The Public Safety radio tab exposes country → state/province → county → city → department → service filters backed by `gev_public_safety_sources`, but playback stays marked **COMING SOON** until an authorized provider or agency-owned source is connected.
+
 Twenty-eight tools, four jobs — the commands below come straight from the product's voice test suite and tool playbook:
 
 **🎥 Direct it** — drone-operator camera verbs:

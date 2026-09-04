@@ -48,6 +48,10 @@
       <span class="material-symbols-outlined" aria-hidden="true">public</span>
     </button>
   </nav>
+  <button id="account-chip" type="button" aria-haspopup="dialog" aria-controls="account-dialog">
+    <span class="material-symbols-outlined" aria-hidden="true">person</span>
+    <span data-account-chip-label>ACCOUNT</span>
+  </button>
   <div id="global-loading-status" role="status" aria-live="polite" aria-atomic="true" hidden>
     <span id="global-loading-label">LOADING LIVE DATA</span>
     <span id="global-loading-detail"></span>
@@ -777,6 +781,23 @@
               <span class="panel-divider"></span>
               <button class="panel-collapse-btn" data-collapse-target="radio-panel" title="Expand Radio" aria-label="Expand Radio section">+</button>
             </div>
+            <div class="radio-source-tabs" role="tablist" aria-label="Audio source">
+              <button type="button" role="tab" aria-selected="true" data-radio-source="broadcast">BROADCAST</button>
+              <button type="button" role="tab" aria-selected="false" data-radio-source="scanner">PUBLIC SAFETY</button>
+            </div>
+            <div class="scanner-jurisdiction-preview" data-scanner-preview hidden>
+              <div class="scanner-coming-soon"><strong>COMING SOON</strong><span>AUTHORIZED PUBLIC-SAFETY DIRECTORY</span></div>
+              <div class="scanner-jurisdiction-grid" aria-label="Public safety jurisdiction filters">
+                <label>COUNTRY<select data-jurisdiction="country"><option value="">All countries</option><option value="US">United States</option><option value="CA">Canada</option></select></label>
+                <label>STATE / PROVINCE<select data-jurisdiction="region"><option value="">All regions</option></select></label>
+                <label>COUNTY / PARISH<select data-jurisdiction="county"><option value="">All counties</option></select></label>
+                <label>CITY / MUNICIPALITY<select data-jurisdiction="city"><option value="">All cities</option></select></label>
+                <label>DEPARTMENT / AGENCY<select data-jurisdiction="agency"><option value="">All agencies</option></select></label>
+                <label>SERVICE TYPE<select data-jurisdiction="service"><option value="">All services</option><option value="police">Police</option><option value="sheriff">Sheriff</option><option value="fire">Fire</option><option value="ems">EMS</option><option value="dispatch">Dispatch</option><option value="combined">Combined feed</option></select></label>
+              </div>
+              <p>Jurisdiction fields are ready for an authorized catalog. Direct scanner playback remains disabled until a licensed or agency-owned source is connected.</p>
+            </div>
+            <div data-radio-broadcast-controls>
             <div class="radio-directory-row">
               <button id="radio-enable-btn" class="panel-layer-toggle" type="button" aria-pressed="false">ENABLE</button>
               <label class="radio-filter-label" for="radio-filter">STATION TAG</label>
@@ -822,6 +843,7 @@
               <a href="https://www.radio-browser.info/" target="_blank" rel="noopener noreferrer">DIRECTORY: RADIO BROWSER</a>
             </div>
             <p class="radio-privacy">Audio connects directly to the broadcaster after you press play. Your IP is visible to that broadcaster.</p>
+            </div>
           </div>
         </section>
       </div>
@@ -907,6 +929,40 @@
       <span class="key-setup-hint">ESC to close</span>
     </div>
     <p class="key-setup-note" data-key-setup-status role="status" aria-live="polite">The Google Maps key buys the photorealistic planet — everything else stacks on top.</p>
+  </aside>
+
+  <aside id="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title" hidden>
+    <div class="account-scanline" aria-hidden="true"></div>
+    <header class="account-header">
+      <span class="account-kicker">THUNDERLINK · SECURE ACCESS</span>
+      <button type="button" class="account-close" data-account-close aria-label="Close account panel">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </header>
+    <h2 id="account-title">Operator account</h2>
+    <div id="account-signed-out">
+      <div class="account-tabs" role="tablist" aria-label="Account action">
+        <button type="button" role="tab" aria-selected="true" data-account-tab="login">SIGN IN</button>
+        <button type="button" role="tab" aria-selected="false" data-account-tab="register">CREATE ACCOUNT</button>
+      </div>
+      <form id="account-form">
+        <label>EMAIL<input name="email" type="email" autocomplete="email" required maxlength="254" /></label>
+        <label>PASSWORD<input name="password" type="password" autocomplete="current-password" required minlength="12" maxlength="256" /></label>
+        <button type="submit" data-account-submit>SIGN IN</button>
+      </form>
+      <p class="account-privacy">Account actions and meaningful console activity—including submitted location searches and filter changes—are recorded for security and product operations. Passwords, API keys, tokens, microphone audio, and voice recordings are never placed in the activity log.</p>
+    </div>
+    <div id="account-signed-in" hidden>
+      <strong data-account-email></strong>
+      <span data-account-role></span>
+      <button type="button" data-account-activity hidden>VIEW ACTIVITY LOG</button>
+      <button type="button" data-account-logout>SIGN OUT</button>
+      <div class="account-activity" data-account-activity-panel hidden>
+        <div class="account-activity-heading"><strong>RECENT ACTIVITY</strong><button type="button" data-account-refresh>REFRESH</button></div>
+        <div data-account-events></div>
+      </div>
+    </div>
+    <p class="account-status" data-account-status role="status" aria-live="polite"></p>
   </aside>
 
   <!-- Intelligence HUD Overlay -->

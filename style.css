@@ -30,6 +30,110 @@
   --cockpit-radio-expanded-width: 232px;
 }
 
+/* ThunderLink accounts and public-safety preview */
+#account-chip {
+  position: fixed;
+  z-index: 120;
+  top: 18px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(69, 224, 255, .42);
+  background: rgba(4, 13, 22, .84);
+  color: #a8f4ff;
+  font: 600 10px/1 'JetBrains Mono', monospace;
+  letter-spacing: .14em;
+  backdrop-filter: blur(12px);
+}
+#account-chip:hover, #account-chip:focus-visible { border-color: #54e8ff; color: #fff; }
+#account-chip .material-symbols-outlined { font-size: 17px; }
+#account-chip.account-unavailable { color: #9aa4ac; border-color: rgba(154, 164, 172, .3); }
+
+#account-dialog {
+  position: fixed;
+  z-index: 1000;
+  inset: 50% auto auto 50%;
+  width: min(460px, calc(100vw - 30px));
+  max-height: min(720px, calc(100vh - 30px));
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  padding: 24px;
+  border: 1px solid rgba(76, 224, 255, .5);
+  background: rgba(4, 10, 17, .97);
+  color: #d9faff;
+  box-shadow: 0 0 0 100vmax rgba(0, 3, 7, .72), 0 0 50px rgba(0, 209, 255, .16);
+  font-family: 'JetBrains Mono', monospace;
+}
+#account-dialog[hidden] { display: none; }
+.account-scanline { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(66, 224, 255, .018) 3px 4px); }
+.account-header, .account-activity-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.account-kicker { color: #54e8ff; font-size: 10px; letter-spacing: .15em; }
+.account-close { border: 0; background: transparent; color: #8bddea; }
+#account-dialog h2 { margin: 16px 0 20px; font: 500 24px/1.15 Inter, sans-serif; }
+.account-tabs { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 16px; }
+.account-tabs button, #account-form button, #account-signed-in > button, .account-activity-heading button {
+  min-height: 36px;
+  border: 1px solid rgba(85, 220, 244, .3);
+  background: rgba(12, 37, 49, .58);
+  color: #92e6f0;
+  font: 600 10px/1 'JetBrains Mono', monospace;
+  letter-spacing: .1em;
+}
+.account-tabs button[aria-selected="true"], #account-form button { border-color: #50eaff; color: #fff; background: rgba(13, 103, 126, .34); }
+#account-form { display: grid; gap: 14px; }
+#account-form label { display: grid; gap: 7px; color: #87b8c1; font-size: 9px; letter-spacing: .13em; }
+#account-form input {
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid rgba(101, 205, 224, .3);
+  outline: none;
+  background: rgba(1, 8, 13, .8);
+  color: white;
+  font: 13px 'JetBrains Mono', monospace;
+}
+#account-form input:focus { border-color: #54e8ff; }
+.account-privacy { color: #779099; font-size: 9px; line-height: 1.55; }
+#account-signed-in { display: grid; gap: 10px; }
+#account-signed-in > strong { color: #fff; font-size: 14px; }
+#account-signed-in > span { color: #5be9ff; font-size: 10px; letter-spacing: .13em; }
+.account-status { min-height: 16px; margin: 14px 0 0; color: #6de4bf; font-size: 10px; line-height: 1.45; }
+.account-status.error { color: #ff9d8f; }
+.account-activity { margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(96, 213, 232, .24); }
+.account-activity-heading { margin-bottom: 8px; font-size: 10px; color: #70e7f7; }
+[data-account-events] { display: grid; gap: 5px; max-height: 270px; overflow: auto; }
+[data-account-events] > div { display: grid; gap: 3px; padding: 7px; background: rgba(25, 61, 73, .28); }
+[data-account-events] strong { font-size: 9px; color: #bcecf2; }
+[data-account-events] span { font-size: 9px; color: #829da5; overflow-wrap: anywhere; }
+
+.radio-source-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.radio-source-tabs button {
+  min-height: 28px;
+  border: 1px solid rgba(86, 211, 233, .22);
+  background: rgba(5, 17, 25, .65);
+  color: #769ca3;
+  font: 600 8px/1 'JetBrains Mono', monospace;
+  letter-spacing: .1em;
+}
+.radio-source-tabs button[aria-selected="true"] { border-color: #4eddf5; color: #d9faff; background: rgba(22, 111, 130, .25); }
+.scanner-jurisdiction-preview { position: relative; display: grid; gap: 9px; padding: 10px; border: 1px solid rgba(74, 215, 239, .25); background: rgba(3, 13, 19, .74); }
+.scanner-jurisdiction-preview[hidden], [data-radio-broadcast-controls][hidden] { display: none; }
+.scanner-coming-soon { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 7px; border-bottom: 1px solid rgba(75, 220, 242, .18); }
+.scanner-coming-soon strong { color: #ffc36c; font-size: 11px; letter-spacing: .14em; text-shadow: 0 0 12px rgba(255, 169, 64, .35); }
+.scanner-coming-soon span { color: #688b92; font-size: 7px; text-align: right; }
+.scanner-jurisdiction-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.scanner-jurisdiction-grid label { display: grid; gap: 3px; color: #6e999f; font: 500 7px/1 'JetBrains Mono', monospace; letter-spacing: .08em; }
+.scanner-jurisdiction-grid select { min-width: 0; height: 28px; border: 1px solid rgba(75, 211, 232, .22); background: #06131a; color: #a7dce3; font: 9px 'JetBrains Mono', monospace; }
+.scanner-jurisdiction-preview > p { margin: 0; color: #6d858b; font: 8px/1.5 'JetBrains Mono', monospace; }
+
+@media (max-width: 700px) {
+  #account-chip { top: 10px; right: 10px; }
+  #account-chip [data-account-chip-label] { display: none; }
+  .scanner-jurisdiction-grid { grid-template-columns: 1fr; }
+}
+
 * {
   margin: 0;
   padding: 0;
