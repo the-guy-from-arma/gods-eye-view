@@ -31,6 +31,18 @@ function firstMatchingValue(rows, key, value) {
   return rows.map((row) => row[key]).find((candidate) => sameArea(candidate, value, key)) || '';
 }
 
+export function normalizeDirectStreamUrl(value) {
+  try {
+    const url = new URL(String(value || '').trim());
+    if (url.protocol !== 'https:' || !url.hostname) return null;
+    url.username = '';
+    url.password = '';
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function filterJurisdictionRows(rows, selected, untilKey = null) {
   const limit = untilKey ? FILTER_ORDER.indexOf(untilKey) : FILTER_ORDER.length;
   return rows.filter((row) => FILTER_ORDER.slice(0, limit).every((key) => !selected[key] || row[key] === selected[key]));
@@ -142,6 +154,11 @@ export function initPublicSafetyPreview() {
   const scanner = radioPanel.querySelector('[data-scanner-preview]');
   const status = radioPanel.querySelector('[data-scanner-auto-status]');
   const results = radioPanel.querySelector('[data-scanner-results]');
+  const streamForm = radioPanel.querySelector('[data-scanner-stream-form]');
+  const streamInput = radioPanel.querySelector('[data-scanner-stream-url]');
+  const streamAudio = radioPanel.querySelector('[data-scanner-stream-audio]');
+  const streamStop = radioPanel.querySelector('[data-scanner-stream-stop]');
+  const streamState = radioPanel.querySelector('[data-scanner-stream-state]');
   const controls = Object.fromEntries([...radioPanel.querySelectorAll('[data-jurisdiction]')].map((node) => [node.dataset.jurisdiction, node]));
   let rows = [];
   let activeTab = 'broadcast';
@@ -152,6 +169,44 @@ export function initPublicSafetyPreview() {
   let lastViewKey = '';
 
   const selected = () => Object.fromEntries(FILTER_ORDER.map((key) => [key, controls[key]?.value || '']));
+  const setStreamState = (message, error = false) => {
+    if (!streamState) return;
+    streamState.textContent = message;
+    streamState.classList.toggle('error', error);
+  };
+  const stopDirectStream = () => {
+    if (!streamAudio) return;
+    streamAudio.pause();
+    streamAudio.removeAttribute('src');
+    streamAudio.load();
+    if (streamStop) streamStop.disabled = true;
+    setStreamState('Stream stopped. Paste or reload an authorized HTTPS audio URL.');
+  };
+  const loadDirectStream = async () => {
+    const streamUrl = normalizeDirectStreamUrl(streamInput?.value);
+    if (!streamUrl) {
+      setStreamState('Enter a valid HTTPS direct audio URL. A webpage URL cannot be played as audio.', true);
+      return false;
+    }
+    streamAudio.src = streamUrl;
+    streamAudio.load();
+    if (streamStop) streamStop.disabled = false;
+    setStreamState('Connecting directly to the stream host…');
+    try {
+      await streamAudio.play();
+      setStreamState('LIVE · Direct stream playing inside God’s Eye.');
+      window.dispatchEvent(new CustomEvent('gev:activity', {
+        detail: { type: 'scanner_stream_started', metadata: { direct: true } },
+      }));
+      return true;
+    } catch (error) {
+      const blocked = error?.name === 'NotAllowedError';
+      setStreamState(blocked
+        ? 'Stream loaded. Press play in the audio controls to begin.'
+        : 'The host rejected playback or the URL is not a browser-compatible audio stream.', !blocked);
+      return false;
+    }
+  };
   const renderFeeds = (visibleRows = filterJurisdictionRows(rows, selected())) => {
     if (!results) return;
     results.replaceChildren();
@@ -271,6 +326,17 @@ export function initPublicSafetyPreview() {
     refresh();
     if (status) status.textContent = 'MANUAL JURISDICTION FILTER';
   }));
+  streamForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void loadDirectStream();
+  });
+  streamStop?.addEventListener('click', stopDirectStream);
+  streamAudio?.addEventListener('playing', () => setStreamState('LIVE · Direct stream playing inside God’s Eye.'));
+  streamAudio?.addEventListener('waiting', () => setStreamState('BUFFERING · Waiting for stream audio…'));
+  streamAudio?.addEventListener('error', () => setStreamState(
+    'Playback failed. Confirm this is a direct HTTPS MP3/AAC stream—not a feed webpage or playlist requiring authorization.',
+    true,
+  ));
 
   fetch('/api/broadcastify/feeds')
     .then(async (response) => {
@@ -304,5 +370,5 @@ export function initPublicSafetyPreview() {
     });
 
   setTab('broadcast');
-  return { setTab, refresh, attachViewer, matchCurrentView };
+  return { setTab, refresh, attachViewer, matchCurrentView, loadDirectStream, stopDirectStream };
 }

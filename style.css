@@ -336,6 +336,15 @@ body.phone-unsupported { overflow: auto; background: #02080d; }
 .scanner-jurisdiction-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .scanner-jurisdiction-grid label { display: grid; gap: 3px; color: #6e999f; font: 500 7px/1 'JetBrains Mono', monospace; letter-spacing: .08em; }
 .scanner-jurisdiction-grid select { min-width: 0; height: 28px; border: 1px solid rgba(75, 211, 232, .22); background: #06131a; color: #a7dce3; font: 9px 'JetBrains Mono', monospace; }
+.scanner-stream-player { display: grid; gap: 6px; padding: 8px; border: 1px solid rgba(75, 211, 232, .2); background: rgba(2, 11, 16, .72); }
+.scanner-stream-player > label { color: #71a5ad; font: 600 7px/1 'JetBrains Mono', monospace; letter-spacing: .1em; }
+.scanner-stream-player > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px; }
+.scanner-stream-player input { min-width: 0; height: 28px; padding: 0 8px; border: 1px solid rgba(75, 211, 232, .24); background: #040d12; color: #bcebf1; font: 8px 'JetBrains Mono', monospace; }
+.scanner-stream-player button { min-width: 42px; border: 1px solid rgba(75, 221, 244, .34); background: rgba(16, 83, 96, .16); color: #74e9fa; font: 700 7px/1 'JetBrains Mono', monospace; }
+.scanner-stream-player button:disabled { cursor: not-allowed; opacity: .35; }
+.scanner-stream-player audio { width: 100%; height: 30px; color-scheme: dark; }
+.scanner-stream-player output { min-height: 10px; color: #65868d; font: 7px/1.4 'JetBrains Mono', monospace; }
+.scanner-stream-player output.error { color: #ff9d7a; }
 .scanner-feed-results { display: grid; gap: 5px; max-height: 190px; overflow: auto; scrollbar-width: thin; scrollbar-color: rgba(61, 213, 237, .35) transparent; }
 .scanner-feed-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; border: 1px solid rgba(75, 211, 232, .15); background: rgba(2, 10, 15, .65); }
 .scanner-feed-card > div { display: grid; min-width: 0; gap: 3px; }

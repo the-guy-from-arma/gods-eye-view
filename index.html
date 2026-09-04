@@ -806,8 +806,18 @@
                 <label>DEPARTMENT / AGENCY<select data-jurisdiction="agency"><option value="">All agencies</option></select></label>
                 <label>SERVICE TYPE<select data-jurisdiction="service"><option value="">All services</option><option value="police">Police</option><option value="sheriff">Sheriff</option><option value="fire">Fire</option><option value="ems">EMS</option><option value="dispatch">Dispatch</option><option value="combined">Combined feed</option></select></label>
               </div>
+              <form class="scanner-stream-player" data-scanner-stream-form>
+                <label for="scanner-stream-url">AUTHORIZED DIRECT STREAM URL</label>
+                <div>
+                  <input id="scanner-stream-url" data-scanner-stream-url type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://…/live.mp3" aria-describedby="scanner-stream-state" />
+                  <button type="submit">LOAD</button>
+                  <button type="button" data-scanner-stream-stop disabled>STOP</button>
+                </div>
+                <audio data-scanner-stream-audio controls preload="none"></audio>
+                <output id="scanner-stream-state" data-scanner-stream-state role="status" aria-live="polite">Paste an HTTPS audio stream supplied or licensed for your use.</output>
+              </form>
               <div class="scanner-feed-results" data-scanner-results aria-label="Matching public safety feeds"></div>
-              <p>Enable <strong>Law Enforcement Transmissions</strong> in Data Layers to map available feeds. Select a marker to open its authorized Broadcastify feed page.</p>
+              <p>Enable <strong>Law Enforcement Transmissions</strong> in Data Layers to map available feeds. Audio connects directly from your browser to the stream host and is not relayed by ThunderLink.</p>
             </div>
             <div data-radio-broadcast-controls>
             <div class="radio-directory-row">

@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterJurisdictionRows, matchCatalogJurisdiction } from './publicSafetyPreview.js';
+import {
+  filterJurisdictionRows,
+  matchCatalogJurisdiction,
+  normalizeDirectStreamUrl,
+} from './publicSafetyPreview.js';
 
 const rows = [
   { country: 'US', region: 'Texas', county: 'Travis', city: 'Austin', agency: 'Austin Police', service: 'police' },
@@ -40,4 +44,11 @@ test('falls back to the matching region when no local catalog entry exists', () 
   });
   assert.equal(match.level, 'region');
   assert.deepEqual(match.rows.map((row) => row.agency), ['Austin Police', 'Houston Police']);
+});
+
+test('accepts only credential-free HTTPS direct stream URLs', () => {
+  assert.equal(normalizeDirectStreamUrl('https://audio.example/live.mp3'), 'https://audio.example/live.mp3');
+  assert.equal(normalizeDirectStreamUrl('http://audio.example/live.mp3'), null);
+  assert.equal(normalizeDirectStreamUrl('https://user:pass@audio.example/live.mp3'), 'https://audio.example/live.mp3');
+  assert.equal(normalizeDirectStreamUrl('not a url'), null);
 });
