@@ -38,12 +38,17 @@ test('the access gate includes a responsible-use disclaimer with an accessible d
 });
 
 test('owner access includes a Postgres approval dashboard and Autopilot controls', () => {
-  assert.match(index, /data-owner-dashboard[^>]*>OWNER DASHBOARD/);
+  assert.match(index, /data-owner-dashboard[^>]*aria-controls="owner-dashboard-dialog"[^>]*>ACCOUNT DASHBOARD/);
+  assert.match(index, /<dialog id="owner-dashboard-dialog"[^>]*aria-labelledby="owner-dashboard-title"/);
+  assert.match(index, /data-owner-metric="pending"/);
+  assert.match(index, /data-owner-metric="approved"/);
   assert.match(index, /data-owner-autopilot[^>]*aria-pressed="false"/);
   assert.match(index, /data-owner-accounts/);
+  assert.match(account, /ownerDashboardDialog\.showModal\(\)/);
+  assert.match(account, /ownerDashboardDialog\.close\(\)/);
   assert.match(account, /api\/account\/admin\/autopilot/);
   assert.match(account, /api\/account\/admin\/users/);
-  assert.match(account, /Registration Autopilot/);
+  assert.match(account, /REGISTRATION AUTOPILOT/i);
 });
 
 test('boot screen names every required initialization phase', () => {

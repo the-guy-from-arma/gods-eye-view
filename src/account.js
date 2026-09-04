@@ -47,13 +47,17 @@ export function initAccounts(options = {}) {
   const activityPanel = dialog?.querySelector('[data-account-activity-panel]');
   const eventsHost = dialog?.querySelector('[data-account-events]');
   const ownerDashboardButton = dialog?.querySelector('[data-owner-dashboard]');
-  const ownerDashboardPanel = dialog?.querySelector('[data-owner-dashboard-panel]');
-  const ownerRefreshButton = dialog?.querySelector('[data-owner-refresh]');
-  const ownerAutopilotButton = dialog?.querySelector('[data-owner-autopilot]');
-  const ownerAutopilotState = dialog?.querySelector('[data-owner-autopilot-state]');
-  const ownerAutopilotDescription = dialog?.querySelector('[data-owner-autopilot-description]');
-  const ownerAccountsHost = dialog?.querySelector('[data-owner-accounts]');
-  const ownerAccountCount = dialog?.querySelector('[data-owner-account-count]');
+  const ownerDashboardDialog = document.getElementById('owner-dashboard-dialog');
+  const ownerDashboardCloseButtons = [...(ownerDashboardDialog?.querySelectorAll('[data-owner-dashboard-close]') || [])];
+  const ownerRefreshButton = ownerDashboardDialog?.querySelector('[data-owner-refresh]');
+  const ownerAutopilotButton = ownerDashboardDialog?.querySelector('[data-owner-autopilot]');
+  const ownerAutopilotState = ownerDashboardDialog?.querySelector('[data-owner-autopilot-state]');
+  const ownerAutopilotDescription = ownerDashboardDialog?.querySelector('[data-owner-autopilot-description]');
+  const ownerAccountsHost = ownerDashboardDialog?.querySelector('[data-owner-accounts]');
+  const ownerAccountCount = ownerDashboardDialog?.querySelector('[data-owner-account-count]');
+  const ownerStatus = ownerDashboardDialog?.querySelector('[data-owner-status]');
+  const ownerMetrics = new Map([...(ownerDashboardDialog?.querySelectorAll('[data-owner-metric]') || [])]
+    .map((node) => [node.dataset.ownerMetric, node]));
   const disclaimerDialog = document.getElementById('platform-disclaimer-dialog');
   const disclaimerOpen = dialog?.querySelector('[data-disclaimer-open]');
   const disclaimerCloseButtons = [...(disclaimerDialog?.querySelectorAll('[data-disclaimer-close]') || [])];
@@ -66,6 +70,20 @@ export function initAccounts(options = {}) {
   const setStatus = (message, error = false) => {
     status.textContent = message;
     status.classList.toggle('error', error);
+  };
+
+  const setOwnerStatus = (message, error = false) => {
+    if (!ownerStatus) return;
+    ownerStatus.textContent = message;
+    ownerStatus.classList.toggle('error', error);
+  };
+
+  const closeOwnerDashboard = ({ returnToAccount = true } = {}) => {
+    if (ownerDashboardDialog?.open) ownerDashboardDialog.close();
+    if (returnToAccount && user) {
+      dialog.hidden = false;
+      ownerDashboardButton?.focus();
+    }
   };
 
   const closeDisclaimer = () => {
@@ -96,7 +114,7 @@ export function initAccounts(options = {}) {
     ownerDashboardButton.hidden = user.role !== 'owner';
     if (user.role !== 'owner') {
       activityPanel.hidden = true;
-      ownerDashboardPanel.hidden = true;
+      closeOwnerDashboard({ returnToAccount: false });
     }
   };
 
@@ -125,7 +143,13 @@ export function initAccounts(options = {}) {
 
   const renderOwnerAccounts = (accounts = []) => {
     const pending = accounts.filter((account) => account.status === 'pending').length;
+    const approved = accounts.filter((account) => account.status === 'approved').length;
+    const rejected = accounts.filter((account) => account.status === 'rejected').length;
     ownerAccountCount.textContent = `${pending} PENDING · ${accounts.length} TOTAL`;
+    if (ownerMetrics.get('pending')) ownerMetrics.get('pending').textContent = String(pending);
+    if (ownerMetrics.get('approved')) ownerMetrics.get('approved').textContent = String(approved);
+    if (ownerMetrics.get('rejected')) ownerMetrics.get('rejected').textContent = String(rejected);
+    if (ownerMetrics.get('total')) ownerMetrics.get('total').textContent = String(accounts.length);
     ownerAccountsHost.replaceChildren(...accounts.map((account) => {
       const row = document.createElement('article');
       row.className = 'owner-account-row';
@@ -163,12 +187,15 @@ export function initAccounts(options = {}) {
 
   const loadOwnerDashboard = async () => {
     ownerAccountsHost.textContent = 'Loading access queue…';
+    setOwnerStatus('SYNCHRONIZING WITH RAILWAY POSTGRES');
     try {
       const payload = await api('/api/account/admin');
       paintAutopilot(Boolean(payload.autopilot));
       renderOwnerAccounts(payload.accounts);
+      setOwnerStatus(`SYNC COMPLETE · ${payload.accounts.length} ACCOUNTS`);
     } catch (error) {
       ownerAccountsHost.textContent = error.message;
+      setOwnerStatus(error.message, true);
     }
   };
 
@@ -203,6 +230,11 @@ export function initAccounts(options = {}) {
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && disclaimerDialog?.open) return;
+    if (event.key === 'Escape' && ownerDashboardDialog?.open) {
+      event.preventDefault();
+      closeOwnerDashboard();
+      return;
+    }
     if (event.key === 'Escape' && !dialog.hidden) {
       if (accessRequired && !user) return;
       dialog.hidden = true;
@@ -250,20 +282,30 @@ export function initAccounts(options = {}) {
   dialog.querySelector('[data-account-logout]')?.addEventListener('click', async () => {
     try { await api('/api/account/logout', { method: 'POST', body: '{}' }); } catch { /* Clear local UI anyway. */ }
     user = null;
+    closeOwnerDashboard({ returnToAccount: false });
     paint();
     setStatus('Signed out.');
     if (accessRequired) location.reload();
   });
   activityButton?.addEventListener('click', () => {
     activityPanel.hidden = !activityPanel.hidden;
-    ownerDashboardPanel.hidden = true;
     if (!activityPanel.hidden) void loadEvents();
   });
   dialog.querySelector('[data-account-refresh]')?.addEventListener('click', loadEvents);
   ownerDashboardButton?.addEventListener('click', () => {
-    ownerDashboardPanel.hidden = !ownerDashboardPanel.hidden;
+    if (user?.role !== 'owner' || !ownerDashboardDialog) return;
     activityPanel.hidden = true;
-    if (!ownerDashboardPanel.hidden) void loadOwnerDashboard();
+    dialog.hidden = true;
+    if (!ownerDashboardDialog.open) ownerDashboardDialog.showModal();
+    ownerRefreshButton?.focus();
+    void loadOwnerDashboard();
+  });
+  ownerDashboardCloseButtons.forEach((button) => button.addEventListener('click', () => {
+    closeOwnerDashboard();
+  }));
+  ownerDashboardDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeOwnerDashboard();
   });
   ownerRefreshButton?.addEventListener('click', loadOwnerDashboard);
   ownerAutopilotButton?.addEventListener('click', async () => {
@@ -275,9 +317,9 @@ export function initAccounts(options = {}) {
         body: JSON.stringify({ enabled }),
       });
       paintAutopilot(Boolean(payload.autopilot));
-      setStatus(`Registration Autopilot ${payload.autopilot ? 'enabled' : 'disabled'}.`);
+      setOwnerStatus(`REGISTRATION AUTOPILOT ${payload.autopilot ? 'ENABLED' : 'DISABLED'}`);
     } catch (error) {
-      setStatus(error.message, true);
+      setOwnerStatus(error.message, true);
     } finally {
       ownerAutopilotButton.disabled = false;
     }
@@ -291,10 +333,10 @@ export function initAccounts(options = {}) {
         method: 'POST',
         body: JSON.stringify({ userId: button.dataset.userId, action: button.dataset.ownerAccountAction }),
       });
-      setStatus(`Account ${button.dataset.ownerAccountAction === 'approve' ? 'approved' : 'denied'}.`);
+      setOwnerStatus(`ACCOUNT ${button.dataset.ownerAccountAction === 'approve' ? 'APPROVED' : 'DENIED'}`);
       await loadOwnerDashboard();
     } catch (error) {
-      setStatus(error.message, true);
+      setOwnerStatus(error.message, true);
       button.disabled = false;
     }
   });

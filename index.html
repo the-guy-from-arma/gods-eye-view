@@ -961,22 +961,9 @@
     <div id="account-signed-in" hidden>
       <strong data-account-email></strong>
       <span data-account-role></span>
-      <button type="button" data-owner-dashboard hidden>OWNER DASHBOARD</button>
+      <button type="button" data-owner-dashboard hidden aria-haspopup="dialog" aria-controls="owner-dashboard-dialog">ACCOUNT DASHBOARD</button>
       <button type="button" data-account-activity hidden>VIEW ACTIVITY LOG</button>
       <button type="button" data-account-logout>SIGN OUT</button>
-      <section class="owner-dashboard" data-owner-dashboard-panel hidden>
-        <div class="owner-dashboard-heading">
-          <div><strong>ACCESS CONTROL</strong><span>RAILWAY POSTGRES</span></div>
-          <button type="button" data-owner-refresh>REFRESH</button>
-        </div>
-        <div class="owner-autopilot">
-          <div><strong>AUTOPILOT</strong><span data-owner-autopilot-description>Manual approval is active.</span></div>
-          <button type="button" data-owner-autopilot aria-pressed="false"><span data-owner-autopilot-state>OFF</span></button>
-        </div>
-        <p><strong>CAUTION:</strong> When Autopilot is ON, anyone who can reach this Railway app can create an approved account without proving ownership of the submitted email address. Keep it OFF for controlled membership and manual review.</p>
-        <div class="owner-accounts-heading"><strong>ACCOUNT QUEUE</strong><span data-owner-account-count>0 REQUESTS</span></div>
-        <div class="owner-accounts" data-owner-accounts></div>
-      </section>
       <div class="account-activity" data-account-activity-panel hidden>
         <div class="account-activity-heading"><strong>RECENT ACTIVITY</strong><button type="button" data-account-refresh>REFRESH</button></div>
         <div data-account-events></div>
@@ -984,6 +971,60 @@
     </div>
     <p class="account-status" data-account-status role="status" aria-live="polite"></p>
   </aside>
+
+  <dialog id="owner-dashboard-dialog" aria-labelledby="owner-dashboard-title">
+    <div class="owner-dashboard-scanline" aria-hidden="true"></div>
+    <header class="owner-dashboard-header">
+      <div>
+        <span class="owner-dashboard-kicker">THUNDERLINK · OWNER COMMAND</span>
+        <h2 id="owner-dashboard-title">Account Control</h2>
+        <p>Railway Postgres access management and registration policy</p>
+      </div>
+      <div class="owner-dashboard-header-actions">
+        <button type="button" data-owner-refresh>
+          <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+          REFRESH
+        </button>
+        <button type="button" data-owner-dashboard-close aria-label="Close account dashboard">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
+    </header>
+    <div class="owner-dashboard-sweep" aria-hidden="true"><span></span></div>
+    <section class="owner-dashboard-metrics" aria-label="Account totals">
+      <article><span>PENDING</span><strong data-owner-metric="pending">0</strong><small>AWAITING DECISION</small></article>
+      <article><span>APPROVED</span><strong data-owner-metric="approved">0</strong><small>ACTIVE OPERATORS</small></article>
+      <article><span>DENIED</span><strong data-owner-metric="rejected">0</strong><small>ACCESS REVOKED</small></article>
+      <article><span>TOTAL</span><strong data-owner-metric="total">0</strong><small>OPERATOR RECORDS</small></article>
+    </section>
+    <section class="owner-dashboard-policy" aria-labelledby="owner-policy-title">
+      <div>
+        <span>REGISTRATION POLICY</span>
+        <strong id="owner-policy-title">AUTOPILOT</strong>
+        <p data-owner-autopilot-description>Manual approval is active.</p>
+      </div>
+      <button type="button" data-owner-autopilot aria-pressed="false">
+        <span data-owner-autopilot-state>OFF</span>
+        <small>AUTO APPROVE</small>
+      </button>
+    </section>
+    <div class="owner-dashboard-warning" role="note">
+      <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+      <p><strong>CONTROLLED ACCESS:</strong> When Autopilot is ON, anyone who can reach this Railway app can create an approved account without proving ownership of the submitted email address. Keep it OFF for manual review.</p>
+    </div>
+    <section class="owner-dashboard-accounts" aria-labelledby="owner-accounts-title">
+      <div class="owner-accounts-heading">
+        <div><span>ACCESS REGISTRY</span><strong id="owner-accounts-title">ACCOUNT QUEUE</strong></div>
+        <span data-owner-account-count>0 PENDING · 0 TOTAL</span>
+      </div>
+      <div class="owner-accounts" data-owner-accounts></div>
+    </section>
+    <footer class="owner-dashboard-footer">
+      <span><i></i> OWNER SESSION VERIFIED</span>
+      <p class="owner-dashboard-status" data-owner-status role="status" aria-live="polite"></p>
+      <button type="button" data-owner-dashboard-close>RETURN TO ACCOUNT</button>
+    </footer>
+  </dialog>
 
   <dialog id="platform-disclaimer-dialog" aria-labelledby="platform-disclaimer-title" aria-describedby="platform-disclaimer-intro">
     <div class="platform-disclaimer-scanline" aria-hidden="true"></div>
