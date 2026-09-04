@@ -45,16 +45,6 @@ function canonicalStreetName(value) {
     .split(/\s+/).filter(Boolean).map((word) => STREET_WORDS[word] || word).join(' ');
 }
 
-function regexEscape(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function streetNamePattern(value) {
-  const original = normalizeLocationQuery(value).replace(/[.]/g, '');
-  const expanded = canonicalStreetName(value).replace(/\b\w/g, (letter) => letter.toUpperCase());
-  return [...new Set([original, expanded].filter(Boolean))].map(regexEscape).join('|');
-}
-
 function finiteCoordinate(value, min, max) {
   const number = Number(value);
   return Number.isFinite(number) && number >= min && number <= max ? number : null;
@@ -216,7 +206,7 @@ async function fetchGooglePlaces(query, bounds, apiKey, fetchImpl) {
   }
 }
 
-function fetchNominatim(query, fetchImpl) {
+function fetchNominatimRows(query, fetchImpl, { limit = 5, geometry = false } = {}) {
   const task = nominatimQueue.then(async () => {
     const waitMs = Math.max(0, NOMINATIM_MIN_INTERVAL_MS - (Date.now() - nominatimLastRequestAt));
     if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -224,9 +214,13 @@ function fetchNominatim(query, fetchImpl) {
     const url = new URL('https://nominatim.openstreetmap.org/search');
     url.searchParams.set('format', 'jsonv2');
     url.searchParams.set('q', query);
-    url.searchParams.set('limit', '5');
+    url.searchParams.set('limit', String(Math.max(1, Math.min(40, limit))));
     url.searchParams.set('addressdetails', '1');
     url.searchParams.set('accept-language', 'en');
+    if (geometry) {
+      url.searchParams.set('polygon_geojson', '1');
+      url.searchParams.set('dedupe', '0');
+    }
     const response = await fetchImpl(url, {
       headers: {
         'User-Agent': 'ThunderLinkGodsEye/0.1 (+https://github.com/the-guy-from-arma/gods-eye-view)',
@@ -235,13 +229,16 @@ function fetchNominatim(query, fetchImpl) {
     });
     if (!response.ok) throw new Error(`OpenStreetMap search returned ${response.status}`);
     const rows = await response.json();
-    const result = Array.isArray(rows)
-      ? rows.map((row) => normalizeNominatimResult(row, query)).find(Boolean) || null
-      : null;
-    return { result, error: null };
+    return Array.isArray(rows) ? rows : [];
   });
   nominatimQueue = task.catch(() => null);
   return task;
+}
+
+async function fetchNominatim(query, fetchImpl) {
+  const rows = await fetchNominatimRows(query, fetchImpl);
+  const result = rows.map((row) => normalizeNominatimResult(row, query)).find(Boolean) || null;
+  return { result, error: null };
 }
 
 function segmentIntersection(a, b, c, d) {
@@ -257,6 +254,48 @@ function segmentIntersection(a, b, c, d) {
     && inside(lon, c.lon, d.lon) && inside(lat, c.lat, d.lat)
     ? { lat, lng: lon }
     : null;
+}
+
+function nearestPointOnSegment(point, start, end) {
+  const referenceLat = (point.lat + start.lat + end.lat) / 3;
+  const yScale = 111_320;
+  const xScale = yScale * Math.max(0.05, Math.cos(referenceLat * Math.PI / 180));
+  const px = point.lon * xScale;
+  const py = point.lat * yScale;
+  const ax = start.lon * xScale;
+  const ay = start.lat * yScale;
+  const bx = end.lon * xScale;
+  const by = end.lat * yScale;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const denominator = dx * dx + dy * dy;
+  const t = denominator > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / denominator)) : 0;
+  const x = ax + t * dx;
+  const y = ay + t * dy;
+  return {
+    distanceM: Math.hypot(px - x, py - y),
+    source: point,
+    target: { lat: y / yScale, lon: x / xScale },
+  };
+}
+
+function nearestRoadApproach(firstWays, secondWays) {
+  let nearest = null;
+  const inspect = (points, segments) => {
+    for (const point of points) {
+      for (let index = 1; index < segments.length; index += 1) {
+        const candidate = nearestPointOnSegment(point, segments[index - 1], segments[index]);
+        if (!nearest || candidate.distanceM < nearest.distanceM) nearest = candidate;
+      }
+    }
+  };
+  for (const first of firstWays) {
+    for (const second of secondWays) {
+      inspect(first, second);
+      inspect(second, first);
+    }
+  }
+  return nearest;
 }
 
 /** Find the first geometric crossing between two sets of OSM road ways. */
@@ -284,36 +323,61 @@ export function findRoadIntersection(elements, firstName, secondName) {
       }
     }
   }
+  // Nominatim returns road geometry as individually indexed way fragments. A
+  // surface intersection can therefore end a few metres shy of the other road
+  // instead of sharing the same vertex. Accept only a very small endpoint/line
+  // gap; parallel or unrelated streets remain far outside this tolerance.
+  const nearest = nearestRoadApproach(firstWays, secondWays);
+  if (nearest && nearest.distanceM <= 15) {
+    return {
+      lat: (nearest.source.lat + nearest.target.lat) / 2,
+      lng: (nearest.source.lon + nearest.target.lon) / 2,
+    };
+  }
   return null;
+}
+
+function roadElementsFromNominatim(rows, name) {
+  const elements = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const geojson = row?.geojson;
+    const lines = geojson?.type === 'LineString'
+      ? [geojson.coordinates]
+      : (geojson?.type === 'MultiLineString' ? geojson.coordinates : []);
+    for (const line of lines) {
+      const geometry = Array.isArray(line) ? line.map((coordinate) => ({
+        lon: Number(coordinate?.[0]),
+        lat: Number(coordinate?.[1]),
+      })).filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon)) : [];
+      if (geometry.length >= 2) elements.push({ tags: { name }, geometry });
+    }
+  }
+  return elements;
 }
 
 async function fetchOpenStreetMapIntersection(query, fetchImpl) {
   const parsed = parseIntersectionQuery(query);
   if (!parsed?.locality) return { result: null, error: null };
-  const locality = await fetchNominatim(parsed.locality, fetchImpl);
-  const center = locality.result?.geometry?.location;
-  if (!center) return { result: null, error: locality.error };
-  const firstPattern = streetNamePattern(parsed.first);
-  const secondPattern = streetNamePattern(parsed.second);
-  if (!firstPattern || !secondPattern) return { result: null, error: null };
-  const around = `around:50000,${center.lat},${center.lng}`;
-  const queryText = `[out:json][timeout:18];(`
-    + `way(${around})["highway"]["name"~"^(${firstPattern})$",i];`
-    + `way(${around})["highway"]["name"~"^(${secondPattern})$",i];`
-    + ');out tags geom;';
   try {
-    const body = new URLSearchParams({ data: queryText });
-    const response = await fetchImpl('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-        'User-Agent': 'ThunderLinkGodsEye/0.1 (+https://github.com/the-guy-from-arma/gods-eye-view)',
-      },
-      body,
-    });
-    if (!response.ok) throw new Error(`OpenStreetMap road search returned ${response.status}`);
-    const payload = await response.json();
-    const point = findRoadIntersection(payload?.elements, parsed.first, parsed.second);
+    // Nominatim can return each named road's OSM LineString even though it does
+    // not return an intersection for a combined free-text query. Search the two
+    // roads independently in the same locality, then intersect their geometry.
+    // Calls share the global 1 req/s Nominatim queue above.
+    const firstRows = await fetchNominatimRows(
+      `${parsed.first}, ${parsed.locality}`,
+      fetchImpl,
+      { limit: 40, geometry: true },
+    );
+    const secondRows = await fetchNominatimRows(
+      `${parsed.second}, ${parsed.locality}`,
+      fetchImpl,
+      { limit: 40, geometry: true },
+    );
+    const elements = [
+      ...roadElementsFromNominatim(firstRows, parsed.first),
+      ...roadElementsFromNominatim(secondRows, parsed.second),
+    ];
+    const point = findRoadIntersection(elements, parsed.first, parsed.second);
     if (!point) return { result: null, error: null };
     const latPad = 0.002;
     const lngPad = latPad / Math.max(0.2, Math.cos(point.lat * Math.PI / 180));
