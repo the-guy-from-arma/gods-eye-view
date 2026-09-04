@@ -182,6 +182,14 @@ export const DATA_CREDITS = [
       '(ODbL 1.0) + Open Infrastructure Map',
   },
   {
+    key: 'flock-camera-placements',
+    html:
+      'Flock camera placements: derived from ' +
+      '<a href="https://github.com/Ringmast4r/FLOCK" target="_blank" rel="noopener">Ringmast4r/FLOCK</a> and ' +
+      '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> ' +
+      '(ODbL 1.0 / source-specific public-data terms; public snapshot, verify independently)',
+  },
+  {
     key: 'firms',
     html:
       'Active fires: NASA FIRMS — we acknowledge the use of data and/or imagery ' +

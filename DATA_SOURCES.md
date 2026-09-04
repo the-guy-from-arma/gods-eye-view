@@ -72,6 +72,7 @@ Static datasets shipped in the repo for an out-of-the-box experience. **None are
 |---------|--------|---------|-----------------|-------------|
 | **Datacenters** (~4.3K) | `datacenters/` | **ODbL 1.0** (OpenStreetMap extract) | ✅ (attribution + share-alike on data) | "© OpenStreetMap contributors" |
 | **Dams** (704) | `dams/` | **ODbL 1.0** (OpenInfraMap / OSM extract) | ✅ (attribution + share-alike on data) | "© OpenStreetMap contributors" (+ Open Infrastructure Map) |
+| **Flock camera placements** (36,750 unique coordinates) | `flock-cameras/` | **ODbL 1.0** for OSM-derived records; source-specific/public-domain terms otherwise | ✅ where source terms permit (retain provenance + applicable attribution/share-alike) | "Ringmast4r/FLOCK + © OpenStreetMap contributors" |
 | **TeleGeography Submarine Cable Map** (712 cables + 1,917 landing points) | `telegeography_submarine_cables/` | **CC BY-NC-SA 3.0** | ❌ **NonCommercial — remove for commercial use** | "© TeleGeography — submarinecablemap.com" |
 | **Natural Earth physical regions** (1,046 land + 292 marine named polygons) | `natural_earth/` | **Public domain** | ✅ (no restrictions) | "Made with Natural Earth" (courtesy credit — not legally required) |
 | **DataSF Analysis Neighborhoods** (41 SF neighborhood polygons) | `neighborhoods/` | **PDDL 1.0** (public domain) | ✅ (no restrictions) | "City & County of San Francisco — DataSF" (courtesy — not legally required) |
@@ -87,6 +88,20 @@ The richer structured dataset is licensed separately/commercially by TeleGeograp
 ### ODbL share-alike (datacenters, dams)
 
 The OSM-derived datasets are under the **Open Database License**. ODbL's share-alike applies to the **data / derived database, not this MIT-licensed code** — the two coexist (exactly how Open Infrastructure Map ships: MIT software + ODbL data). If you publicly distribute a *modified* version of these databases, you must offer it under ODbL. Keep the "© OpenStreetMap contributors" notice (link: https://www.openstreetmap.org/copyright).
+
+### Flock camera placement snapshot (`flock-cameras/`)
+
+The compact placement file is derived from `CAMERAS_WITH_NETWORK_DATA.geojson`
+in [Ringmast4r/FLOCK](https://github.com/Ringmast4r/FLOCK), commit
+`9387a188d7996f8c5fdadcc765bbc9074774406b` (upstream update 2025-11-14).
+The import keeps only points with an explicit Flock/Flock Safety identity in a
+manufacturer, brand, dedicated surveillance-brand, or exact operator field.
+It removes the upstream map code, precincts, network lines, portal URLs,
+sharing lists, images, and unrelated cameras, then collapses duplicate
+coordinates. The result is a public historical snapshot, not a live feed or a
+guarantee that a camera is still present. The upstream repository identifies
+OSM-derived data as ODbL 1.0 and other records as retaining their original
+public/source-specific terms. See the folder README and keep the in-app credit.
 
 ### NASA FIRMS acknowledgement
 
