@@ -948,7 +948,7 @@
       <form id="account-form">
         <label>EMAIL<input name="email" type="email" autocomplete="email" required maxlength="254" /></label>
         <label>PASSWORD<input name="password" type="password" autocomplete="current-password" required minlength="12" maxlength="256" /></label>
-        <label data-owner-setup-field hidden>OWNER SETUP CODE<input name="ownerSetupToken" type="password" autocomplete="one-time-code" maxlength="256" /></label>
+        <label data-owner-setup-field hidden>OWNER SETUP CODE · OPTIONAL<input name="ownerSetupToken" type="password" autocomplete="one-time-code" maxlength="256" /></label>
         <button type="submit" data-account-submit>SIGN IN</button>
       </form>
       <section class="account-disclaimer-summary" aria-labelledby="account-disclaimer-title">
@@ -961,8 +961,22 @@
     <div id="account-signed-in" hidden>
       <strong data-account-email></strong>
       <span data-account-role></span>
+      <button type="button" data-owner-dashboard hidden>OWNER DASHBOARD</button>
       <button type="button" data-account-activity hidden>VIEW ACTIVITY LOG</button>
       <button type="button" data-account-logout>SIGN OUT</button>
+      <section class="owner-dashboard" data-owner-dashboard-panel hidden>
+        <div class="owner-dashboard-heading">
+          <div><strong>ACCESS CONTROL</strong><span>RAILWAY POSTGRES</span></div>
+          <button type="button" data-owner-refresh>REFRESH</button>
+        </div>
+        <div class="owner-autopilot">
+          <div><strong>AUTOPILOT</strong><span data-owner-autopilot-description>Manual approval is active.</span></div>
+          <button type="button" data-owner-autopilot aria-pressed="false"><span data-owner-autopilot-state>OFF</span></button>
+        </div>
+        <p><strong>CAUTION:</strong> When Autopilot is ON, anyone who can reach this Railway app can create an approved account without proving ownership of the submitted email address. Keep it OFF for controlled membership and manual review.</p>
+        <div class="owner-accounts-heading"><strong>ACCOUNT QUEUE</strong><span data-owner-account-count>0 REQUESTS</span></div>
+        <div class="owner-accounts" data-owner-accounts></div>
+      </section>
       <div class="account-activity" data-account-activity-panel hidden>
         <div class="account-activity-heading"><strong>RECENT ACTIVITY</strong><button type="button" data-account-refresh>REFRESH</button></div>
         <div data-account-events></div>

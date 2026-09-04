@@ -95,13 +95,6 @@ function sanitizeActivityMetadata(value) {
   return out;
 }
 
-function requestBaseUrl(req, configuredUrl) {
-  if (configuredUrl) return configuredUrl.replace(/\/$/, '');
-  const protocol = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
-  const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
-  return `${protocol}://${host}`;
-}
-
 function sameOrigin(req) {
   const origin = req.headers.origin;
   if (!origin) return true;
@@ -130,8 +123,6 @@ export function createAccountApi(options = {}) {
   const ownerPassword = String(env.OWNER_PASSWORD || '');
   const ownerVariableLoginEnabled = Boolean(ownerEmail && ownerPassword.length >= 12 && ownerPassword.length <= 256);
   const ownerSetupToken = String(env.OWNER_SETUP_TOKEN || '');
-  const resendKey = env.RESEND_API_KEY || '';
-  const emailFrom = env.EMAIL_FROM || '';
   const pool = options.pool || (connectionString ? new Pool({ connectionString }) : null);
   const authLimit = createLimiter(12, 15 * 60_000);
   const activityLimit = createLimiter(180, 60_000);
@@ -145,16 +136,14 @@ export function createAccountApi(options = {}) {
         email TEXT NOT NULL UNIQUE,
         password_digest TEXT NOT NULL,
         email_verified_at TIMESTAMPTZ,
+        approval_status TEXT NOT NULL DEFAULT 'pending',
+        approved_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
-      CREATE TABLE IF NOT EXISTS gev_email_verifications (
-        id BIGSERIAL PRIMARY KEY,
-        user_id BIGINT NOT NULL REFERENCES gev_users(id) ON DELETE CASCADE,
-        token_digest TEXT NOT NULL UNIQUE,
-        expires_at TIMESTAMPTZ NOT NULL,
-        consumed_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
+      ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'pending';
+      ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+      UPDATE gev_users SET approval_status = 'approved', approved_at = COALESCE(approved_at, email_verified_at)
+        WHERE email_verified_at IS NOT NULL AND approval_status = 'pending';
       CREATE TABLE IF NOT EXISTS gev_sessions (
         id BIGSERIAL PRIMARY KEY,
         user_id BIGINT NOT NULL REFERENCES gev_users(id) ON DELETE CASCADE,
@@ -172,6 +161,13 @@ export function createAccountApi(options = {}) {
       );
       CREATE INDEX IF NOT EXISTS gev_activity_created_idx ON gev_activity_events(created_at DESC);
       CREATE INDEX IF NOT EXISTS gev_activity_user_idx ON gev_activity_events(user_id, created_at DESC);
+      CREATE TABLE IF NOT EXISTS gev_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      INSERT INTO gev_settings (key, value) VALUES ('registration_autopilot', 'false')
+        ON CONFLICT (key) DO NOTHING;
       CREATE TABLE IF NOT EXISTS gev_public_safety_sources (
         id BIGSERIAL PRIMARY KEY,
         country_code TEXT NOT NULL,
@@ -203,7 +199,7 @@ export function createAccountApi(options = {}) {
     const result = await pool.query(`
       SELECT u.id, u.email, u.email_verified_at
       FROM gev_sessions s JOIN gev_users u ON u.id = s.user_id
-      WHERE s.token_digest = $1 AND s.expires_at > NOW()
+      WHERE s.token_digest = $1 AND s.expires_at > NOW() AND u.approval_status = 'approved'
     `, [tokenDigest(raw)]);
     const user = result.rows[0];
     if (!user) return null;
@@ -215,19 +211,9 @@ export function createAccountApi(options = {}) {
     };
   };
 
-  const sendVerification = async (req, email, rawToken) => {
-    const verificationUrl = `${requestBaseUrl(req, env.PUBLIC_APP_URL)}/api/account/verify?token=${encodeURIComponent(rawToken)}`;
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: emailFrom,
-        to: [email],
-        subject: "Verify your ThunderLink God's Eye account",
-        html: `<p>Confirm your ThunderLink God's Eye account:</p><p><a href="${verificationUrl}">Verify email</a></p><p>This link expires in 30 minutes.</p>`,
-      }),
-    });
-    if (!response.ok) throw new Error(`Email delivery failed (${response.status})`);
+  const isAutopilotEnabled = async () => {
+    const result = await pool.query("SELECT value FROM gev_settings WHERE key = 'registration_autopilot'");
+    return result.rows[0]?.value === 'true';
   };
 
   const record = async (req, eventType, metadata = {}, user = null) => {
@@ -246,7 +232,7 @@ export function createAccountApi(options = {}) {
       if (url.pathname === '/api/account/status' && req.method === 'GET') {
         return json(res, 200, {
           database: Boolean(pool),
-          email: Boolean(resendKey && emailFrom),
+          approval: 'owner',
           ownerConfigured: Boolean(ownerEmail),
           ownerLoginConfigured: ownerVariableLoginEnabled,
           ownerSetupConfigured: Boolean(ownerEmail && ownerSetupToken),
@@ -302,12 +288,12 @@ export function createAccountApi(options = {}) {
           && crypto.timingSafeEqual(Buffer.from(suppliedSetupDigest), Buffer.from(expectedSetupDigest))
         );
         if (ownerClaim) {
-          const existing = await pool.query('SELECT id, email_verified_at FROM gev_users WHERE email = $1', [email]);
-          if (existing.rows[0]?.email_verified_at) return json(res, 409, { error: 'Owner account is already configured' });
+          const existing = await pool.query('SELECT id, approval_status FROM gev_users WHERE email = $1', [email]);
+          if (existing.rows[0]?.approval_status === 'approved') return json(res, 409, { error: 'Owner account is already configured' });
           const digest = await passwordDigest(password);
           const result = existing.rows[0]
-            ? await pool.query('UPDATE gev_users SET password_digest = $1, email_verified_at = NOW() WHERE id = $2 RETURNING id, email', [digest, existing.rows[0].id])
-            : await pool.query('INSERT INTO gev_users (email, password_digest, email_verified_at) VALUES ($1, $2, NOW()) RETURNING id, email', [email, digest]);
+            ? await pool.query("UPDATE gev_users SET password_digest = $1, email_verified_at = NOW(), approval_status = 'approved', approved_at = NOW() WHERE id = $2 RETURNING id, email", [digest, existing.rows[0].id])
+            : await pool.query("INSERT INTO gev_users (email, password_digest, email_verified_at, approval_status, approved_at) VALUES ($1, $2, NOW(), 'approved', NOW()) RETURNING id, email", [email, digest]);
           const row = result.rows[0];
           const rawSession = crypto.randomBytes(32).toString('base64url');
           await pool.query(`INSERT INTO gev_sessions (user_id, token_digest, expires_at)
@@ -318,51 +304,33 @@ export function createAccountApi(options = {}) {
             'Set-Cookie': cookie('gev_session', rawSession, req, SESSION_DAYS * 86400),
           });
         }
-        if (!resendKey || !emailFrom) return json(res, 503, { error: 'Email verification is not configured yet. The owner can use the one-time setup code.' });
         const digest = await passwordDigest(password);
-        const client = await pool.connect();
-        let rawToken;
-        try {
-          await client.query('BEGIN');
-          const existing = await client.query('SELECT id, email_verified_at FROM gev_users WHERE email = $1', [email]);
-          if (existing.rows[0]?.email_verified_at) {
-            await client.query('ROLLBACK');
-            return json(res, 202, { ok: true, message: 'If eligible, a verification email has been sent.' });
-          }
-          const userResult = existing.rows[0]
-            ? await client.query('UPDATE gev_users SET password_digest = $1 WHERE id = $2 RETURNING id', [digest, existing.rows[0].id])
-            : await client.query('INSERT INTO gev_users (email, password_digest) VALUES ($1, $2) RETURNING id', [email, digest]);
-          const userId = userResult.rows[0].id;
-          rawToken = crypto.randomBytes(32).toString('base64url');
-          await client.query('DELETE FROM gev_email_verifications WHERE user_id = $1 AND consumed_at IS NULL', [userId]);
-          await client.query(`INSERT INTO gev_email_verifications (user_id, token_digest, expires_at)
-            VALUES ($1, $2, NOW() + INTERVAL '30 minutes')`, [userId, tokenDigest(rawToken)]);
-          await client.query('COMMIT');
-        } catch (error) {
-          await client.query('ROLLBACK');
-          throw error;
-        } finally {
-          client.release();
-        }
-        await sendVerification(req, email, rawToken);
-        await record(req, 'account_register', { emailDomain: email.split('@')[1] });
-        return json(res, 201, { ok: true, message: 'Check your email to verify your account.' });
-      }
-
-      if (url.pathname === '/api/account/verify' && req.method === 'GET') {
-        const rawToken = safeText(url.searchParams.get('token'), 128);
-        const result = await pool.query(`
-          UPDATE gev_users u SET email_verified_at = COALESCE(u.email_verified_at, NOW())
-          FROM gev_email_verifications v
-          WHERE v.user_id = u.id AND v.token_digest = $1 AND v.consumed_at IS NULL AND v.expires_at > NOW()
-          RETURNING u.id
-        `, [tokenDigest(rawToken)]);
-        if (!result.rows[0]) return json(res, 400, { error: 'Verification link is invalid or expired' });
-        await pool.query('UPDATE gev_email_verifications SET consumed_at = NOW() WHERE token_digest = $1', [tokenDigest(rawToken)]);
-        res.statusCode = 302;
-        res.setHeader('Location', '/?verified=1');
-        res.end();
-        return;
+        const existing = await pool.query('SELECT id, approval_status FROM gev_users WHERE email = $1', [email]);
+        if (existing.rows[0]?.approval_status === 'approved') return json(res, 409, { error: 'Account already exists. Sign in instead.' });
+        if (existing.rows[0]?.approval_status === 'rejected') return json(res, 403, { error: 'This access request was not approved.' });
+        const autopilot = await isAutopilotEnabled();
+        const approvalStatus = autopilot ? 'approved' : 'pending';
+        const result = existing.rows[0]
+          ? await pool.query(`UPDATE gev_users SET password_digest = $1, approval_status = $2,
+              email_verified_at = CASE WHEN $2 = 'approved' THEN NOW() ELSE NULL END,
+              approved_at = CASE WHEN $2 = 'approved' THEN NOW() ELSE NULL END
+            WHERE id = $3 RETURNING id, email`, [digest, approvalStatus, existing.rows[0].id])
+          : await pool.query(`INSERT INTO gev_users
+              (email, password_digest, email_verified_at, approval_status, approved_at)
+            VALUES ($1, $2, CASE WHEN $3 = 'approved' THEN NOW() ELSE NULL END, $3,
+              CASE WHEN $3 = 'approved' THEN NOW() ELSE NULL END)
+            RETURNING id, email`, [email, digest, approvalStatus]);
+        const row = result.rows[0];
+        const registeringUser = { id: String(row.id), email: row.email };
+        await record(req, 'account_register', { approval: approvalStatus, emailDomain: email.split('@')[1] }, registeringUser);
+        if (!autopilot) return json(res, 202, { ok: true, status: 'pending', message: 'Access request submitted for owner approval.' });
+        const rawSession = crypto.randomBytes(32).toString('base64url');
+        await pool.query(`INSERT INTO gev_sessions (user_id, token_digest, expires_at)
+          VALUES ($1, $2, NOW() + INTERVAL '${SESSION_DAYS} days')`, [row.id, tokenDigest(rawSession)]);
+        const user = { id: String(row.id), email: row.email, verified: true, role: 'user' };
+        return json(res, 201, { ok: true, status: 'approved', user, message: 'Account approved by Autopilot.' }, {
+          'Set-Cookie': cookie('gev_session', rawSession, req, SESSION_DAYS * 86400),
+        });
       }
 
       if (url.pathname === '/api/account/login' && req.method === 'POST') {
@@ -374,11 +342,13 @@ export function createAccountApi(options = {}) {
           if (!secretMatches(password, ownerPassword)) return json(res, 401, { error: 'Invalid email or password' });
           const digest = await passwordDigest(password);
           const ownerResult = await pool.query(`
-            INSERT INTO gev_users (email, password_digest, email_verified_at)
-            VALUES ($1, $2, NOW())
+            INSERT INTO gev_users (email, password_digest, email_verified_at, approval_status, approved_at)
+            VALUES ($1, $2, NOW(), 'approved', NOW())
             ON CONFLICT (email) DO UPDATE SET
               password_digest = EXCLUDED.password_digest,
-              email_verified_at = COALESCE(gev_users.email_verified_at, NOW())
+              email_verified_at = COALESCE(gev_users.email_verified_at, NOW()),
+              approval_status = 'approved',
+              approved_at = COALESCE(gev_users.approved_at, NOW())
             RETURNING id, email
           `, [email, digest]);
           const owner = ownerResult.rows[0];
@@ -389,12 +359,14 @@ export function createAccountApi(options = {}) {
           await record(req, 'account_login', { ownerVariable: true }, user);
           return json(res, 200, { user }, { 'Set-Cookie': cookie('gev_session', rawSession, req, SESSION_DAYS * 86400) });
         }
-        const result = await pool.query('SELECT id, email, password_digest, email_verified_at FROM gev_users WHERE email = $1', [email]);
+        const result = await pool.query('SELECT id, email, password_digest, email_verified_at, approval_status FROM gev_users WHERE email = $1', [email]);
         const row = result.rows[0];
         if (!row || !(await passwordMatches(password, row.password_digest))) {
           return json(res, 401, { error: 'Invalid email or password' });
         }
-        if (!row.email_verified_at) return json(res, 403, { error: 'Verify your email before signing in' });
+        if (row.approval_status === 'pending') return json(res, 403, { error: 'Your access request is awaiting owner approval.' });
+        if (row.approval_status === 'rejected') return json(res, 403, { error: 'Your access request was not approved.' });
+        if (row.approval_status !== 'approved') return json(res, 403, { error: 'Account access is not active.' });
         const rawToken = crypto.randomBytes(32).toString('base64url');
         await pool.query(`INSERT INTO gev_sessions (user_id, token_digest, expires_at)
           VALUES ($1, $2, NOW() + INTERVAL '${SESSION_DAYS} days')`, [row.id, tokenDigest(rawToken)]);
@@ -411,6 +383,60 @@ export function createAccountApi(options = {}) {
 
       if (url.pathname === '/api/account/session' && req.method === 'GET') {
         return json(res, 200, { user: await currentUser(req) });
+      }
+
+      if (url.pathname === '/api/account/admin' && req.method === 'GET') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const [autopilot, accounts] = await Promise.all([
+          isAutopilotEnabled(),
+          pool.query(`
+            SELECT id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt"
+            FROM gev_users
+            WHERE email <> $1
+            ORDER BY CASE approval_status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+              created_at DESC
+            LIMIT 250
+          `, [ownerEmail]),
+        ]);
+        return json(res, 200, {
+          autopilot,
+          accounts: accounts.rows.map((account) => ({ ...account, id: String(account.id) })),
+        });
+      }
+
+      if (url.pathname === '/api/account/admin/autopilot' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const body = await readJson(req);
+        if (typeof body.enabled !== 'boolean') return json(res, 400, { error: 'Autopilot state must be true or false' });
+        await pool.query(`
+          INSERT INTO gev_settings (key, value, updated_at) VALUES ('registration_autopilot', $1, NOW())
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+        `, [String(body.enabled)]);
+        await record(req, 'ui_action', { action: 'registration_autopilot', enabled: body.enabled }, user);
+        return json(res, 200, { ok: true, autopilot: body.enabled });
+      }
+
+      if (url.pathname === '/api/account/admin/users' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const body = await readJson(req);
+        const targetId = String(body.userId || '');
+        const action = body.action === 'approve' ? 'approved' : body.action === 'reject' ? 'rejected' : '';
+        if (!/^\d+$/.test(targetId) || !action) return json(res, 400, { error: 'Choose a valid account action' });
+        const result = await pool.query(`
+          UPDATE gev_users SET approval_status = $1,
+            email_verified_at = CASE WHEN $1 = 'approved' THEN NOW() ELSE NULL END,
+            approved_at = CASE WHEN $1 = 'approved' THEN NOW() ELSE NULL END
+          WHERE id = $2 AND email <> $3
+          RETURNING id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt"
+        `, [action, targetId, ownerEmail]);
+        const account = result.rows[0];
+        if (!account) return json(res, 404, { error: 'Account not found' });
+        if (action === 'rejected') await pool.query('DELETE FROM gev_sessions WHERE user_id = $1', [account.id]);
+        await record(req, 'ui_action', { action: `account_${action}`, accountId: String(account.id) }, user);
+        return json(res, 200, { ok: true, account: { ...account, id: String(account.id) } });
       }
 
       if (url.pathname === '/api/account/activity' && req.method === 'GET') {

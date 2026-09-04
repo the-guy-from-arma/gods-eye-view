@@ -46,6 +46,14 @@ export function initAccounts(options = {}) {
   const activityButton = dialog?.querySelector('[data-account-activity]');
   const activityPanel = dialog?.querySelector('[data-account-activity-panel]');
   const eventsHost = dialog?.querySelector('[data-account-events]');
+  const ownerDashboardButton = dialog?.querySelector('[data-owner-dashboard]');
+  const ownerDashboardPanel = dialog?.querySelector('[data-owner-dashboard-panel]');
+  const ownerRefreshButton = dialog?.querySelector('[data-owner-refresh]');
+  const ownerAutopilotButton = dialog?.querySelector('[data-owner-autopilot]');
+  const ownerAutopilotState = dialog?.querySelector('[data-owner-autopilot-state]');
+  const ownerAutopilotDescription = dialog?.querySelector('[data-owner-autopilot-description]');
+  const ownerAccountsHost = dialog?.querySelector('[data-owner-accounts]');
+  const ownerAccountCount = dialog?.querySelector('[data-owner-account-count]');
   const disclaimerDialog = document.getElementById('platform-disclaimer-dialog');
   const disclaimerOpen = dialog?.querySelector('[data-disclaimer-open]');
   const disclaimerCloseButtons = [...(disclaimerDialog?.querySelectorAll('[data-disclaimer-close]') || [])];
@@ -83,9 +91,13 @@ export function initAccounts(options = {}) {
     chipLabel.textContent = user ? (user.role === 'owner' ? 'OWNER' : 'ACCOUNT') : 'ACCOUNT';
     if (!user) return;
     signedIn.querySelector('[data-account-email]').textContent = user.email;
-    signedIn.querySelector('[data-account-role]').textContent = user.role === 'owner' ? 'OWNER ACCESS' : 'VERIFIED OPERATOR';
+    signedIn.querySelector('[data-account-role]').textContent = user.role === 'owner' ? 'OWNER ACCESS' : 'APPROVED OPERATOR';
     activityButton.hidden = user.role !== 'owner';
-    if (user.role !== 'owner') activityPanel.hidden = true;
+    ownerDashboardButton.hidden = user.role !== 'owner';
+    if (user.role !== 'owner') {
+      activityPanel.hidden = true;
+      ownerDashboardPanel.hidden = true;
+    }
   };
 
   const continueAfterAuthentication = async () => {
@@ -105,10 +117,59 @@ export function initAccounts(options = {}) {
       const selected = tab.dataset.accountTab === mode;
       tab.setAttribute('aria-selected', String(selected));
     });
-    submit.textContent = mode === 'register' ? 'CREATE & VERIFY' : 'SIGN IN';
+    submit.textContent = mode === 'register' ? 'REQUEST ACCESS' : 'SIGN IN';
     form.elements.password.autocomplete = mode === 'register' ? 'new-password' : 'current-password';
     ownerSetupField.hidden = mode !== 'register';
-    setStatus(mode === 'register' ? 'Use the one-time owner code, or receive an email verification link.' : '');
+    setStatus(mode === 'register' ? 'Create an access request. The owner or Autopilot will approve it.' : '');
+  };
+
+  const renderOwnerAccounts = (accounts = []) => {
+    const pending = accounts.filter((account) => account.status === 'pending').length;
+    ownerAccountCount.textContent = `${pending} PENDING · ${accounts.length} TOTAL`;
+    ownerAccountsHost.replaceChildren(...accounts.map((account) => {
+      const row = document.createElement('article');
+      row.className = 'owner-account-row';
+      row.dataset.status = account.status;
+      const identity = document.createElement('div');
+      const email = document.createElement('strong');
+      const detail = document.createElement('span');
+      email.textContent = account.email;
+      detail.textContent = `${String(account.status || 'pending').toUpperCase()} · ${new Date(account.createdAt).toLocaleString()}`;
+      identity.append(email, detail);
+      const actions = document.createElement('div');
+      actions.className = 'owner-account-actions';
+      for (const action of ['approve', 'reject']) {
+        if ((action === 'approve' && account.status === 'approved') || (action === 'reject' && account.status === 'rejected')) continue;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.ownerAccountAction = action;
+        button.dataset.userId = account.id;
+        button.textContent = action === 'approve' ? 'APPROVE' : 'DENY';
+        actions.append(button);
+      }
+      row.append(identity, actions);
+      return row;
+    }));
+    if (!accounts.length) ownerAccountsHost.textContent = 'No operator accounts yet.';
+  };
+
+  const paintAutopilot = (enabled) => {
+    ownerAutopilotButton.setAttribute('aria-pressed', String(enabled));
+    ownerAutopilotState.textContent = enabled ? 'ON' : 'OFF';
+    ownerAutopilotDescription.textContent = enabled
+      ? 'New registrations are approved automatically.'
+      : 'Manual approval is active.';
+  };
+
+  const loadOwnerDashboard = async () => {
+    ownerAccountsHost.textContent = 'Loading access queue…';
+    try {
+      const payload = await api('/api/account/admin');
+      paintAutopilot(Boolean(payload.autopilot));
+      renderOwnerAccounts(payload.accounts);
+    } catch (error) {
+      ownerAccountsHost.textContent = error.message;
+    }
   };
 
   const loadEvents = async () => {
@@ -166,7 +227,7 @@ export function initAccounts(options = {}) {
       if (mode === 'register') {
         if (payload.user) {
           user = payload.user;
-          setStatus('Owner account secured.');
+          setStatus(payload.message || 'Account approved.');
           paint();
           await continueAfterAuthentication();
         } else {
@@ -195,9 +256,48 @@ export function initAccounts(options = {}) {
   });
   activityButton?.addEventListener('click', () => {
     activityPanel.hidden = !activityPanel.hidden;
+    ownerDashboardPanel.hidden = true;
     if (!activityPanel.hidden) void loadEvents();
   });
   dialog.querySelector('[data-account-refresh]')?.addEventListener('click', loadEvents);
+  ownerDashboardButton?.addEventListener('click', () => {
+    ownerDashboardPanel.hidden = !ownerDashboardPanel.hidden;
+    activityPanel.hidden = true;
+    if (!ownerDashboardPanel.hidden) void loadOwnerDashboard();
+  });
+  ownerRefreshButton?.addEventListener('click', loadOwnerDashboard);
+  ownerAutopilotButton?.addEventListener('click', async () => {
+    const enabled = ownerAutopilotButton.getAttribute('aria-pressed') !== 'true';
+    ownerAutopilotButton.disabled = true;
+    try {
+      const payload = await api('/api/account/admin/autopilot', {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
+      });
+      paintAutopilot(Boolean(payload.autopilot));
+      setStatus(`Registration Autopilot ${payload.autopilot ? 'enabled' : 'disabled'}.`);
+    } catch (error) {
+      setStatus(error.message, true);
+    } finally {
+      ownerAutopilotButton.disabled = false;
+    }
+  });
+  ownerAccountsHost?.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-owner-account-action]');
+    if (!button) return;
+    button.disabled = true;
+    try {
+      await api('/api/account/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({ userId: button.dataset.userId, action: button.dataset.ownerAccountAction }),
+      });
+      setStatus(`Account ${button.dataset.ownerAccountAction === 'approve' ? 'approved' : 'denied'}.`);
+      await loadOwnerDashboard();
+    } catch (error) {
+      setStatus(error.message, true);
+      button.disabled = false;
+    }
+  });
 
   document.getElementById('location-search')?.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') sendActivity('search', { query: event.currentTarget.value });
@@ -216,14 +316,9 @@ export function initAccounts(options = {}) {
   }, true);
   window.addEventListener('gev:activity', (event) => sendActivity(event.detail?.type, event.detail?.metadata));
 
-  const verified = new URLSearchParams(location.search).get('verified') === '1';
   api('/api/account/session').then((payload) => {
     user = payload.user;
     paint();
-    if (verified) {
-      dialog.hidden = false;
-      setStatus('Email verified. You can sign in now.');
-    }
     if (user) void continueAfterAuthentication();
   }).catch(() => {
     chip.classList.add('account-unavailable');

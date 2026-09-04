@@ -37,6 +37,15 @@ test('the access gate includes a responsible-use disclaimer with an accessible d
   assert.match(account, /disclaimerDialog\.close\(\)/);
 });
 
+test('owner access includes a Postgres approval dashboard and Autopilot controls', () => {
+  assert.match(index, /data-owner-dashboard[^>]*>OWNER DASHBOARD/);
+  assert.match(index, /data-owner-autopilot[^>]*aria-pressed="false"/);
+  assert.match(index, /data-owner-accounts/);
+  assert.match(account, /api\/account\/admin\/autopilot/);
+  assert.match(account, /api\/account\/admin\/users/);
+  assert.match(account, /Registration Autopilot/);
+});
+
 test('boot screen names every required initialization phase', () => {
   for (const phase of ['auth', 'database', 'runtime', 'globe', 'feeds', 'ready']) {
     assert.match(index, new RegExp(`data-boot-phase="${phase}"`));
