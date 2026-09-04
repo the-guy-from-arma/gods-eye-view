@@ -153,6 +153,13 @@ export const DATA_CREDITS = [
       '(public domain; audio delivered directly by each broadcaster)',
   },
   {
+    key: 'broadcastify',
+    html:
+      'Law-enforcement transmission directory: ' +
+      '<a href="https://www.broadcastify.com/" target="_blank" rel="noopener">Broadcastify</a> ' +
+      '(licensed catalog; listening opens the provider feed page)',
+  },
+  {
     key: 'reearth-terrain',
     html:
       'Terrain (keyless globe stacks): ' +

@@ -53,12 +53,12 @@ export function initPublicSafetyPreview() {
   tabs.forEach((tab) => tab.addEventListener('click', () => setTab(tab.dataset.radioSource)));
   Object.values(controls).forEach((control) => control.addEventListener('change', refresh));
 
-  fetch('/api/public-safety/jurisdictions')
+  fetch('/api/broadcastify/feeds')
     .then((response) => response.ok ? response.json() : Promise.reject(new Error('catalog unavailable')))
     .then((payload) => {
-      rows = Array.isArray(payload.sources) ? payload.sources.map((row) => ({
+      rows = Array.isArray(payload.feeds) ? payload.feeds.map((row) => ({
         country: row.countryCode,
-        countryName: row.countryName,
+        countryName: row.country,
         region: row.region,
         county: row.county,
         city: row.city,

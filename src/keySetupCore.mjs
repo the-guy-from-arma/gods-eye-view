@@ -14,7 +14,7 @@
 /** Longest accepted key/token value. Real provider keys are all far shorter. */
 export const KEY_SETUP_VALUE_LIMIT = 512;
 
-/** Most env vars accepted in one save. The registry defines nine. */
+/** Most env vars accepted in one save. The registry defines ten. */
 export const KEY_SETUP_UPDATE_LIMIT = 16;
 
 /** Header line written above keys the panel appends to a .env file. */
@@ -60,6 +60,14 @@ export const KEY_SETUP_KEYS = Object.freeze([
     getUrl: 'https://firms.modaps.eosdis.nasa.gov/api/map_key/',
     envVars: Object.freeze(['FIRMS_MAP_KEY']),
     tier: 'free',
+  }),
+  Object.freeze({
+    id: 'broadcastify',
+    title: 'BROADCASTIFY',
+    unlocks: 'Licensed law-enforcement transmission directory',
+    getUrl: 'https://bcfy.io/dev',
+    envVars: Object.freeze(['BROADCASTIFY_API_KEY']),
+    tier: 'metered',
   }),
   Object.freeze({
     id: 'tomtom',

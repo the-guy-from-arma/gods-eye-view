@@ -18,7 +18,8 @@
  *  13. Weather effects — camera-local Open-Meteo observations without news/geocoding overhead
  *  14. Rocket launches — recent Launch Library 2 mission metadata
  *  15. Radio Browser — public-domain station directory and click counting
- *  16. Live events — keyless NASA EONET + GDACS global event alerts
+ *  16. Broadcastify — licensed law-enforcement feed catalog metadata
+ *  17. Live events — keyless NASA EONET + GDACS global event alerts
  *
  * Also exposes Cesium and Google 3D Tiles API keys to the
  * client via `import.meta.env.*` defines.
@@ -44,6 +45,7 @@ import {
 } from './src/data/tomtomTiles.js';
 import { filterTrailing24h, parseFirmsCsv } from './src/data/firmsCsv.js';
 import { accountApiPlugin } from './server/accountApi.js';
+import { broadcastifyApiPlugin } from './server/broadcastifyApi.js';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { defineConfig, loadEnv } from 'vite';
@@ -5839,7 +5841,7 @@ const GEV_REALTIME_TOOLS = [
         layerId: {
           type: 'string',
           description:
-            'Common-name mapping for the non-obvious ids: space mission(s) → rocket-launches; fires/wildfires/active fires → local-firms (NASA FIRMS); ships/vessels/boats → ais-live-vessels; undersea/submarine cables → telegeography-submarine-cables; datacenters → local-datacenters; dams → local-dams; bikes/bike share → bikeshare; street traffic/congestion → traffic; traffic cameras → cctv; internet radio/stations → radio.',
+            'Common-name mapping for the non-obvious ids: space mission(s) → rocket-launches; fires/wildfires/active fires → local-firms (NASA FIRMS); ships/vessels/boats → ais-live-vessels; undersea/submarine cables → telegeography-submarine-cables; datacenters → local-datacenters; dams → local-dams; bikes/bike share → bikeshare; street traffic/congestion → traffic; traffic cameras → cctv; internet radio/stations → radio; Broadcastify/police scanner/law-enforcement transmissions → law-enforcement-transmissions.',
           enum: [
             'flights',
             'military',
@@ -5849,6 +5851,7 @@ const GEV_REALTIME_TOOLS = [
             'traffic',
             'cctv',
             'radio',
+            'law-enforcement-transmissions',
             'bikeshare',
             'ais-live-vessels',
             'local-datacenters',
@@ -7813,6 +7816,7 @@ export default defineConfig(({ mode }) => {
       weatherEffectsProxy(),
       cctvProxy(),
       radioBrowserProxy(),
+      broadcastifyApiPlugin({ env }),
       gbfsProxy(),
       adsbLolProxy(),
       aisLiveProxy(),
