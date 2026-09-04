@@ -80,6 +80,48 @@ export function normalizeGoogleGeocodeResult(result) {
   };
 }
 
+function addressComponent(components, type, field = 'long_name') {
+  return components.find((item) => item?.types?.includes(type))?.[field] || null;
+}
+
+/** Normalize reverse-geocoder output to the jurisdiction fields used by catalogs. */
+export function normalizeGoogleJurisdiction(payload) {
+  const results = Array.isArray(payload?.results) ? payload.results : [];
+  if (payload?.status !== 'OK' || !results.length) return null;
+  const components = results.flatMap((result) => (
+    Array.isArray(result?.address_components) ? result.address_components : []
+  ));
+  const locality = addressComponent(components, 'locality')
+    || addressComponent(components, 'postal_town')
+    || addressComponent(components, 'administrative_area_level_3');
+  return {
+    countryCode: String(addressComponent(components, 'country', 'short_name') || '').toUpperCase() || null,
+    country: normalizeLocationQuery(addressComponent(components, 'country')) || null,
+    region: normalizeLocationQuery(addressComponent(components, 'administrative_area_level_1')) || null,
+    county: normalizeLocationQuery(addressComponent(components, 'administrative_area_level_2')) || null,
+    city: normalizeLocationQuery(locality) || null,
+    formattedAddress: normalizeLocationQuery(results[0]?.formatted_address) || null,
+  };
+}
+
+/** Normalize Nominatim reverse output to the same jurisdiction contract. */
+export function normalizeNominatimJurisdiction(payload) {
+  const address = payload?.address;
+  if (!address || typeof address !== 'object') return null;
+  const countryCode = String(address.country_code || '').trim().toUpperCase();
+  const jurisdiction = {
+    countryCode: /^[A-Z]{2,3}$/.test(countryCode) ? countryCode : null,
+    country: normalizeLocationQuery(address.country) || null,
+    region: normalizeLocationQuery(address.state || address.province || address.region) || null,
+    county: normalizeLocationQuery(address.county || address.state_district) || null,
+    city: normalizeLocationQuery(
+      address.city || address.town || address.municipality || address.village || address.borough
+    ) || null,
+    formattedAddress: normalizeLocationQuery(payload.display_name) || null,
+  };
+  return Object.values(jurisdiction).some(Boolean) ? jurisdiction : null;
+}
+
 function nominatimTypes(row, intersection) {
   const kind = String(row?.addresstype || row?.type || '').toLowerCase();
   let types;
@@ -239,6 +281,79 @@ async function fetchNominatim(query, fetchImpl) {
   const rows = await fetchNominatimRows(query, fetchImpl);
   const result = rows.map((row) => normalizeNominatimResult(row, query)).find(Boolean) || null;
   return { result, error: null };
+}
+
+function queueNominatimRequest(taskFactory) {
+  const task = nominatimQueue.then(async () => {
+    const waitMs = Math.max(0, NOMINATIM_MIN_INTERVAL_MS - (Date.now() - nominatimLastRequestAt));
+    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    nominatimLastRequestAt = Date.now();
+    return taskFactory();
+  });
+  nominatimQueue = task.catch(() => null);
+  return task;
+}
+
+async function fetchGoogleJurisdiction(latitude, longitude, apiKey, fetchImpl) {
+  if (!apiKey) return null;
+  const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+  url.searchParams.set('latlng', `${latitude},${longitude}`);
+  url.searchParams.set('result_type', 'locality|administrative_area_level_2|administrative_area_level_1|country');
+  url.searchParams.set('key', apiKey);
+  const response = await fetchImpl(url, { signal: AbortSignal.timeout(8_000) });
+  if (!response.ok) return null;
+  return normalizeGoogleJurisdiction(await response.json().catch(() => ({})));
+}
+
+async function fetchNominatimJurisdiction(latitude, longitude, fetchImpl) {
+  return queueNominatimRequest(async () => {
+    const url = new URL('https://nominatim.openstreetmap.org/reverse');
+    url.searchParams.set('format', 'jsonv2');
+    url.searchParams.set('lat', String(latitude));
+    url.searchParams.set('lon', String(longitude));
+    url.searchParams.set('zoom', '10');
+    url.searchParams.set('addressdetails', '1');
+    url.searchParams.set('accept-language', 'en');
+    const response = await fetchImpl(url, {
+      headers: {
+        'User-Agent': 'ThunderLinkGodsEye/0.1 (+https://github.com/the-guy-from-arma/gods-eye-view)',
+        Referer: 'https://github.com/the-guy-from-arma/gods-eye-view',
+      },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return null;
+    return normalizeNominatimJurisdiction(await response.json().catch(() => ({})));
+  });
+}
+
+export async function resolveJurisdiction({ latitude, longitude, apiKey = '', fetchImpl = fetch }) {
+  const lat = finiteCoordinate(latitude, -90, 90);
+  const lon = finiteCoordinate(longitude, -180, 180);
+  if (lat === null || lon === null) throw new Error('Valid latitude and longitude are required');
+  const cacheKey = `reverse:${lat.toFixed(3)},${lon.toFixed(3)}`;
+  const cached = cacheRead(cacheKey);
+  if (cached !== undefined) return { ...cached, cached: true };
+
+  let google = null;
+  try {
+    google = await fetchGoogleJurisdiction(lat, lon, apiKey, fetchImpl);
+  } catch {
+    // The keyless provider below keeps jurisdiction matching operational.
+  }
+  if (google) {
+    const value = { jurisdiction: google, provider: 'google', error: null };
+    cacheWrite(cacheKey, value);
+    return value;
+  }
+
+  try {
+    const openstreetmap = await fetchNominatimJurisdiction(lat, lon, fetchImpl);
+    const value = { jurisdiction: openstreetmap, provider: openstreetmap ? 'openstreetmap' : null, error: null };
+    cacheWrite(cacheKey, value);
+    return value;
+  } catch (error) {
+    return { jurisdiction: null, provider: null, error: error?.message || 'Jurisdiction lookup failed' };
+  }
 }
 
 function segmentIntersection(a, b, c, d) {
@@ -479,6 +594,35 @@ export function locationSearchApiPlugin({ env = {}, fetchImpl = fetch } = {}) {
           result: null,
           provider: null,
           error: error?.message || 'Location search failed',
+        });
+      }
+    });
+    middlewares.use('/api/location/reverse', async (req, res) => {
+      if (req.method !== 'GET') {
+        sendJson(res, 405, { jurisdiction: null, provider: null, error: 'Method not allowed' });
+        return;
+      }
+      const requestUrl = new URL(req.url || '', 'http://localhost');
+      const latitude = Number(requestUrl.searchParams.get('lat'));
+      const longitude = Number(requestUrl.searchParams.get('lon'));
+      if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+          || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+        sendJson(res, 400, { jurisdiction: null, provider: null, error: 'Valid latitude and longitude are required' });
+        return;
+      }
+      try {
+        const payload = await resolveJurisdiction({
+          latitude,
+          longitude,
+          apiKey: env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '',
+          fetchImpl,
+        });
+        sendJson(res, 200, payload, payload.cached ? 'private, max-age=300' : 'private, max-age=60');
+      } catch (error) {
+        sendJson(res, 502, {
+          jurisdiction: null,
+          provider: null,
+          error: error?.message || 'Jurisdiction lookup failed',
         });
       }
     });

@@ -6,7 +6,9 @@ import {
   findRoadIntersection,
   looksLikeIntersection,
   normalizeGoogleGeocodeResult,
+  normalizeGoogleJurisdiction,
   normalizeLocationQuery,
+  normalizeNominatimJurisdiction,
   normalizeNominatimResult,
   parseIntersectionQuery,
   resolveLocationSearch,
@@ -109,6 +111,32 @@ test('location API registers the same-origin search route', () => {
     middlewares: { use(path, handler) { routes.set(path, handler); } },
   });
   assert.equal(typeof routes.get('/api/location/search'), 'function');
+  assert.equal(typeof routes.get('/api/location/reverse'), 'function');
+});
+
+test('normalizes Google and OpenStreetMap jurisdiction responses', () => {
+  assert.deepEqual(normalizeGoogleJurisdiction({
+    status: 'OK',
+    results: [{
+      formatted_address: 'Austin, Travis County, Texas, USA',
+      address_components: [
+        { long_name: 'Austin', short_name: 'Austin', types: ['locality'] },
+        { long_name: 'Travis County', short_name: 'Travis County', types: ['administrative_area_level_2'] },
+        { long_name: 'Texas', short_name: 'TX', types: ['administrative_area_level_1'] },
+        { long_name: 'United States', short_name: 'US', types: ['country'] },
+      ],
+    }],
+  }), {
+    countryCode: 'US', country: 'United States', region: 'Texas', county: 'Travis County', city: 'Austin',
+    formattedAddress: 'Austin, Travis County, Texas, USA',
+  });
+  assert.deepEqual(normalizeNominatimJurisdiction({
+    display_name: 'Austin, Travis County, Texas, United States',
+    address: { city: 'Austin', county: 'Travis County', state: 'Texas', country: 'United States', country_code: 'us' },
+  }), {
+    countryCode: 'US', country: 'United States', region: 'Texas', county: 'Travis County', city: 'Austin',
+    formattedAddress: 'Austin, Travis County, Texas, United States',
+  });
 });
 
 test('defined-location and landmark rails expose draggable scrolling plus wheel navigation', () => {

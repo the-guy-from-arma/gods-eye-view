@@ -41,7 +41,7 @@ import { loadPhotorealisticTileset } from './mapStartup.js';
 import { initPublicSafetyPreview } from './publicSafetyPreview.js';
 
 initLogoGaze();
-initPublicSafetyPreview();
+const publicSafetyPreview = initPublicSafetyPreview();
 
 /**
  * Extract a human-readable error message from any thrown value.
@@ -123,6 +123,7 @@ async function init() {
         },
       },
     });
+    publicSafetyPreview?.attachViewer?.(viewer);
 
     // Cap the default render loop at 60 fps. Cesium's loop otherwise runs at
     // the display's refresh rate — 120 Hz on ProMotion panels — doubling GPU
