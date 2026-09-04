@@ -56,12 +56,14 @@ export function isLawEnforcementBroadcast(raw = {}) {
   return /\bdispatch\b/.test(haystack) && !/\b(fire|ems|ambulance|rescue)\b/.test(haystack);
 }
 
-export function normalizeBroadcastifyFeed(raw, index = 0) {
+export function normalizeBroadcastifyFeed(raw, index = 0, context = {}) {
   if (!raw || typeof raw !== 'object') return null;
   const location = raw.location && typeof raw.location === 'object' ? raw.location : {};
   const feedId = cleanText(firstValue(raw, ['feedId', 'feedid', 'feed_id', 'id']), 64);
   const name = cleanText(firstValue(raw, ['name', 'description', 'descr', 'feedName', 'feed_name', 'title']));
-  if (!feedId || !name || !isLawEnforcementBroadcast(raw)) return null;
+  const eventGenre = Number(context.genreId);
+  const isEventFeed = eventGenre === 7 || eventGenre === 8;
+  if (!feedId || !name || (!isLawEnforcementBroadcast(raw) && !isEventFeed)) return null;
 
   const lat = finiteCoordinate(firstValue(raw, ['lat', 'latitude', 'feedLat', 'feed_lat'])
     ?? firstValue(location, ['lat', 'latitude']), -90, 90);
@@ -73,6 +75,13 @@ export function normalizeBroadcastifyFeed(raw, index = 0) {
   const online = typeof explicitOnline === 'boolean'
     ? explicitOnline
     : !/offline|down|disabled|inactive/.test(statusText);
+
+  const activityType = eventGenre === 8
+    ? 'disaster-event'
+    : (eventGenre === 7 ? 'special-event' : (context.top === true ? 'listener-activity' : null));
+  const activityLabel = eventGenre === 8
+    ? 'DISASTER EVENT FEED'
+    : (eventGenre === 7 ? 'SPECIAL EVENT FEED' : (context.top === true ? 'ELEVATED LISTENER ACTIVITY' : null));
 
   return Object.freeze({
     id: `broadcastify-${feedId || index}`,
@@ -92,18 +101,22 @@ export function normalizeBroadcastifyFeed(raw, index = 0) {
     service: serviceType(raw),
     listeners: Number.isFinite(listenerValue) && listenerValue >= 0 ? Math.floor(listenerValue) : null,
     online,
+    genreId: Number.isFinite(eventGenre) ? eventGenre : null,
+    activityType,
+    activityLabel,
+    activeSignal: Boolean(activityType) && online,
     lat,
     lon,
     officialUrl: `https://www.broadcastify.com/listen/feed/${encodeURIComponent(feedId)}`,
   });
 }
 
-export function normalizeBroadcastifyCatalog(payload, maxRows = MAX_CATALOG_ROWS) {
+export function normalizeBroadcastifyCatalog(payload, maxRows = MAX_CATALOG_ROWS, context = {}) {
   const limit = Math.max(1, Math.min(MAX_CATALOG_ROWS, Math.floor(Number(maxRows) || MAX_CATALOG_ROWS)));
   const seen = new Set();
   const feeds = [];
   for (const [index, raw] of catalogRows(payload).entries()) {
-    const feed = normalizeBroadcastifyFeed(raw, index);
+    const feed = normalizeBroadcastifyFeed(raw, index, context);
     if (!feed || seen.has(feed.feedId)) continue;
     seen.add(feed.feedId);
     feeds.push(feed);

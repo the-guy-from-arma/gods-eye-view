@@ -20,6 +20,7 @@
  *  15. Radio Browser — public-domain station directory and click counting
  *  16. Broadcastify — licensed law-enforcement feed catalog metadata
  *  17. Live events — keyless NASA EONET + GDACS global event alerts
+ *  18. Global news reports — GDELT-indexed CNN, Fox News, and ABC News incident reports
  *
  * Also exposes Cesium and Google 3D Tiles API keys to the
  * client via `import.meta.env.*` defines.
@@ -47,6 +48,7 @@ import { filterTrailing24h, parseFirmsCsv } from './src/data/firmsCsv.js';
 import { accountApiPlugin } from './server/accountApi.js';
 import { broadcastifyApiPlugin } from './server/broadcastifyApi.js';
 import { locationSearchApiPlugin } from './server/locationSearchApi.js';
+import { newsEventsApiPlugin } from './server/newsEventsApi.js';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { defineConfig, loadEnv } from 'vite';
@@ -7818,6 +7820,7 @@ export default defineConfig(({ mode }) => {
       cctvProxy(),
       radioBrowserProxy(),
       broadcastifyApiPlugin({ env }),
+      newsEventsApiPlugin({ env }),
       gbfsProxy(),
       adsbLolProxy(),
       aisLiveProxy(),

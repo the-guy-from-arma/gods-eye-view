@@ -41,3 +41,23 @@ test('accepts common catalog envelopes, filters non-law feeds, and deduplicates 
   assert.equal(result.length, 1);
   assert.equal(result[0].name, 'City Police');
 });
+
+test('accepts licensed special/disaster event feeds and labels them without claiming an incident', () => {
+  const special = normalizeBroadcastifyFeed({
+    id: 'event-7',
+    name: 'County Fair Operations',
+    lat: 30,
+    lon: -97,
+  }, 0, { genreId: 7 });
+  const disaster = normalizeBroadcastifyFeed({
+    id: 'event-8',
+    name: 'Storm Operations',
+    lat: 31,
+    lon: -98,
+  }, 0, { genreId: 8 });
+  assert.equal(special.activityType, 'special-event');
+  assert.equal(special.activityLabel, 'SPECIAL EVENT FEED');
+  assert.equal(special.activeSignal, true);
+  assert.equal(disaster.activityType, 'disaster-event');
+  assert.equal(disaster.activityLabel, 'DISASTER EVENT FEED');
+});

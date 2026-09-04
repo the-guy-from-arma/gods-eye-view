@@ -5,7 +5,15 @@ const LABEL_DISTANCE_METERS = 350_000;
 
 function labelFor(feed) {
   const jurisdiction = [feed.city, feed.county, feed.region, feed.countryCode].filter(Boolean).join(' · ');
-  return jurisdiction ? `${feed.name}\n${jurisdiction}` : feed.name;
+  const activity = feed.activityLabel ? `${feed.activityLabel}\n` : '';
+  return jurisdiction ? `${activity}${feed.name}\n${jurisdiction}` : `${activity}${feed.name}`;
+}
+
+function activityColor(feed) {
+  if (feed.activityType === 'disaster-event') return '#ff2d55';
+  if (feed.activityType === 'special-event') return '#ff9f0a';
+  if (feed.activityType === 'listener-activity') return '#ffd166';
+  return feed.online ? '#00dcff' : '#66747c';
 }
 
 function descriptionFor(feed) {
@@ -18,8 +26,10 @@ function descriptionFor(feed) {
     ['Jurisdiction', [feed.city, feed.county, feed.region, feed.country].filter(Boolean).join(', ')],
     ['Listeners', Number.isFinite(feed.listeners) ? feed.listeners.toLocaleString() : 'Not reported'],
     ['Status', feed.online ? 'Online' : 'Offline'],
+    ['Directory signal', feed.activityLabel || 'Standard catalog feed'],
   ].map(([key, value]) => `<tr><th>${key}</th><td>${escape(value || 'Not reported')}</td></tr>`).join('');
   return `<table class="cesium-infoBox-defaultTable"><tbody>${rows}</tbody></table>`
+    + '<p><strong>Directory context only:</strong> a listed event feed or listener increase does not confirm an emergency.</p>'
     + `<p><a href="${escape(feed.officialUrl)}" target="_blank" rel="noopener noreferrer">Open authorized Broadcastify feed page</a></p>`;
 }
 
@@ -29,6 +39,8 @@ export function createLawEnforcementTransmissionsLayer() {
   let enabled = false;
   let count = 0;
   let geolocated = 0;
+  let activeEventCount = 0;
+  let activityCounts = { special: 0, disaster: 0, listeners: 0 };
   let lastUpdate = null;
   let lastError = null;
   let stale = false;
@@ -79,17 +91,28 @@ export function createLawEnforcementTransmissionsLayer() {
         dataSource.entities.removeAll();
         count = payload.feeds.length;
         geolocated = 0;
+        activeEventCount = Number.isFinite(payload.activeEventCount)
+          ? payload.activeEventCount
+          : payload.feeds.filter((feed) => feed.activeSignal).length;
+        activityCounts = payload.feeds.reduce((counts, feed) => {
+          if (!feed.activeSignal) return counts;
+          if (feed.activityType === 'special-event') counts.special += 1;
+          else if (feed.activityType === 'disaster-event') counts.disaster += 1;
+          else if (feed.activityType === 'listener-activity') counts.listeners += 1;
+          return counts;
+        }, { special: 0, disaster: 0, listeners: 0 });
         for (const feed of payload.feeds) {
           if (!Number.isFinite(feed.lat) || !Number.isFinite(feed.lon)) continue;
           geolocated += 1;
+          const accent = Cesium.Color.fromCssColorString(activityColor(feed));
           dataSource.entities.add({
             id: feed.id,
             name: feed.name,
             description: descriptionFor(feed),
             position: Cesium.Cartesian3.fromDegrees(feed.lon, feed.lat, 15),
             point: {
-              pixelSize: feed.online ? 8 : 6,
-              color: feed.online ? Cesium.Color.fromCssColorString('#00dcff') : Cesium.Color.fromCssColorString('#66747c'),
+              pixelSize: feed.activeSignal ? 12 : (feed.online ? 8 : 6),
+              color: accent,
               outlineColor: Cesium.Color.fromCssColorString('#03131a'),
               outlineWidth: 2,
               heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
@@ -98,7 +121,7 @@ export function createLawEnforcementTransmissionsLayer() {
             label: {
               text: labelFor(feed),
               font: '11px monospace',
-              fillColor: Cesium.Color.fromCssColorString('#9cefff'),
+              fillColor: feed.activeSignal ? accent : Cesium.Color.fromCssColorString('#9cefff'),
               outlineColor: Cesium.Color.BLACK,
               outlineWidth: 3,
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
@@ -116,6 +139,9 @@ export function createLawEnforcementTransmissionsLayer() {
               officialUrl: feed.officialUrl,
               listeners: feed.listeners,
               online: feed.online,
+              activeSignal: feed.activeSignal,
+              activityType: feed.activityType,
+              activityLabel: feed.activityLabel,
             },
           });
         }
@@ -143,19 +169,34 @@ export function createLawEnforcementTransmissionsLayer() {
       enabled = false;
       count = 0;
       geolocated = 0;
+      activeEventCount = 0;
+      activityCounts = { special: 0, disaster: 0, listeners: 0 };
       lastUpdate = null;
       lastError = null;
       stale = false;
+    },
+
+    getRowControls() {
+      return {
+        legend: [
+          { label: 'Disaster event feeds', count: activityCounts.disaster, color: '#ff2d55' },
+          { label: 'Special event feeds', count: activityCounts.special, color: '#ff9f0a' },
+          { label: 'Listener activity', count: activityCounts.listeners, color: '#ffd166' },
+        ].filter((entry) => entry.count > 0),
+      };
     },
 
     getStats() {
       return {
         count,
         geolocated,
+        activeEventCount,
         lastUpdate,
         error: lastError,
         stale,
-        coverage: count ? `${geolocated.toLocaleString()} geolocated · provider links` : 'licensed catalog',
+        coverage: count
+          ? `${geolocated.toLocaleString()} geolocated · ${activeEventCount.toLocaleString()} directory activity signals`
+          : 'licensed catalog',
       };
     },
   };

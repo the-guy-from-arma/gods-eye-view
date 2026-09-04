@@ -260,7 +260,7 @@ Twenty-eight tools, four jobs — the commands below come straight from the prod
 
 ## 🛰️ What's on the Globe
 
-Fourteen live layers. **Twelve of them need nothing at all** — no key, no account, no signup, starting with the satellite basemap you land on. (🟢 nothing · 🟡 free key · 🔴 metered.)
+Sixteen live layers, with keyless coverage available immediately and optional credentials unlocking additional feeds and geocoding. (🟢 nothing · 🟡 free/approved key · 🔴 metered.)
 
 | Layer | What you get | Source | Auth |
 |-------|--------------|--------|------|
@@ -271,6 +271,8 @@ Fourteen live layers. **Twelve of them need nothing at all** — no key, no acco
 | 🛰️ **Satellites** | 838-object catalog, color-coded by class with a live legend — the **DENSE** chip drops in the whole Starlink shell | CelesTrak | 🟢 |
 | 🌍 **Earthquakes** | Global seismic activity, last 24h | USGS | 🟢 |
 | ⚡ **Live Global Events** | Near-real-time natural events and disaster alerts with source-linked globe cards | NASA EONET + GDACS | 🟢 |
+| 📰 **Global News Reports** | Recent incident reports from CNN, Fox News, and ABC News, shown as approximate `REPORTED · UNVERIFIED` markers with direct article links | GDELT + publishers | 🟡 Google geocoding key for markers |
+| 📡 **Law Enforcement Transmissions** | Licensed public-safety directory, special/disaster event feeds, and elevated listener-activity signals; listening opens the provider page | Broadcastify | 🟡 approved catalog key |
 | 🚗 **Traffic** | Live congestion driving per-vehicle flow at street level — dive below ~8 km and the dots color to real jams. Keyless it's an approximate simulation | TomTom + OSM | 🟢 (🟡 TomTom makes it real — get one) |
 | 📹 **CCTV Mesh** | ~800 public cameras projected *into* the 3D space — Austin · California (Caltrans) · London (TfL). Positions are published; poses are estimated priors **you calibrate by dragging a gizmo on the camera itself** | City APIs | 🟢 |
 | 📻 **Radio** | Geolocated world radio with an **analog tuner** — drag the needle across up to 750 stations and the globe flies to each broadcaster | Radio Browser / broadcasters | 🟢 |

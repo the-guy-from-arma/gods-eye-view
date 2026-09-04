@@ -34,6 +34,7 @@ export const ANALYST_LAYERS = {
   'local-firms': { numeric: ['frp'], text: ['confidence', 'satellite'], flags: [] },
   earthquakes: { numeric: ['magnitude', 'depthKm'], text: ['place'], flags: [] },
   'live-events': { numeric: [], text: ['title', 'category', 'source', 'country', 'alertLevel', 'severity', 'confidence'], flags: [] },
+  'global-news-reports': { numeric: [], text: ['title', 'category', 'source', 'location', 'locationPrecision', 'verification'], flags: [] },
 };
 
 const EARTH_R_KM = 6371;

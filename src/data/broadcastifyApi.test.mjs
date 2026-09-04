@@ -12,11 +12,11 @@ function responseRecorder() {
 
 test('Broadcastify proxy keeps the credential server-side and returns normalized provider links', async () => {
   let handler;
-  let requestedUrl = '';
+  const requestedUrls = [];
   const plugin = broadcastifyApiPlugin({
     env: { BROADCASTIFY_API_KEY: 'licensed-secret-value' },
     fetchImpl: async (url) => {
-      requestedUrl = String(url);
+      requestedUrls.push(String(url));
       return {
         ok: true,
         json: async () => [{ feedId: 99, description: 'County Sheriff Dispatch', lat: 30, lon: -97 }],
@@ -29,9 +29,15 @@ test('Broadcastify proxy keeps the credential server-side and returns normalized
   const payload = JSON.parse(res.body);
   assert.equal(res.statusCode, 200);
   assert.equal(payload.feeds.length, 1);
+  assert.equal(payload.activeEventCount, 1);
   assert.equal(payload.feeds[0].officialUrl, 'https://www.broadcastify.com/listen/feed/99');
-  assert.match(requestedUrl, /genre=1/);
-  assert.match(requestedUrl, /key=licensed-secret-value/);
+  assert.equal(payload.feeds[0].listeners, null);
+  assert.equal(requestedUrls.length, 4);
+  assert.ok(requestedUrls.some((url) => /genre=1/.test(url)));
+  assert.ok(requestedUrls.some((url) => /genre=7/.test(url)));
+  assert.ok(requestedUrls.some((url) => /genre=8/.test(url)));
+  assert.ok(requestedUrls.some((url) => /top=50/.test(url)));
+  assert.ok(requestedUrls.every((url) => /key=licensed-secret-value/.test(url)));
   assert.equal(res.body.includes('licensed-secret-value'), false);
 });
 
