@@ -2064,6 +2064,7 @@ export class DataLayerManager {
       const bottomRow = document.createElement('div');
       bottomRow.className = 'data-toggle-meta';
       bottomRow.textContent = this._buildMetaText(layer);
+      bottomRow.hidden = !bottomRow.textContent;
 
       row.appendChild(topRow);
       row.appendChild(bottomRow);
@@ -2201,6 +2202,7 @@ export class DataLayerManager {
       const meta = row.querySelector('.data-toggle-meta');
       if (meta) {
         meta.textContent = this._buildMetaText(layer);
+        meta.hidden = !meta.textContent;
       }
 
       this._syncRowControls(row.querySelector('.data-toggle-controls'), layer);
@@ -2211,44 +2213,43 @@ export class DataLayerManager {
     const stats = layer.stats || {};
     const feedState = layerFeedState(stats);
     const stateLabel = FEED_STATE_LABELS[feedState];
-    const source = stats.source || layer.source;
     const lifecycleState = layer.lifecycleState || (layer.enabled ? 'enabled' : 'disabled');
     if (lifecycleState === 'enabling' || lifecycleState === 'disabling') {
-      return `${lifecycleState.toUpperCase()} · ${source}`;
+      return lifecycleState.toUpperCase();
     }
     if (layer.lifecycleUncertain) {
-      return `UNCERTAIN · ${source} · lifecycle state requires reconciliation`;
+      return 'UNCERTAIN · lifecycle state requires reconciliation';
     }
     const presentedError = stats.error || stats.lastError || stats.managerRefreshError;
     if (presentedError) {
       if (typeof stats.retryInSec === 'number' && stats.retryInSec > 0) {
-        return `${stateLabel} · ${source} · ${presentedError} · retry ${stats.retryInSec}s`;
+        return `${stateLabel} · ${presentedError} · retry ${stats.retryInSec}s`;
       }
-      return `${stateLabel} · ${source} · ${presentedError}`;
+      return `${stateLabel} · ${presentedError}`;
     }
-    const ago = stats.lastUpdate ? this._timeAgo(stats.lastUpdate) : 'never';
+    const ago = stats.lastUpdate ? this._timeAgo(stats.lastUpdate) : '';
     if (stats.loading) {
       const loadingLabel = typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()
         ? stats.loadingLabel.trim()
         : 'loading...';
-      return `${source} · ${loadingLabel}`;
+      return loadingLabel;
     }
     if (feedState === 'fallback') {
       const detail = typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()
         ? stats.loadingLabel.trim()
         : (stats.coverage || ago);
-      return `${stateLabel} · ${source} · ${detail}`;
+      return `${stateLabel} · ${detail}`;
     }
     if (feedState === 'stale') {
       const retry = typeof stats.retryInSec === 'number' && stats.retryInSec > 0
         ? ` · retrying in ${stats.retryInSec}s`
         : '';
-      return `${stateLabel} · ${source} · ${ago}${retry}`;
+      return `${stateLabel}${ago ? ` · ${ago}` : ''}${retry}`;
     }
     if (typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()) {
-      return `${source} · ${stats.loadingLabel.trim()}`;
+      return stats.loadingLabel.trim();
     }
-    return `${source} · ${ago}`;
+    return ago;
   }
 
   _syncToggleButton(button, layer) {

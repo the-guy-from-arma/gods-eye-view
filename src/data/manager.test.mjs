@@ -1838,15 +1838,15 @@ test('layer metadata names degraded state instead of presenting an ordinary age'
   assert.match(mgr._buildMetaText({
     source: 'AISStream',
     stats: { stale: true, count: 20, lastUpdate: Date.now() - 10_000 },
-  }), /^STALE · AISStream · /);
+  }), /^STALE · /);
   assert.equal(mgr._buildMetaText({
     source: 'TomTom',
     stats: { mode: 'sim', count: 120, lastUpdate: 1, loadingLabel: 'simulated traffic' },
-  }), 'FALLBACK · TomTom · simulated traffic');
+  }), 'FALLBACK · simulated traffic');
   assert.equal(mgr._buildMetaText({
     source: 'CelesTrak',
     stats: { error: 'CelesTrak unreachable', count: 0, lastUpdate: null },
-  }), 'UNAVAILABLE · CelesTrak · CelesTrak unreachable');
+  }), 'UNAVAILABLE · CelesTrak unreachable');
   assert.equal(mgr._buildMetaText({
     source: 'CelesTrak',
     stats: {
@@ -1855,7 +1855,11 @@ test('layer metadata names degraded state instead of presenting an ordinary age'
       count: 50,
       lastUpdate: 1,
     },
-  }), 'UNAVAILABLE · CelesTrak · CelesTrak unreachable');
+  }), 'UNAVAILABLE · CelesTrak unreachable');
+  assert.equal(mgr._buildMetaText({
+    source: 'Broadcastify',
+    stats: { count: 0, lastUpdate: null },
+  }), '', 'an idle row shows neither its provider nor a useless never label');
 });
 
 test('uncertain lifecycle state overrides ordinary feed status without disabling reconciliation', () => {
@@ -1890,7 +1894,7 @@ test('uncertain lifecycle state overrides ordinary feed status without disabling
   assert.equal(classes.get('feed-nominal'), false);
   assert.equal(
     mgr._buildMetaText(layer),
-    'UNCERTAIN · Radio Browser · lifecycle state requires reconciliation',
+    'UNCERTAIN · lifecycle state requires reconciliation',
   );
 });
 
