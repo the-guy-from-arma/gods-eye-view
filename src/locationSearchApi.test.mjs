@@ -3,10 +3,12 @@ import fs from 'node:fs';
 import test from 'node:test';
 import {
   locationSearchApiPlugin,
+  findRoadIntersection,
   looksLikeIntersection,
   normalizeGoogleGeocodeResult,
   normalizeLocationQuery,
   normalizeNominatimResult,
+  parseIntersectionQuery,
   resolveLocationSearch,
 } from '../server/locationSearchApi.js';
 
@@ -14,6 +16,9 @@ test('normalizes human location queries without damaging address punctuation', (
   assert.equal(normalizeLocationQuery('  5th St.  &  Congress Ave, Austin, TX  '), '5th St. & Congress Ave, Austin, TX');
   assert.equal(looksLikeIntersection('5th St and Congress Ave, Austin'), true);
   assert.equal(looksLikeIntersection('Congress Avenue, Austin'), false);
+  assert.deepEqual(parseIntersectionQuery('E 5th St & Congress Ave, Austin, TX'), {
+    first: 'E 5th St', second: 'Congress Ave', locality: 'Austin, TX',
+  });
 });
 
 test('normalizes exact Google address results for the location client', () => {
@@ -54,9 +59,17 @@ test('OpenStreetMap fallback classifies towns and intersections for camera frami
   assert.deepEqual(intersection.types, ['intersection', 'route']);
 });
 
-test('resolver falls back to OpenStreetMap when Google rejects the key', async () => {
+test('finds the geometric crossing of expanded OSM street names', () => {
+  const point = findRoadIntersection([
+    { tags: { name: 'East 5th Street' }, geometry: [{ lat: 30, lon: -98 }, { lat: 30, lon: -97 }] },
+    { tags: { name: 'Congress Avenue' }, geometry: [{ lat: 29, lon: -97.5 }, { lat: 31, lon: -97.5 }] },
+  ], 'E 5th St', 'Congress Ave');
+  assert.deepEqual(point, { lat: 30, lng: -97.5 });
+});
+
+test('resolver falls back to OSM road geometry when Google rejects an intersection', async () => {
   const calls = [];
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, options = {}) => {
     calls.push(String(url));
     if (String(url).includes('maps.googleapis.com')) {
       return { json: async () => ({ status: 'REQUEST_DENIED', error_message: 'disabled' }) };
@@ -64,23 +77,28 @@ test('resolver falls back to OpenStreetMap when Google rejects the key', async (
     if (String(url).includes('places.googleapis.com')) {
       return { json: async () => ({ error: { message: 'disabled' } }) };
     }
-    return {
+    if (String(url).includes('nominatim.openstreetmap.org')) return {
       ok: true,
       json: async () => [{
-        lat: '30.2673', lon: '-97.7431', display_name: '5th Street and Congress Avenue, Austin, Texas',
-        addresstype: 'road', boundingbox: ['30.2672', '30.2674', '-97.7432', '-97.7430'],
+        lat: '30.2673', lon: '-97.7431', display_name: 'Austin, Texas',
+        addresstype: 'city', boundingbox: ['30.0', '30.5', '-98.0', '-97.5'],
       }],
     };
+    assert.equal(options.method, 'POST');
+    return { ok: true, json: async () => ({ elements: [
+      { tags: { name: 'East 5th Street' }, geometry: [{ lat: 30.26, lon: -97.75 }, { lat: 30.27, lon: -97.73 }] },
+      { tags: { name: 'Congress Avenue' }, geometry: [{ lat: 30.25, lon: -97.73 }, { lat: 30.28, lon: -97.745 }] },
+    ] }) };
   };
   const resolved = await resolveLocationSearch({
-    query: '5th Street & Congress Avenue, Austin',
+    query: 'E 5th St & Congress Ave, Austin, TX',
     apiKey: 'server-only-key',
     fetchImpl,
   });
   assert.equal(resolved.provider, 'openstreetmap');
-  assert.equal(resolved.result.formatted_address, '5th Street and Congress Avenue, Austin, Texas');
+  assert.equal(resolved.result.formatted_address, 'E 5th St & Congress Ave, Austin, TX');
   assert.ok(resolved.result.types.includes('intersection'));
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
 });
 
 test('location API registers the same-origin search route', () => {
