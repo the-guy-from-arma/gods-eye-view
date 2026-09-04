@@ -6,7 +6,7 @@
 
 ThunderLink-branded fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) by Bilawal Sidhu. The original MIT license and third-party attribution are preserved.
 
-Photorealistic 3D globe. Live aircraft, ships, satellites, earthquakes, global disaster events, traffic, and public cameras. Hands-free voice control powered by a realtime AI agent.
+Photorealistic 3D globe. Live aircraft, ships, satellites, earthquakes, global disaster events, traffic, and public cameras. Free browser voice commands by default, with an optional realtime AI agent.
 
 *No place left behind.*
 
@@ -211,9 +211,9 @@ The cockpit even carries its own briefing strip: nearby live signals, regional h
 
 ## 🎙️ Talk to It
 
-> Voice needs an **OpenAI key**. Without one the entire app still runs — the mic button just reports voice is unavailable. The same key drives the **AI HUD summary**: a terse, five-word intelligence-style readout of the current view that regenerates as you move.
+> Voice commands are **free by default** in Chrome and Edge through the browser Speech Recognition API. Click the mic and speak one command such as *"fly to London,"* *"show breaking news,"* or *"use night vision."* No OpenAI key or paid request is used.
 
-Click **GEV MIC**, grant the microphone, and just talk. This is more than a voice-controlled remote:
+The original conversational AI voice remains available as an explicit `?voice=ai` URL opt-in. It requires a funded `OPENAI_API_KEY`; the same key also drives the optional **AI HUD summary**. AI mode adds open-ended conversation and the advanced tools below:
 
 - **🧠 It knows what it's looking at.** The agent pulls live scene context before answering — including coordinates, street names, active layers, and view scale. Ask *"what city is this?"* mid-flight and it knows.
 - **🎯 Entity Q&A.** Click any plane, ship, or datacenter and ask *"what's this?"* It answers using the object's live telemetry.
@@ -333,7 +333,7 @@ Some of the engineering that makes it feel real rather than like a tech demo:
 - **Sits on the real ground.** Entity heights run through a real vertical datum — geoid-aware, sampled against the *rendered* terrain mesh — so aircraft park on aprons and cameras stand on street corners instead of floating.
 - **Spends your quota like it's its own.** The paid feeds run behind cached, budget-governed proxies — an OpenSky credit governor, a TomTom daily tile budget, disk-cached TLEs — so an afternoon of exploring doesn't torch an API allowance.
 - **Secure by design.** Every API that touches a private key (OpenAI, AISStream, OpenSky OAuth, camera frames) is brokered through a hardened server-side proxy with SSRF protection, response caps, and sanitized errors. The only keys the browser sees are Google Maps and Cesium ion (restrict both at the provider).
-- **No framework.** Vanilla JavaScript, **CesiumJS**, and **Vite** — plus **Google Photorealistic 3D Tiles** for the planet and the **OpenAI Realtime API** for voice. Fast to read, fast to hack on.
+- **No framework.** Vanilla JavaScript, **CesiumJS**, and **Vite** — plus **Google Photorealistic 3D Tiles**, free browser speech commands, and optional **OpenAI Realtime** voice. Fast to read, fast to hack on.
 
 ```
 src/
@@ -343,7 +343,7 @@ src/
 ├── keySetup.js             # POWER UP panel — in-app provider keys (dev server only)
 ├── mapStackController.js   # Basemap switching — Google 3D / Esri / OSM / ion stacks
 ├── iconOrientation.js      # Screen-projected world-space headings + horizon cull
-├── voice/                  # OpenAI Realtime session + 28 voice tools
+├── voice/                  # Free browser commands + optional OpenAI Realtime tools
 ├── data/                   # One module per layer + orchestration + context store
 │   └── local_data/         # Bundled datasets (per-folder provenance)
 └── scenes/                 # Cinematic scene director
@@ -373,7 +373,7 @@ Six keys. Four have a free tier, and the two 🔴 ones are metered:
 |---|-----|-----|--------|
 | 🟡 | **Cesium ion** | 🗺️ Google Photorealistic 3D, world terrain, and additional ion-hosted imagery stacks. The free Community plan is for eligible individual, personal/non-commercial use and has quotas | [cesium.com/ion](https://cesium.com/ion) — use a public `assets:read` token and check current [pricing/eligibility](https://cesium.com/platform/cesium-ion/pricing/) |
 | 🔴 | **Google Maps** | Direct Google Photorealistic 3D + Google place search ([Map Tiles API](https://developers.google.com/maps/documentation/tile)) | [Google Cloud Console](https://console.cloud.google.com/) — URL-restrict it |
-| 🔴 | **OpenAI** | 🎙️ The voice experience + AI HUD summary. The mini model works; the standard model is noticeably smarter. Want Gemini or another provider behind the mic? PRs welcome | [platform.openai.com](https://platform.openai.com) — metered, see costs below |
+| 🔴 | **OpenAI** | Optional conversational AI voice + AI HUD summary. Free browser voice commands do not need this key | [platform.openai.com](https://platform.openai.com) — metered, see costs below |
 | 🟡 | **AISStream** | 🚢 Live global ships | [aisstream.io](https://aisstream.io) — free, seriously, it's a two-minute signup |
 | 🟡 | **NASA FIRMS** | 🔥 Live active fires | [firms.modaps.eosdis.nasa.gov](https://firms.modaps.eosdis.nasa.gov/api/map_key/) — free |
 | 🟡 | **TomTom** | 🚦 Real traffic instead of an approximate simulation | [developer.tomtom.com](https://developer.tomtom.com) — free tier is plenty, completely worth it |
@@ -422,9 +422,10 @@ Honest numbers, roughly, as of mid-2026 — always check the provider pricing pa
 | | Cost reality |
 |---|---|
 | **🟢 Most layers** | **$0, no signup.** OpenSky anon, USGS, CelesTrak, adsb.lol, city CCTV, Radio Browser, GBFS, Launch Library 2, bundled datasets. |
+| **🎙️ Free voice commands** | **$0, no API key.** Uses browser speech recognition for deterministic globe commands; Chrome or Edge recommended. |
 | **🟡 The free-key tier** | **$0 with a signup.** AISStream, FIRMS, TomTom, OpenSky, plus Cesium ion for eligible personal/non-commercial use. Provider quotas and eligibility still apply. |
 | **🗺️ Google 3D tiles** | **Free through an eligible Cesium ion Community account within its quota; metered through a direct Google key.** Use the direct route for GEV place search or commercial deployment, verify current provider terms, and set budget alerts where billing is enabled. |
-| **🔴 OpenAI voice** | **The one that costs real money — so the app meters it for you.** Realtime audio runs a few cents per active minute; an evening of heavy use is single-digit dollars. A live session-spend readout sits next to the mic, with an STD/MINI model toggle, a $2 warning, and a **$5 hard cap that ends the session**. The voice context window is kept deliberately short too. |
+| **🔴 Optional OpenAI voice** | **Paid and opt-in via `?voice=ai`.** Realtime audio has a live session-spend readout, an STD/MINI model toggle, a $2 warning, and a **$5 hard cap that ends the session**. |
 
 Google's direct 3D route is surprisingly generous: the first 1,000 Photorealistic
 3D Tiles sessions each month are currently free, and one root request supports

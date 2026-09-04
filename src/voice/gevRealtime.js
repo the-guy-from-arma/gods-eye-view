@@ -1,4 +1,5 @@
 import { createGevActionRunner, readLayerLifecycleSummary } from './gevActions.js';
+import { GevFreeVoiceController } from './freeVoice.js';
 import {
   DEFAULT_VOICE_TIER,
   VOICE_COST_LIMITS,
@@ -200,7 +201,12 @@ export function initGevVoiceCommands({ viewer, styleManager, dataManager, sceneD
   const runner = createGevActionRunner({ viewer, styleManager, dataManager, sceneDirector, annotations });
   const ui = createVoiceControl({ reset: true });
   const radioLayer = dataManager?.layers?.get('radio')?.module || null;
-  const controller = new GevRealtimeController({ runner, ui, radioLayer, dataManager });
+  // Free browser speech is the safe default. The original OpenAI Realtime
+  // controller remains available as an explicit opt-in via ?voice=ai.
+  const usePaidRealtime = new URLSearchParams(window.location.search).get('voice') === 'ai';
+  const controller = usePaidRealtime
+    ? new GevRealtimeController({ runner, ui, radioLayer, dataManager })
+    : new GevFreeVoiceController({ runner, ui });
   // Deferred annotation outlines finish AFTER their tool result returned. Feed the
   // final outcome (resolved / failed) into the conversation so the model can honestly
   // confirm — or correct — what it narrated about a boundary it never saw land.
@@ -215,7 +221,7 @@ export function initGevVoiceCommands({ viewer, styleManager, dataManager, sceneD
     else controller.start({ pushToTalk: false });
   };
   ui.button.addEventListener('click', controller.buttonHandler);
-  if (ui.tierButton) {
+  if (usePaidRealtime && ui.tierButton) {
     controller.tierHandler = () => controller.toggleVoiceTier();
     ui.tierButton.addEventListener('click', controller.tierHandler);
   }
