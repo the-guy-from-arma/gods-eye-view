@@ -31,8 +31,8 @@
 }
 
 /* ThunderLink accounts and public-safety preview */
-body.auth-pending > :not(#account-dialog):not(script) { visibility: hidden !important; }
-body.auth-pending #account-dialog { visibility: visible; }
+body.auth-pending > :not(#account-dialog):not(#platform-disclaimer-dialog):not(script) { visibility: hidden !important; }
+body.auth-pending #account-dialog, body.auth-pending #platform-disclaimer-dialog { visibility: visible; }
 body.auth-pending #account-chip { display: none; }
 body.auth-pending .account-close { visibility: hidden; pointer-events: none; }
 body.auth-pending { background: #02060a; }
@@ -102,7 +102,29 @@ body.auth-pending { background: #02060a; }
   font: 13px 'JetBrains Mono', monospace;
 }
 #account-form input:focus { border-color: #54e8ff; }
-.account-privacy { color: #779099; font-size: 9px; line-height: 1.55; }
+.account-disclaimer-summary {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid rgba(255, 174, 74, .34);
+  background: rgba(74, 38, 7, .2);
+}
+.account-disclaimer-summary strong { color: #ffc36c; font-size: 9px; letter-spacing: .13em; }
+.account-disclaimer-summary p { color: #a89982; font-size: 8px; line-height: 1.55; }
+.account-disclaimer-summary button {
+  justify-self: start;
+  min-height: 27px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 195, 108, .42);
+  background: rgba(104, 57, 12, .3);
+  color: #ffd79d;
+  font: 600 8px/1 'JetBrains Mono', monospace;
+  letter-spacing: .11em;
+  cursor: pointer;
+}
+.account-disclaimer-summary button:hover, .account-disclaimer-summary button:focus-visible { border-color: #ffc36c; color: #fff; }
+.account-privacy { margin-top: 10px; color: #779099; font-size: 9px; line-height: 1.55; }
 #account-signed-in { display: grid; gap: 10px; }
 #account-signed-in > strong { color: #fff; font-size: 14px; }
 #account-signed-in > span { color: #5be9ff; font-size: 10px; letter-spacing: .13em; }
@@ -114,6 +136,46 @@ body.auth-pending { background: #02060a; }
 [data-account-events] > div { display: grid; gap: 3px; padding: 7px; background: rgba(25, 61, 73, .28); }
 [data-account-events] strong { font-size: 9px; color: #bcecf2; }
 [data-account-events] span { font-size: 9px; color: #829da5; overflow-wrap: anywhere; }
+
+#platform-disclaimer-dialog {
+  z-index: 1200;
+  width: min(650px, calc(100vw - 30px));
+  max-height: min(780px, calc(100vh - 30px));
+  margin: auto;
+  padding: 24px;
+  overflow: auto;
+  border: 1px solid rgba(76, 224, 255, .5);
+  background: rgba(4, 10, 17, .985);
+  color: #d9faff;
+  box-shadow: 0 0 55px rgba(0, 209, 255, .18);
+  font-family: 'JetBrains Mono', monospace;
+}
+#platform-disclaimer-dialog::backdrop { background: rgba(0, 3, 7, .86); backdrop-filter: blur(5px); }
+.platform-disclaimer-scanline { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(66, 224, 255, .018) 3px 4px); }
+.platform-disclaimer-header, .platform-disclaimer-footer { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.platform-disclaimer-header > span { color: #54e8ff; font-size: 9px; letter-spacing: .15em; }
+.platform-disclaimer-header button { border: 0; background: transparent; color: #8bddea; cursor: pointer; }
+#platform-disclaimer-dialog h2 { position: relative; margin: 17px 0 9px; font: 500 25px/1.15 Inter, sans-serif; }
+#platform-disclaimer-intro { position: relative; color: #9bb9c0; font-size: 10px; line-height: 1.65; }
+.platform-disclaimer-copy { position: relative; display: grid; gap: 13px; margin-top: 18px; }
+.platform-disclaimer-copy section { padding-left: 12px; border-left: 1px solid rgba(78, 222, 247, .28); }
+.platform-disclaimer-copy h3 { margin-bottom: 5px; color: #5eeaff; font-size: 9px; letter-spacing: .14em; }
+.platform-disclaimer-copy p { color: #87a0a7; font-size: 9px; line-height: 1.65; }
+.platform-disclaimer-warning { position: relative; margin-top: 18px; padding: 13px; border: 1px solid rgba(255, 116, 91, .48); background: rgba(91, 20, 12, .25); }
+.platform-disclaimer-warning strong { color: #ff9b85; font-size: 10px; letter-spacing: .12em; }
+.platform-disclaimer-warning p { margin-top: 7px; color: #c0a09b; font-size: 9px; line-height: 1.65; }
+.platform-disclaimer-footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(75, 220, 242, .18); }
+.platform-disclaimer-footer span { color: #718f96; font-size: 8px; letter-spacing: .1em; }
+.platform-disclaimer-footer button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid #50eaff;
+  background: rgba(13, 103, 126, .34);
+  color: #fff;
+  font: 600 9px/1 'JetBrains Mono', monospace;
+  letter-spacing: .11em;
+  cursor: pointer;
+}
 
 .radio-source-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
 .radio-source-tabs button {
@@ -139,6 +201,8 @@ body.auth-pending { background: #02060a; }
   #account-chip { top: 10px; right: 10px; }
   #account-chip [data-account-chip-label] { display: none; }
   .scanner-jurisdiction-grid { grid-template-columns: 1fr; }
+  #platform-disclaimer-dialog { padding: 18px; }
+  .platform-disclaimer-footer { align-items: stretch; flex-direction: column; }
 }
 
 * {

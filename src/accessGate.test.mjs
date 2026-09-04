@@ -27,6 +27,16 @@ test('the locked gate cannot be dismissed and hidden account states stay hidden'
   assert.match(css, /body\.auth-pending > :not\(#account-dialog\)/);
 });
 
+test('the access gate includes a responsible-use disclaimer with an accessible details dialog', () => {
+  assert.match(index, /WARNING · LAWFUL USE ONLY/);
+  assert.match(index, /data-disclaimer-open[^>]*aria-haspopup="dialog"/);
+  assert.match(index, /<dialog id="platform-disclaimer-dialog"/);
+  assert.match(index, /DO NOT USE THIS INFORMATION MALICIOUSLY/);
+  assert.match(index, /PUBLIC DATA DOES NOT MEAN HARMLESS DATA/);
+  assert.match(account, /disclaimerDialog\.showModal\(\)/);
+  assert.match(account, /disclaimerDialog\.close\(\)/);
+});
+
 test('boot screen names every required initialization phase', () => {
   for (const phase of ['auth', 'database', 'runtime', 'globe', 'feeds', 'ready']) {
     assert.match(index, new RegExp(`data-boot-phase="${phase}"`));

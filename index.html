@@ -951,6 +951,11 @@
         <label data-owner-setup-field hidden>OWNER SETUP CODE<input name="ownerSetupToken" type="password" autocomplete="one-time-code" maxlength="256" /></label>
         <button type="submit" data-account-submit>SIGN IN</button>
       </form>
+      <section class="account-disclaimer-summary" aria-labelledby="account-disclaimer-title">
+        <strong id="account-disclaimer-title">WARNING · LAWFUL USE ONLY</strong>
+        <p>This open-source platform presents public and authorized data for awareness, education, and responsible research. Never use it maliciously or to harm, stalk, harass, target, or interfere with anyone.</p>
+        <button type="button" data-disclaimer-open aria-haspopup="dialog" aria-controls="platform-disclaimer-dialog">LEARN MORE</button>
+      </section>
       <p class="account-privacy">Account actions and meaningful console activity—including submitted location searches and filter changes—are recorded for security and product operations. Passwords, API keys, tokens, microphone audio, and voice recordings are never placed in the activity log.</p>
     </div>
     <div id="account-signed-in" hidden>
@@ -965,6 +970,38 @@
     </div>
     <p class="account-status" data-account-status role="status" aria-live="polite"></p>
   </aside>
+
+  <dialog id="platform-disclaimer-dialog" aria-labelledby="platform-disclaimer-title" aria-describedby="platform-disclaimer-intro">
+    <div class="platform-disclaimer-scanline" aria-hidden="true"></div>
+    <header class="platform-disclaimer-header">
+      <span>THUNDERLINK · RESPONSIBLE USE NOTICE</span>
+      <button type="button" data-disclaimer-close aria-label="Close disclaimer"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
+    </header>
+    <h2 id="platform-disclaimer-title">Why this project exists</h2>
+    <p id="platform-disclaimer-intro">ThunderLink God’s Eye is an open-source final community project created as we departed one online platform and moved toward another.</p>
+    <div class="platform-disclaimer-copy">
+      <section>
+        <h3>THE COMMUNITY</h3>
+        <p>Many people in the community we were leaving were military enthusiasts and computer nerds. We understood that shared curiosity about technology, maps, aircraft, communications, and public information—and built this as a collaborative farewell project.</p>
+      </section>
+      <section>
+        <h3>THE PRIVACY LESSON</h3>
+        <p>Our departure followed an incident in which private community data was exposed. That experience motivated a defensive lesson: information people assume is hidden can be surprisingly easy to discover through public-facing APIs and open datasets. This project demonstrates that exposure so people can better understand and protect their privacy—not exploit someone else’s.</p>
+      </section>
+      <section>
+        <h3>OPEN-SOURCE SCOPE</h3>
+        <p>The platform combines public, licensed, or operator-supplied sources. It does not grant permission to bypass access controls, obtain private data, invade privacy, or violate a provider’s terms. Source data can be incomplete, delayed, inaccurate, or removed without notice.</p>
+      </section>
+    </div>
+    <div class="platform-disclaimer-warning" role="note">
+      <strong>DO NOT USE THIS INFORMATION MALICIOUSLY.</strong>
+      <p>Do not use ThunderLink God’s Eye to stalk, harass, intimidate, identify or target vulnerable people, facilitate violence, evade lawful authorities, trespass, interfere with emergency or military operations, or support any unlawful act. It is not operational intelligence, an all-clear, or a substitute for official sources. You are responsible for lawful, ethical use and for respecting privacy, consent, safety, and local regulations.</p>
+    </div>
+    <footer class="platform-disclaimer-footer">
+      <span>PUBLIC DATA DOES NOT MEAN HARMLESS DATA.</span>
+      <button type="button" data-disclaimer-close>I UNDERSTAND</button>
+    </footer>
+  </dialog>
 
   <!-- Intelligence HUD Overlay -->
   <div id="intel-hud"></div>

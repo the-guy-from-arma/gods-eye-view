@@ -223,7 +223,9 @@ The original conversational AI voice remains available as an explicit `?voice=ai
 
 ### Operator accounts and audit log
 
-ThunderLink can use a Railway Postgres service for verified operator accounts, secure sessions, public-safety jurisdiction metadata, and a sanitized activity log. Attach Postgres so Railway injects `DATABASE_URL`, then configure `OWNER_EMAIL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `PUBLIC_APP_URL`. The verified account matching `OWNER_EMAIL` receives owner access and can inspect recent activity from the Account panel; no plaintext owner password is stored in an environment variable.
+ThunderLink can use a Railway Postgres service for verified operator accounts, secure sessions, public-safety jurisdiction metadata, and a sanitized activity log. Attach Postgres so Railway injects `DATABASE_URL`, then configure `OWNER_EMAIL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `PUBLIC_APP_URL`. The verified account matching `OWNER_EMAIL` receives owner access and can inspect recent activity from the Account panel.
+
+For a Railway-managed owner login, set `OWNER_PASSWORD` to a unique 12–256 character server-only variable. Signing in with `OWNER_EMAIL` and that password creates or refreshes the verified owner record without email delivery. Never prefix it with `VITE_`, expose it to client code, or commit it to Git.
 
 Production starts at the account lock and does not initialize Cesium or any live data layer until a verified session exists. The first owner may be bootstrapped with `OWNER_SETUP_TOKEN`: choose **Create Account**, enter `OWNER_EMAIL`, a new password, and that one-time code. Remove the variable after the owner is claimed. Later registrations always use email verification.
 

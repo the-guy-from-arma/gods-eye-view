@@ -46,6 +46,9 @@ export function initAccounts(options = {}) {
   const activityButton = dialog?.querySelector('[data-account-activity]');
   const activityPanel = dialog?.querySelector('[data-account-activity-panel]');
   const eventsHost = dialog?.querySelector('[data-account-events]');
+  const disclaimerDialog = document.getElementById('platform-disclaimer-dialog');
+  const disclaimerOpen = dialog?.querySelector('[data-disclaimer-open]');
+  const disclaimerCloseButtons = [...(disclaimerDialog?.querySelectorAll('[data-disclaimer-close]') || [])];
   let mode = 'login';
   let user = null;
   let authenticationHandled = false;
@@ -56,6 +59,23 @@ export function initAccounts(options = {}) {
     status.textContent = message;
     status.classList.toggle('error', error);
   };
+
+  const closeDisclaimer = () => {
+    if (!disclaimerDialog?.open) return;
+    disclaimerDialog.close();
+    disclaimerOpen?.focus();
+  };
+
+  disclaimerOpen?.addEventListener('click', () => {
+    if (!disclaimerDialog || disclaimerDialog.open) return;
+    disclaimerDialog.showModal();
+    disclaimerDialog.querySelector('[data-disclaimer-close]')?.focus();
+  });
+  disclaimerCloseButtons.forEach((button) => button.addEventListener('click', closeDisclaimer));
+  disclaimerDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeDisclaimer();
+  });
 
   const paint = () => {
     signedOut.hidden = Boolean(user);
@@ -121,6 +141,7 @@ export function initAccounts(options = {}) {
     chip.focus();
   });
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && disclaimerDialog?.open) return;
     if (event.key === 'Escape' && !dialog.hidden) {
       if (accessRequired && !user) return;
       dialog.hidden = true;

@@ -35,6 +35,13 @@ function tokenDigest(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
+function secretMatches(value, expected) {
+  if (!expected) return false;
+  const left = Buffer.from(tokenDigest(String(value || '')), 'hex');
+  const right = Buffer.from(tokenDigest(String(expected)), 'hex');
+  return crypto.timingSafeEqual(left, right);
+}
+
 async function passwordDigest(password) {
   const salt = crypto.randomBytes(16).toString('hex');
   const key = await scrypt(password, salt, 64);
@@ -120,6 +127,8 @@ export function createAccountApi(options = {}) {
   const env = options.env || process.env;
   const connectionString = env.DATABASE_URL;
   const ownerEmail = cleanEmail(env.OWNER_EMAIL);
+  const ownerPassword = String(env.OWNER_PASSWORD || '');
+  const ownerVariableLoginEnabled = Boolean(ownerEmail && ownerPassword.length >= 12 && ownerPassword.length <= 256);
   const ownerSetupToken = String(env.OWNER_SETUP_TOKEN || '');
   const resendKey = env.RESEND_API_KEY || '';
   const emailFrom = env.EMAIL_FROM || '';
@@ -239,6 +248,8 @@ export function createAccountApi(options = {}) {
           database: Boolean(pool),
           email: Boolean(resendKey && emailFrom),
           ownerConfigured: Boolean(ownerEmail),
+          ownerLoginConfigured: ownerVariableLoginEnabled,
+          ownerSetupConfigured: Boolean(ownerEmail && ownerSetupToken),
         });
       }
       await ensureSchema();
@@ -358,9 +369,29 @@ export function createAccountApi(options = {}) {
         if (!authLimit(`login:${remoteKey}`)) return json(res, 429, { error: 'Try again later' });
         const body = await readJson(req);
         const email = cleanEmail(body.email);
+        const password = String(body.password || '');
+        if (ownerVariableLoginEnabled && email === ownerEmail) {
+          if (!secretMatches(password, ownerPassword)) return json(res, 401, { error: 'Invalid email or password' });
+          const digest = await passwordDigest(password);
+          const ownerResult = await pool.query(`
+            INSERT INTO gev_users (email, password_digest, email_verified_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (email) DO UPDATE SET
+              password_digest = EXCLUDED.password_digest,
+              email_verified_at = COALESCE(gev_users.email_verified_at, NOW())
+            RETURNING id, email
+          `, [email, digest]);
+          const owner = ownerResult.rows[0];
+          const rawSession = crypto.randomBytes(32).toString('base64url');
+          await pool.query(`INSERT INTO gev_sessions (user_id, token_digest, expires_at)
+            VALUES ($1, $2, NOW() + INTERVAL '${SESSION_DAYS} days')`, [owner.id, tokenDigest(rawSession)]);
+          const user = { id: String(owner.id), email: owner.email, verified: true, role: 'owner' };
+          await record(req, 'account_login', { ownerVariable: true }, user);
+          return json(res, 200, { user }, { 'Set-Cookie': cookie('gev_session', rawSession, req, SESSION_DAYS * 86400) });
+        }
         const result = await pool.query('SELECT id, email, password_digest, email_verified_at FROM gev_users WHERE email = $1', [email]);
         const row = result.rows[0];
-        if (!row || !(await passwordMatches(String(body.password || ''), row.password_digest))) {
+        if (!row || !(await passwordMatches(password, row.password_digest))) {
           return json(res, 401, { error: 'Invalid email or password' });
         }
         if (!row.email_verified_at) return json(res, 403, { error: 'Verify your email before signing in' });
@@ -428,4 +459,4 @@ export function accountApiPlugin(options = {}) {
   };
 }
 
-export const accountSecurity = { sanitizeActivityMetadata, cleanEmail };
+export const accountSecurity = { sanitizeActivityMetadata, cleanEmail, secretMatches };
