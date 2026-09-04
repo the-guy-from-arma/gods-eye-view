@@ -1,5 +1,6 @@
 import { governorRequestRender } from '../renderGovernor.js';
 import { markDetectionSourcesChanged } from './detection.js';
+import { normalizeLayerAvailabilityStatus } from './layerAvailability.js';
 function cloneLayerParams(value) {
   if (Array.isArray(value)) return value.map(cloneLayerParams);
   if (value && typeof value === 'object') {
@@ -163,6 +164,7 @@ export class DataLayerManager {
     }
     this.layers.set(layerModule.id, {
       module: layerModule,
+      availabilityStatus: 'live',
       enabled: false,
       initialized: false,
       intervalId: null,
@@ -981,6 +983,20 @@ export class DataLayerManager {
     const entry = this.layers.get(layerId);
     if (!entry) return { intentEpoch: null, promise: Promise.resolve() };
     const desiredState = Boolean(shouldEnable);
+    if (desiredState && entry.availabilityStatus !== 'live') {
+      const reason = entry.availabilityStatus === 'maintenance'
+        ? 'This layer is temporarily in maintenance mode.'
+        : 'This layer is not publicly available yet.';
+      this._notifyListeners({
+        type: 'visibility-blocked',
+        layerId,
+        enabled: true,
+        origin,
+        reason,
+      });
+      this._refreshTogglePanel();
+      return { intentEpoch: null, promise: Promise.resolve(false) };
+    }
     if (entry.destroying) {
       return { intentEpoch: null, promise: Promise.resolve(desiredState === false) };
     }
@@ -1923,6 +1939,7 @@ export class DataLayerManager {
         icon: entry.module.icon,
         source: entry.module.source,
         showInTogglePanel: entry.module.showInTogglePanel !== false,
+        availabilityStatus: entry.availabilityStatus,
         enabled: entry.enabled,
         lifecycleState: entry.lifecycleState,
         lifecycleUncertain: entry.lifecycleUncertain,
@@ -1930,6 +1947,26 @@ export class DataLayerManager {
       });
     }
     return result;
+  }
+
+  async applyLayerAvailability(layers = []) {
+    const statusById = new Map((Array.isArray(layers) ? layers : []).map((layer) => [
+      String(layer?.id || layer?.layerId || ''),
+      normalizeLayerAvailabilityStatus(layer?.status),
+    ]));
+    const disableRequests = [];
+    for (const [layerId, entry] of this.layers) {
+      const nextStatus = statusById.get(layerId) || 'live';
+      entry.availabilityStatus = nextStatus;
+      if (nextStatus !== 'live' && (entry.enabled || entry.visibilityIntentEnabled)) {
+        disableRequests.push(this.setEnabled(layerId, false, { origin: 'availability' }));
+      }
+    }
+    this._renderToggles();
+    await Promise.allSettled(disableRequests);
+    this._renderToggles();
+    this._notifyListeners({ type: 'availability', layers: this.getAll() });
+    return true;
   }
 
   subscribe(callback) {
@@ -2024,9 +2061,11 @@ export class DataLayerManager {
 
     for (const layer of this.getAll()) {
       if (!layer.showInTogglePanel) continue;
+      if (layer.availabilityStatus === 'disabled') continue;
       const row = document.createElement('div');
       row.className = 'data-toggle-row';
       row.dataset.layerId = layer.id;
+      row.dataset.availabilityStatus = layer.availabilityStatus;
 
       const topRow = document.createElement('div');
       topRow.className = 'data-toggle-top';
@@ -2040,7 +2079,9 @@ export class DataLayerManager {
 
       const count = document.createElement('span');
       count.className = 'data-count';
-      count.textContent = layer.stats.count ? this._formatCount(layer.stats.count) : '—';
+      count.textContent = layer.availabilityStatus === 'live' && layer.stats.count
+        ? this._formatCount(layer.stats.count)
+        : '—';
 
       const toggle = document.createElement('button');
       toggle.className = `data-toggle-btn${layer.enabled ? ' active' : ''}`;
@@ -2073,7 +2114,7 @@ export class DataLayerManager {
       // listener is delegated and attached once here, so it survives
       // _refreshTogglePanel — which only rewrites the container's contents.
       const rowModule = this.layers.get(layer.id)?.module;
-      if (typeof rowModule?.getRowControls === 'function') {
+      if (layer.availabilityStatus === 'live' && typeof rowModule?.getRowControls === 'function') {
         // A layer whose controls settle asynchronously (a chunked catalog load
         // that can also fail) pushes a re-render through this; nothing else
         // would repaint the row before its next scheduled refresh.
@@ -2210,6 +2251,8 @@ export class DataLayerManager {
   }
 
   _buildMetaText(layer) {
+    if (layer.availabilityStatus === 'coming_soon') return 'COMING SOON · This layer is being prepared';
+    if (layer.availabilityStatus === 'maintenance') return 'MAINTENANCE · Temporarily unavailable';
     const stats = layer.stats || {};
     const feedState = layerFeedState(stats);
     const stateLabel = FEED_STATE_LABELS[feedState];
@@ -2253,6 +2296,16 @@ export class DataLayerManager {
   }
 
   _syncToggleButton(button, layer) {
+    const availabilityStatus = layer.availabilityStatus || 'live';
+    if (availabilityStatus !== 'live') {
+      const label = availabilityStatus === 'maintenance' ? 'MAINTENANCE' : 'COMING SOON';
+      button.className = 'data-toggle-btn availability-unavailable';
+      button.dataset.feedState = availabilityStatus;
+      button.disabled = true;
+      button.textContent = label;
+      button.setAttribute('aria-label', `${layer.name}: ${label}`);
+      return;
+    }
     const feedState = layer.enabled ? layerFeedState(layer.stats) : 'off';
     const transitioning = layer.lifecycleState === 'enabling' || layer.lifecycleState === 'disabling';
     const uncertain = Boolean(layer.lifecycleUncertain);

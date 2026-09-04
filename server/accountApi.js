@@ -1,6 +1,11 @@
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import pg from 'pg';
+import {
+  PUBLIC_LAYER_IDS,
+  mergeLayerAvailability,
+  normalizeLayerAvailabilityStatus,
+} from '../src/data/layerAvailability.js';
 
 const { Pool } = pg;
 const scrypt = promisify(crypto.scrypt);
@@ -10,6 +15,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ACTIVITY_TYPES = new Set([
   'page_view', 'search', 'ui_action', 'filter_change', 'scanner_interest',
 ]);
+const PUBLIC_LAYER_ID_SET = new Set(PUBLIC_LAYER_IDS);
 
 function json(res, status, payload, headers = {}) {
   res.statusCode = status;
@@ -168,6 +174,13 @@ export function createAccountApi(options = {}) {
       );
       INSERT INTO gev_settings (key, value) VALUES ('registration_autopilot', 'false')
         ON CONFLICT (key) DO NOTHING;
+      CREATE TABLE IF NOT EXISTS gev_layer_availability (
+        layer_id TEXT PRIMARY KEY,
+        status TEXT NOT NULL DEFAULT 'live'
+          CHECK (status IN ('live', 'coming_soon', 'maintenance', 'disabled')),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_by BIGINT REFERENCES gev_users(id) ON DELETE SET NULL
+      );
       CREATE TABLE IF NOT EXISTS gev_public_safety_sources (
         id BIGSERIAL PRIMARY KEY,
         country_code TEXT NOT NULL,
@@ -214,6 +227,15 @@ export function createAccountApi(options = {}) {
   const isAutopilotEnabled = async () => {
     const result = await pool.query("SELECT value FROM gev_settings WHERE key = 'registration_autopilot'");
     return result.rows[0]?.value === 'true';
+  };
+
+  const getLayerAvailability = async () => {
+    const result = await pool.query(`
+      SELECT layer_id AS "layerId", status
+      FROM gev_layer_availability
+      ORDER BY layer_id
+    `);
+    return mergeLayerAvailability(result.rows);
   };
 
   const record = async (req, eventType, metadata = {}, user = null) => {
@@ -385,10 +407,16 @@ export function createAccountApi(options = {}) {
         return json(res, 200, { user: await currentUser(req) });
       }
 
+      if (url.pathname === '/api/account/layers' && req.method === 'GET') {
+        const user = await currentUser(req);
+        if (!user) return json(res, 401, { error: 'Sign in required' });
+        return json(res, 200, { layers: await getLayerAvailability() });
+      }
+
       if (url.pathname === '/api/account/admin' && req.method === 'GET') {
         const user = await currentUser(req);
         if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
-        const [autopilot, accounts] = await Promise.all([
+        const [autopilot, accounts, layers] = await Promise.all([
           isAutopilotEnabled(),
           pool.query(`
             SELECT id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt"
@@ -398,11 +426,31 @@ export function createAccountApi(options = {}) {
               created_at DESC
             LIMIT 250
           `, [ownerEmail]),
+          getLayerAvailability(),
         ]);
         return json(res, 200, {
           autopilot,
           accounts: accounts.rows.map((account) => ({ ...account, id: String(account.id) })),
+          layers,
         });
+      }
+
+      if (url.pathname === '/api/account/admin/layers' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const body = await readJson(req);
+        const layerId = safeText(body.layerId, 80);
+        const status = normalizeLayerAvailabilityStatus(body.status);
+        if (!PUBLIC_LAYER_ID_SET.has(layerId)) return json(res, 400, { error: 'Choose a valid layer' });
+        if (status !== body.status) return json(res, 400, { error: 'Choose a valid layer state' });
+        await pool.query(`
+          INSERT INTO gev_layer_availability (layer_id, status, updated_at, updated_by)
+          VALUES ($1, $2, NOW(), $3)
+          ON CONFLICT (layer_id) DO UPDATE SET
+            status = EXCLUDED.status, updated_at = NOW(), updated_by = EXCLUDED.updated_by
+        `, [layerId, status, user.id]);
+        await record(req, 'ui_action', { action: 'layer_availability', layerId, status }, user);
+        return json(res, 200, { ok: true, layers: await getLayerAvailability() });
       }
 
       if (url.pathname === '/api/account/admin/autopilot' && req.method === 'POST') {

@@ -49,6 +49,18 @@ test('owner access includes a Postgres approval dashboard and Autopilot controls
   assert.match(account, /api\/account\/admin\/autopilot/);
   assert.match(account, /api\/account\/admin\/users/);
   assert.match(account, /REGISTRATION AUTOPILOT/i);
+  assert.match(index, /data-owner-layers/);
+  assert.match(index, /LAYER AVAILABILITY/);
+  assert.match(account, /api\/account\/admin\/layers/);
+});
+
+test('phones receive a friendly tablet-or-PC compatibility gate before authentication', () => {
+  assert.match(index, /id="phone-compatibility-gate"[^>]*hidden/);
+  assert.match(index, /iPad, tablet, laptop, or desktop PC/);
+  assert.match(index, /Your phone did absolutely nothing wrong/);
+  assert.match(bootstrap, /detectPhoneLikeDevice\(\)/);
+  assert.match(bootstrap, /classList\.add\('phone-unsupported'\)/);
+  assert.match(css, /body\.phone-unsupported/);
 });
 
 test('boot screen names every required initialization phase', () => {

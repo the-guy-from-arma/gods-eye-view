@@ -31,11 +31,42 @@
 }
 
 /* ThunderLink accounts and public-safety preview */
-body.auth-pending > :not(#account-dialog):not(#platform-disclaimer-dialog):not(script) { visibility: hidden !important; }
-body.auth-pending #account-dialog, body.auth-pending #platform-disclaimer-dialog { visibility: visible; }
+body.auth-pending > :not(#account-dialog):not(#platform-disclaimer-dialog):not(#phone-compatibility-gate):not(script) { visibility: hidden !important; }
+body.auth-pending #account-dialog, body.auth-pending #platform-disclaimer-dialog, body.auth-pending #phone-compatibility-gate { visibility: visible; }
 body.auth-pending #account-chip { display: none; }
 body.auth-pending .account-close { visibility: hidden; pointer-events: none; }
 body.auth-pending { background: #02060a; }
+
+#phone-compatibility-gate[hidden] { display: none; }
+body.phone-unsupported > :not(#phone-compatibility-gate):not(script) { display: none !important; }
+body.phone-unsupported { overflow: auto; background: #02080d; }
+#phone-compatibility-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 34px 28px;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(0, 206, 255, .15), transparent 30%),
+    linear-gradient(145deg, #02070c, #06131a 54%, #02070c);
+  color: #dffaff;
+  text-align: center;
+}
+#phone-compatibility-gate::before { content: ''; position: fixed; inset: 14px; border: 1px solid rgba(79, 225, 250, .22); pointer-events: none; }
+.phone-compatibility-orbit { position: relative; display: grid; place-items: center; width: 118px; height: 118px; border: 1px solid rgba(84, 232, 255, .35); border-radius: 50%; box-shadow: 0 0 40px rgba(0, 214, 255, .13); }
+.phone-compatibility-orbit::before { content: ''; position: absolute; inset: 18px -12px; border: 1px solid rgba(84, 232, 255, .28); border-radius: 50%; transform: rotate(-22deg); }
+.phone-compatibility-orbit i { font-style: normal; font-size: 44px; filter: drop-shadow(0 0 12px rgba(76, 223, 255, .45)); }
+.phone-compatibility-orbit span { position: absolute; top: -2px; right: 3px; font-size: 25px; transform: rotate(10deg); }
+.phone-compatibility-kicker { color: #50eaff; font: 600 9px/1 'JetBrains Mono', monospace; letter-spacing: .2em; }
+#phone-compatibility-gate h1 { width: min(100%, 430px); font: 500 clamp(25px, 8vw, 38px)/1.1 Inter, sans-serif; }
+#phone-compatibility-gate p { width: min(100%, 430px); color: #91adb4; font: 400 14px/1.65 Inter, sans-serif; }
+#phone-compatibility-gate strong { width: min(100%, 430px); padding: 14px 16px; border: 1px solid rgba(82, 229, 255, .35); background: rgba(11, 78, 94, .22); color: #baf6ff; font: 600 11px/1.45 'JetBrains Mono', monospace; letter-spacing: .07em; }
+#phone-compatibility-gate small { color: #62838b; font: 400 11px/1.5 'JetBrains Mono', monospace; }
 #account-signed-in[hidden], #account-signed-out[hidden] { display: none !important; }
 
 #account-chip {
@@ -206,6 +237,23 @@ body.auth-pending { background: #02060a; }
 .owner-dashboard-warning .material-symbols-outlined { color: #ffc36c; font-size: 16px; }
 .owner-dashboard-warning p { color: #9b8e77; font-size: 8px; line-height: 1.55; }
 .owner-dashboard-warning strong { color: #ffc36c; }
+.owner-dashboard-layers { position: relative; display: grid; gap: 10px; padding: 17px 28px 5px; }
+.owner-layers-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+.owner-layers-heading > div { display: grid; gap: 3px; }
+.owner-layers-heading > div > span { color: #5d8790; font-size: 7px; letter-spacing: .15em; }
+.owner-layers-heading strong { color: #c9f8ff; font-size: 11px; letter-spacing: .15em; }
+.owner-layers-heading > span { color: #6d999f; font-size: 8px; }
+.owner-dashboard-layers > p { color: #68878e; font-size: 8px; line-height: 1.5; }
+.owner-layers { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-height: 210px; overflow-y: auto; padding-right: 5px; scrollbar-color: rgba(74, 222, 247, .45) rgba(6, 25, 33, .8); }
+.owner-layer-row { display: grid; grid-template-columns: minmax(0, 1fr) 118px; align-items: center; gap: 10px; min-height: 48px; padding: 7px 9px; border: 1px solid rgba(77, 208, 230, .18); background: rgba(5, 25, 34, .57); }
+.owner-layer-row > span { display: grid; min-width: 0; gap: 3px; }
+.owner-layer-row strong { overflow: hidden; color: #bfeaf0; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.owner-layer-row small { overflow: hidden; color: #4f747b; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.owner-layer-row select { min-width: 0; height: 30px; border: 1px solid rgba(79, 222, 244, .32); background: #06141b; color: #7feac6; font: 600 7px/1 'JetBrains Mono', monospace; letter-spacing: .05em; }
+.owner-layer-row[data-status="coming_soon"] select { color: #77dff1; }
+.owner-layer-row[data-status="maintenance"] select { color: #ffc36c; }
+.owner-layer-row[data-status="disabled"] { opacity: .62; }
+.owner-layer-row[data-status="disabled"] select { color: #ff9a8d; }
 .owner-dashboard-accounts { position: relative; display: grid; gap: 10px; padding: 17px 28px 20px; }
 .owner-accounts-heading { display: flex; align-items: end; justify-content: space-between; gap: 14px; }
 .owner-accounts-heading > div { display: grid; gap: 4px; }
@@ -303,6 +351,8 @@ body.auth-pending { background: #02060a; }
   .owner-dashboard-metrics article { min-height: 78px; }
   .owner-dashboard-policy { margin: 8px 18px 0; }
   .owner-dashboard-warning { margin: 8px 18px 0; }
+  .owner-dashboard-layers { padding: 15px 18px 5px; }
+  .owner-layers { grid-template-columns: 1fr; }
   .owner-dashboard-accounts { padding: 15px 18px; }
   .owner-account-row { grid-template-columns: 1fr; align-items: stretch; }
   .owner-account-actions button { flex: 1; }
@@ -4795,6 +4845,13 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 .data-toggle-row:hover {
   background: rgba(255, 255, 255, 0.03);
 }
+.data-toggle-row[data-availability-status="coming_soon"],
+.data-toggle-row[data-availability-status="maintenance"] { opacity: .68; }
+.data-toggle-row[data-availability-status="coming_soon"] .data-name::after,
+.data-toggle-row[data-availability-status="maintenance"] .data-name::after { display: inline-block; margin-left: 7px; padding: 2px 4px; border: 1px solid currentColor; font-size: 6px; letter-spacing: .08em; vertical-align: 1px; }
+.data-toggle-row[data-availability-status="coming_soon"] .data-name::after { content: 'COMING SOON'; color: #6bdff1; }
+.data-toggle-row[data-availability-status="maintenance"] .data-name::after { content: 'MAINTENANCE'; color: #ffc36c; }
+.data-toggle-btn.availability-unavailable { width: auto; min-width: 74px; padding: 0 7px; cursor: not-allowed; opacity: .78; font-size: 6px; }
 
 /* Selected-only, provenance-first proximity results. This is intentionally a
    contextual panel, not a radar/engagement display. */

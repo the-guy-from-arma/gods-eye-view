@@ -55,6 +55,8 @@ export function initAccounts(options = {}) {
   const ownerAutopilotDescription = ownerDashboardDialog?.querySelector('[data-owner-autopilot-description]');
   const ownerAccountsHost = ownerDashboardDialog?.querySelector('[data-owner-accounts]');
   const ownerAccountCount = ownerDashboardDialog?.querySelector('[data-owner-account-count]');
+  const ownerLayersHost = ownerDashboardDialog?.querySelector('[data-owner-layers]');
+  const ownerLayerCount = ownerDashboardDialog?.querySelector('[data-owner-layer-count]');
   const ownerStatus = ownerDashboardDialog?.querySelector('[data-owner-status]');
   const ownerMetrics = new Map([...(ownerDashboardDialog?.querySelectorAll('[data-owner-metric]') || [])]
     .map((node) => [node.dataset.ownerMetric, node]));
@@ -185,6 +187,40 @@ export function initAccounts(options = {}) {
       : 'Manual approval is active.';
   };
 
+  const renderOwnerLayers = (layers = []) => {
+    if (!ownerLayersHost || !ownerLayerCount) return;
+    const live = layers.filter((layer) => layer.status === 'live').length;
+    ownerLayerCount.textContent = `${live} LIVE · ${layers.length} TOTAL`;
+    ownerLayersHost.replaceChildren(...layers.map((layer) => {
+      const row = document.createElement('label');
+      row.className = 'owner-layer-row';
+      row.dataset.status = layer.status;
+      const identity = document.createElement('span');
+      const name = document.createElement('strong');
+      const id = document.createElement('small');
+      name.textContent = layer.name;
+      id.textContent = layer.id;
+      identity.append(name, id);
+      const select = document.createElement('select');
+      select.dataset.ownerLayerId = layer.id;
+      select.setAttribute('aria-label', `${layer.name} public availability`);
+      for (const [value, label] of [
+        ['live', 'LIVE'],
+        ['coming_soon', 'COMING SOON'],
+        ['maintenance', 'MAINTENANCE'],
+        ['disabled', 'DISABLED'],
+      ]) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        option.selected = layer.status === value;
+        select.appendChild(option);
+      }
+      row.append(identity, select);
+      return row;
+    }));
+  };
+
   const loadOwnerDashboard = async () => {
     ownerAccountsHost.textContent = 'Loading access queue…';
     setOwnerStatus('SYNCHRONIZING WITH RAILWAY POSTGRES');
@@ -192,6 +228,7 @@ export function initAccounts(options = {}) {
       const payload = await api('/api/account/admin');
       paintAutopilot(Boolean(payload.autopilot));
       renderOwnerAccounts(payload.accounts);
+      renderOwnerLayers(payload.layers);
       setOwnerStatus(`SYNC COMPLETE · ${payload.accounts.length} ACCOUNTS`);
     } catch (error) {
       ownerAccountsHost.textContent = error.message;
@@ -338,6 +375,25 @@ export function initAccounts(options = {}) {
     } catch (error) {
       setOwnerStatus(error.message, true);
       button.disabled = false;
+    }
+  });
+  ownerLayersHost?.addEventListener('change', async (event) => {
+    const select = event.target.closest('[data-owner-layer-id]');
+    if (!select) return;
+    select.disabled = true;
+    try {
+      const payload = await api('/api/account/admin/layers', {
+        method: 'POST',
+        body: JSON.stringify({ layerId: select.dataset.ownerLayerId, status: select.value }),
+      });
+      renderOwnerLayers(payload.layers);
+      window.dispatchEvent(new CustomEvent('gev:layer-availability-changed', {
+        detail: { layers: payload.layers },
+      }));
+      setOwnerStatus(`${select.dataset.ownerLayerId.toUpperCase()} SET TO ${select.value.replace('_', ' ').toUpperCase()}`);
+    } catch (error) {
+      setOwnerStatus(error.message, true);
+      await loadOwnerDashboard();
     }
   });
 

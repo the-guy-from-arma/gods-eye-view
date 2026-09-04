@@ -50,6 +50,26 @@ test('keeps panel-hidden coordinator layers registered and addressable', () => {
   assert.equal(mgr.isEnabled('military-awareness'), false);
 });
 
+test('layer availability hides disabled rows and blocks unavailable activation', async () => {
+  const mgr = new DataLayerManager({});
+  const live = makeSlowLayer('flights', { updateInterval: -1 });
+  const unavailable = makeSlowLayer('radio', { updateInterval: -1 });
+  mgr.register(live.module);
+  mgr.register(unavailable.module);
+
+  await mgr.applyLayerAvailability([
+    { id: 'flights', status: 'disabled' },
+    { id: 'radio', status: 'maintenance' },
+  ]);
+
+  const states = Object.fromEntries(mgr.getAll().map((layer) => [layer.id, layer.availabilityStatus]));
+  assert.deepEqual(states, { flights: 'disabled', radio: 'maintenance' });
+  assert.equal(await mgr.setEnabled('flights', true), false);
+  assert.equal(await mgr.setEnabled('radio', true), false);
+  assert.equal(live.calls.enable, 0);
+  assert.equal(unavailable.calls.enable, 0);
+});
+
 test('adopts direct layer params without re-entering the layer setter', () => {
   let params = { selectedFlightsTrackingId: 'flight-a' };
   let setterCalls = 0;

@@ -161,6 +161,32 @@ test('owner can enable Autopilot and manually approve or reject accounts', async
   assert.equal(calls.some(({ sql, params }) => /DELETE FROM gev_sessions WHERE user_id/.test(sql) && params[0] === 27), true);
 });
 
+test('owner can publish maintenance state while invalid layer changes are rejected', async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM gev_sessions/.test(sql)) return { rows: [{ id: 1, email: 'owner@example.com', email_verified_at: new Date() }] };
+      if (/SELECT layer_id AS/.test(sql)) return { rows: [{ layerId: 'radio', status: 'maintenance' }] };
+      return { rows: [] };
+    },
+  };
+  const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
+  const req = request('POST', '/api/account/admin/layers', { layerId: 'radio', status: 'maintenance' });
+  req.headers.cookie = 'gev_session=owner-session';
+  const res = response();
+  await middleware(req, res, () => assert.fail('account path must not fall through'));
+  assert.equal(res.statusCode, 200);
+  assert.equal(JSON.parse(res.body).layers.find(({ id }) => id === 'radio').status, 'maintenance');
+  assert.equal(calls.some(({ sql, params }) => /INSERT INTO gev_layer_availability/.test(sql) && params[0] === 'radio' && params[1] === 'maintenance'), true);
+
+  const badReq = request('POST', '/api/account/admin/layers', { layerId: '../../secret', status: 'disabled' });
+  badReq.headers.cookie = 'gev_session=owner-session';
+  const badRes = response();
+  await middleware(badReq, badRes, () => assert.fail('account path must not fall through'));
+  assert.equal(badRes.statusCode, 400);
+});
+
 test('a pending account cannot sign in before owner approval', async () => {
   const digest = await new Promise((resolve, reject) => {
     crypto.scrypt('valid-user-password', '00112233445566778899aabbccddeeff', 64, (error, key) => {

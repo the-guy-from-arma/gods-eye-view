@@ -1,4 +1,5 @@
 import { initAccounts } from './account.js';
+import { detectPhoneLikeDevice } from './deviceCompatibility.js';
 
 const loadingScreen = document.getElementById('loading-screen');
 const loaderStatus = loadingScreen?.querySelector('.loader-status');
@@ -45,4 +46,9 @@ async function startGodsEye() {
   }
 }
 
-initAccounts({ required: true, onAuthenticated: startGodsEye });
+if (detectPhoneLikeDevice()) {
+  document.body.classList.add('phone-unsupported');
+  document.getElementById('phone-compatibility-gate')?.removeAttribute('hidden');
+} else {
+  initAccounts({ required: true, onAuthenticated: startGodsEye });
+}

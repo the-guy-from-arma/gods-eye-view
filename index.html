@@ -14,6 +14,14 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
 </head>
 <body class="auth-pending">
+  <main id="phone-compatibility-gate" hidden aria-labelledby="phone-compatibility-title">
+    <div class="phone-compatibility-orbit" aria-hidden="true"><span>🛰️</span><i>🌎</i></div>
+    <span class="phone-compatibility-kicker">THUNDERLINK · FRIENDLY HEADS-UP</span>
+    <h1 id="phone-compatibility-title">Oh, crumbs—this globe needs a little more elbow room.</h1>
+    <p>We’re really sorry! God’s Eye packs a very big world into one screen, and phones are just a bit too cozy for the controls right now.</p>
+    <strong>Please come back on an iPad, tablet, laptop, or desktop PC.</strong>
+    <small>Your phone did absolutely nothing wrong. Promise. 💙</small>
+  </main>
   <div id="cesiumContainer"></div>
   <div id="world-overlay-root" aria-hidden="true">
     <canvas id="world-overlay-canvas"></canvas>
@@ -979,8 +987,8 @@
     <header class="owner-dashboard-header">
       <div>
         <span class="owner-dashboard-kicker">THUNDERLINK · OWNER COMMAND</span>
-        <h2 id="owner-dashboard-title">Account Control</h2>
-        <p>Railway Postgres access management and registration policy</p>
+        <h2 id="owner-dashboard-title">System Control</h2>
+        <p>Railway Postgres access management, layer availability, and registration policy</p>
       </div>
       <div class="owner-dashboard-header-actions">
         <button type="button" data-owner-refresh>
@@ -1014,6 +1022,14 @@
       <span class="material-symbols-outlined" aria-hidden="true">warning</span>
       <p><strong>CONTROLLED ACCESS:</strong> When Autopilot is ON, anyone who can reach this Railway app can create an approved account without proving ownership of the submitted email address. Keep it OFF for manual review.</p>
     </div>
+    <section class="owner-dashboard-layers" aria-labelledby="owner-layers-title">
+      <div class="owner-layers-heading">
+        <div><span>PUBLIC CONSOLE</span><strong id="owner-layers-title">LAYER AVAILABILITY</strong></div>
+        <span data-owner-layer-count>0 LIVE · 0 TOTAL</span>
+      </div>
+      <p>LIVE is usable. COMING SOON and MAINTENANCE stay listed but cannot be opened. DISABLED removes the layer from the public list completely.</p>
+      <div class="owner-layers" data-owner-layers></div>
+    </section>
     <section class="owner-dashboard-accounts" aria-labelledby="owner-accounts-title">
       <div class="owner-accounts-heading">
         <div><span>ACCESS REGISTRY</span><strong id="owner-accounts-title">ACCOUNT QUEUE</strong></div>
