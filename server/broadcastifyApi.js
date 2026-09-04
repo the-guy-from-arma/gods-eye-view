@@ -9,6 +9,27 @@ const CATALOG_REQUESTS = Object.freeze([
   Object.freeze({ genreId: 8, params: { genre: '8' } }),
   Object.freeze({ genreId: 1, top: true, params: { genre: '1', top: '50' } }),
 ]);
+const UNFILTERED_REQUEST = Object.freeze({ genreId: null, params: {} });
+
+function upstreamError(status) {
+  const credentialRejected = status === 401 || status === 403;
+  const error = new Error(credentialRejected
+    ? 'Broadcastify rejected the configured application key'
+    : `Broadcastify catalog returned HTTP ${status}`);
+  error.status = credentialRejected ? 503 : status;
+  error.upstreamStatus = status;
+  error.code = credentialRejected ? 'credential_rejected' : 'upstream_response';
+  return error;
+}
+
+function transportError(cause) {
+  const error = new Error(cause?.name === 'TimeoutError'
+    ? 'Broadcastify catalog request timed out'
+    : 'Broadcastify catalog transport failed');
+  error.status = 502;
+  error.code = cause?.name === 'TimeoutError' ? 'upstream_timeout' : 'upstream_unreachable';
+  return error;
+}
 
 function respond(res, status, payload) {
   res.statusCode = status;
@@ -31,20 +52,48 @@ export function broadcastifyApiPlugin(options = {}) {
       error.status = 503;
       throw error;
     }
-    const catalogs = await Promise.all(CATALOG_REQUESTS.map(async (request) => {
+    const fetchCatalog = async (request) => {
       const url = new URL(UPSTREAM_URL);
       url.search = new URLSearchParams({ a: 'feeds', type: 'json', ...request.params, key }).toString();
-      const response = await fetchImpl(url, {
-        headers: { Accept: 'application/json', 'User-Agent': "ThunderLink-Gods-Eye/1.0" },
-        signal: AbortSignal.timeout(20_000),
-      });
-      if (!response.ok) {
-        const error = new Error(`Broadcastify catalog returned HTTP ${response.status}`);
-        error.status = response.status === 401 || response.status === 403 ? 502 : response.status;
+      let response;
+      try {
+        response = await fetchImpl(url, {
+          headers: { Accept: 'application/json', 'User-Agent': "ThunderLink-Gods-Eye/1.0" },
+          signal: AbortSignal.timeout(20_000),
+        });
+      } catch (error) {
+        throw transportError(error);
+      }
+      if (!response.ok) throw upstreamError(response.status);
+      try {
+        return normalizeBroadcastifyCatalog(await response.json(), undefined, request);
+      } catch {
+        const error = new Error('Broadcastify returned an invalid catalog response');
+        error.status = 502;
+        error.code = 'invalid_upstream_payload';
         throw error;
       }
-      return normalizeBroadcastifyCatalog(await response.json(), undefined, request);
-    }));
+    };
+
+    // Public Safety is the only catalog required to serve the layer. Special
+    // events, disaster events, and listener rankings enrich it, but one
+    // optional rejection must never turn an otherwise valid directory into a
+    // 502. If a license rejects the genre filter, the documented unfiltered
+    // catalog remains a compatible fallback and is filtered locally.
+    let primary;
+    let usedUnfilteredFallback = false;
+    try {
+      primary = await fetchCatalog(CATALOG_REQUESTS[0]);
+    } catch (error) {
+      if (error?.code === 'credential_rejected') throw error;
+      primary = await fetchCatalog(UNFILTERED_REQUEST);
+      usedUnfilteredFallback = true;
+    }
+    const optional = await Promise.allSettled(CATALOG_REQUESTS.slice(1).map(fetchCatalog));
+    const catalogs = [primary, ...optional
+      .filter((result) => result.status === 'fulfilled')
+      .map((result) => result.value)];
+    const optionalFailureCount = optional.filter((result) => result.status === 'rejected').length;
     const byFeedId = new Map();
     for (const feed of catalogs.flat()) {
       const previous = byFeedId.get(feed.feedId);
@@ -73,6 +122,8 @@ export function broadcastifyApiPlugin(options = {}) {
       activeEventCount: feeds.filter((feed) => feed.activeSignal).length,
       updatedAt: new Date().toISOString(),
       cachedAt: Date.now(),
+      degraded: usedUnfilteredFallback || optionalFailureCount > 0,
+      optionalFailureCount,
     });
     return cache;
   };
@@ -100,14 +151,25 @@ export function broadcastifyApiPlugin(options = {}) {
             activeEventCount: catalog.activeEventCount,
             updatedAt: catalog.updatedAt,
             stale: catalog.stale,
+            degraded: catalog.degraded,
+            optionalFailureCount: catalog.optionalFailureCount,
             provider: 'Broadcastify',
             playbackMode: 'provider-link',
           });
         } catch (error) {
+          console.warn('[Broadcastify Proxy]', {
+            code: error?.code || 'catalog_unavailable',
+            status: error?.status || 502,
+            upstreamStatus: error?.upstreamStatus || null,
+          });
           return respond(res, error?.status || 502, {
-            error: error?.status === 503
-              ? 'Broadcastify key is not configured'
-              : 'Broadcastify catalog is temporarily unavailable',
+            error: error?.code === 'credential_rejected'
+              ? 'Broadcastify rejected the configured application key'
+              : (error?.status === 503
+                ? 'Broadcastify key is not configured'
+                : 'Broadcastify catalog is temporarily unavailable'),
+            code: error?.code || 'catalog_unavailable',
+            ...(Number.isInteger(error?.upstreamStatus) ? { upstreamStatus: error.upstreamStatus } : {}),
           });
         }
       });

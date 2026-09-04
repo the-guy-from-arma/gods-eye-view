@@ -54,3 +54,70 @@ test('Broadcastify proxy reports an unconfigured server without attempting an up
   assert.equal(res.statusCode, 503);
   assert.equal(calls, 0);
 });
+
+test('optional event catalog failures do not take down a valid public-safety catalog', async () => {
+  let handler;
+  let calls = 0;
+  const plugin = broadcastifyApiPlugin({
+    env: { BROADCASTIFY_API_KEY: 'licensed-secret-value' },
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) return {
+        ok: true,
+        json: async () => [{ feedId: 41, description: 'Metro Police Dispatch', lat: 30, lon: -97 }],
+      };
+      return { ok: false, status: 429 };
+    },
+  });
+  plugin.configureServer({ middlewares: { use(_path, fn) { handler = fn; } } });
+  const res = responseRecorder();
+  await handler({ method: 'GET' }, res);
+  const payload = JSON.parse(res.body);
+  assert.equal(res.statusCode, 200);
+  assert.equal(payload.feeds.length, 1);
+  assert.equal(payload.degraded, true);
+  assert.equal(payload.optionalFailureCount, 3);
+});
+
+test('credential rejection is reported explicitly without exposing the key', async () => {
+  let handler;
+  let calls = 0;
+  const plugin = broadcastifyApiPlugin({
+    env: { BROADCASTIFY_API_KEY: 'licensed-secret-value' },
+    fetchImpl: async () => { calls += 1; return { ok: false, status: 403 }; },
+  });
+  plugin.configureServer({ middlewares: { use(_path, fn) { handler = fn; } } });
+  const res = responseRecorder();
+  await handler({ method: 'GET' }, res);
+  const payload = JSON.parse(res.body);
+  assert.equal(res.statusCode, 503);
+  assert.equal(payload.code, 'credential_rejected');
+  assert.equal(payload.upstreamStatus, 403);
+  assert.equal(res.body.includes('licensed-secret-value'), false);
+  assert.equal(calls, 1, 'credential rejection must not trigger more licensed requests');
+});
+
+test('a failed genre-filter request falls back to the documented unfiltered catalog', async () => {
+  let handler;
+  const requestedUrls = [];
+  const plugin = broadcastifyApiPlugin({
+    env: { BROADCASTIFY_API_KEY: 'licensed-secret-value' },
+    fetchImpl: async (url) => {
+      requestedUrls.push(String(url));
+      if (requestedUrls.length === 1) throw new TypeError('network fixture');
+      if (requestedUrls.length === 2) return {
+        ok: true,
+        json: async () => [{ feedId: 51, description: 'County Sheriff Dispatch', lat: 30, lon: -97 }],
+      };
+      return { ok: false, status: 429 };
+    },
+  });
+  plugin.configureServer({ middlewares: { use(_path, fn) { handler = fn; } } });
+  const res = responseRecorder();
+  await handler({ method: 'GET' }, res);
+  const payload = JSON.parse(res.body);
+  assert.equal(res.statusCode, 200);
+  assert.equal(payload.feeds.length, 1);
+  assert.equal(payload.degraded, true);
+  assert.equal(new URL(requestedUrls[1]).searchParams.has('genre'), false);
+});

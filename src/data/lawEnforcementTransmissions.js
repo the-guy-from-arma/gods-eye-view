@@ -84,8 +84,8 @@ export function createLawEnforcementTransmissionsLayer() {
       controller = new AbortController();
       try {
         const response = await fetch(ENDPOINT, { signal: controller.signal });
-        if (!response.ok) throw new Error(`Broadcastify directory returned ${response.status}`);
-        const payload = await response.json();
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || `Broadcastify directory returned ${response.status}`);
         if (!Array.isArray(payload?.feeds)) throw new Error('Broadcastify directory response was malformed');
 
         dataSource.entities.removeAll();
@@ -145,7 +145,7 @@ export function createLawEnforcementTransmissionsLayer() {
             },
           });
         }
-        stale = payload.stale === true;
+        stale = payload.stale === true || payload.degraded === true;
         lastUpdate = Date.now();
         lastError = null;
         viewer?.scene?.requestRender?.();
