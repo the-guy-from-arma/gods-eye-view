@@ -6767,6 +6767,64 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
     0 1px 0 rgba(255, 255, 255, 0.06) inset;
 }
 
+/* Scene catalog remains inspectable while playback is intentionally paused. */
+.scene-preview-badge,
+.scene-disabled-notice {
+  display: none;
+}
+
+#scene-panel.scene-feature-disabled .scene-panel-inner {
+  background: rgba(5, 10, 16, 0.48);
+  border-color: rgba(0, 212, 255, 0.16);
+  backdrop-filter: blur(14px) saturate(0.85);
+  -webkit-backdrop-filter: blur(14px) saturate(0.85);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+#scene-panel.scene-feature-disabled .scene-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: rgba(168, 247, 255, 0.58);
+  font-family: var(--font-mono);
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+
+#scene-panel.scene-feature-disabled .scene-disabled-notice {
+  display: block;
+  margin: 0 0 9px;
+  color: rgba(168, 247, 255, 0.5);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 1.35px;
+  text-align: center;
+}
+
+#scene-panel.scene-feature-disabled :is(
+  .scene-shot-list,
+  .scene-progress,
+  #scene-status,
+  .scene-controls button
+) {
+  opacity: 0.42;
+}
+
+#scene-panel.scene-feature-disabled :is(button, .scene-shot-btn):disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+#scene-panel.scene-feature-disabled #scene-select {
+  opacity: 0.72;
+}
+
+#scene-panel.scene-feature-disabled.collapsed .scene-disabled-notice {
+  display: none;
+}
+
 .scene-controls {
   display: flex;
   gap: 8px;

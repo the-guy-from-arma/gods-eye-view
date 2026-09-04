@@ -1077,6 +1077,14 @@ function controlScene(sceneDirector, args = {}) {
   if (sceneAction === 'status') {
     return { ok: true, action: 'control_scene', ...sceneDirector.getPlaybackStatus() };
   }
+  if (sceneDirector.enabled === false) {
+    return {
+      ok: false,
+      action: 'control_scene',
+      error: 'Scene playback is temporarily disabled',
+      ...sceneDirector.getPlaybackStatus(),
+    };
+  }
   if (sceneAction === 'stop') {
     sceneDirector.stopScene('Stopped by voice');
     return { ok: true, action: 'control_scene', running: false };

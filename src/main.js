@@ -253,8 +253,10 @@ async function init() {
     dataManager.buildTogglePanel(document.getElementById('data-toggles'));
     styleManager.attachDataManager(dataManager);
 
-    // Initialize deterministic scene playback for social clip capture
-    const sceneDirector = new SceneDirector(viewer, styleManager, dataManager);
+    // Keep the recipe catalog visible as a preview while scene playback is
+    // paused. This prevents recipes from applying CRT/retro visual state to the
+    // live globe until the director is deliberately re-enabled.
+    const sceneDirector = new SceneDirector(viewer, styleManager, dataManager, { enabled: false });
 
     // Initialize the voice "whiteboard" annotation engine (world-space renderer)
     const annotations = initAnnotations({ viewer, tileset });

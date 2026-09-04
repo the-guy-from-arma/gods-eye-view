@@ -173,12 +173,55 @@ function makeDirector(options = {}) {
   const viewer = fakeViewer();
   const styleManager = fakeStyleManager(options.style);
   const dataManager = fakeDataManager(options.data);
-  const director = new SceneDirector(viewer, styleManager, dataManager);
+  const director = new SceneDirector(viewer, styleManager, dataManager, options.director);
   // Telemetry is only accumulated during a run; observable-failure assertions
   // need the accumulator without driving a whole run.
   director._activeRun = { events: [] };
   return { director, viewer, styleManager, dataManager, restore };
 }
+
+test('disabled Scene preview cannot apply visual state, layers, or camera movement', async () => {
+  const { director, viewer, styleManager, dataManager, restore } = makeDirector({
+    director: { enabled: false },
+  });
+  try {
+    const status = director.getPlaybackStatus();
+    assert.equal(status.enabled, false);
+
+    assert.deepEqual(
+      await director.startScene('scene-1'),
+      { started: false, reason: 'temporarily-disabled' },
+    );
+    assert.deepEqual(
+      await director.loadShot('scene-1', 'shot-b'),
+      { loaded: false, reason: 'temporarily-disabled' },
+    );
+    assert.deepEqual(
+      await director.runNextScene(),
+      { advanced: false, reason: 'temporarily-disabled' },
+    );
+    assert.equal(director.captureShot(), false);
+
+    assert.deepEqual(styleManager.visualStates, []);
+    assert.deepEqual(dataManager.setEnabledCalls, []);
+    assert.deepEqual(viewer.flights, []);
+    assert.equal(director.running, false);
+  } finally {
+    restore();
+  }
+});
+
+test('production wiring keeps Scene options visible in disabled translucent preview mode', () => {
+  const main = fs.readFileSync(new URL('../main.js', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../../style.css', import.meta.url), 'utf8');
+
+  assert.match(main, /new SceneDirector\([\s\S]*?\{ enabled: false \}\)/);
+  assert.match(html, /class="scene-preview-badge"[\s\S]*?>PREVIEW</);
+  assert.match(html, /SCENE TOOLS TEMPORARILY DISABLED/);
+  assert.match(css, /#scene-panel\.scene-feature-disabled \.scene-panel-inner/);
+  assert.match(css, /background:\s*rgba\(5, 10, 16, 0\.48\)/);
+});
 
 /** The layer map a shipped recipe declares, in normalized form. */
 function recipeLayers(recipeId) {

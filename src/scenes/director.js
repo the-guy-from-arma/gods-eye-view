@@ -294,11 +294,14 @@ export class SceneDirector {
    * @param {Cesium.Viewer} viewer - The Cesium viewer instance
    * @param {Object} styleManager - Controls visual state (bloom, sharpen, HUD, detection, style presets)
    * @param {Object} dataManager - Manages data layer enable/disable and per-layer params
+   * @param {Object} [options]
+   * @param {boolean} [options.enabled=true] - Whether scenes may mutate the live globe
    */
-  constructor(viewer, styleManager, dataManager) {
+  constructor(viewer, styleManager, dataManager, { enabled = true } = {}) {
     this.viewer = viewer;
     this.styleManager = styleManager;
     this.dataManager = dataManager;
+    this._enabled = enabled !== false;
 
     /** @type {boolean} True while a scene run is in progress */
     this._running = false;
@@ -401,6 +404,8 @@ export class SceneDirector {
 
     this._renderSceneSelect();
     this._renderShotList();
+    this._scenePanel?.classList.toggle('scene-feature-disabled', !this._enabled);
+    this._scenePanel?.setAttribute('aria-disabled', String(!this._enabled));
 
     this._sceneSelect.addEventListener('change', () => {
       this._selectedSceneId = this._sceneSelect.value;
@@ -445,7 +450,7 @@ export class SceneDirector {
       this.downloadLastRunMetadata();
     });
 
-    this._updateStatus('Ready');
+    this._updateStatus(this._enabled ? 'Ready' : 'Preview only · Scene playback temporarily disabled');
     this._setProgress(0);
     this._setButtons(false);
   }
@@ -525,6 +530,7 @@ export class SceneDirector {
       const loadBtn = document.createElement('button');
       loadBtn.className = 'scene-shot-btn';
       loadBtn.textContent = 'LOAD';
+      loadBtn.disabled = !this._enabled;
       loadBtn.addEventListener('click', () => {
         this.loadShot(scene.id, shot.id);
       });
@@ -532,6 +538,7 @@ export class SceneDirector {
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'scene-shot-btn scene-shot-danger';
       deleteBtn.textContent = 'DEL';
+      deleteBtn.disabled = !this._enabled;
       deleteBtn.addEventListener('click', () => {
         this.deleteShot(scene.id, shot.id);
       });
@@ -575,6 +582,7 @@ export class SceneDirector {
 
   /** Prompt the user for a name and append a new empty scene to the project. */
   _createScene() {
+    if (!this._enabled) return false;
     const sceneName = window.prompt('New scene name', `Scene ${this._project.scenes.length + 1}`);
     if (!sceneName) return;
 
@@ -594,6 +602,7 @@ export class SceneDirector {
 
   /** Delete the currently selected scene after user confirmation. Resets to defaults if empty. */
   _deleteSelectedScene() {
+    if (!this._enabled) return false;
     const scene = this._getSelectedScene();
     if (!scene) return;
 
@@ -634,6 +643,7 @@ export class SceneDirector {
    * new shot appended to the selected scene. No-op if no scene is selected.
    */
   captureShot() {
+    if (!this._enabled) return false;
     const scene = this._getSelectedScene();
     if (!scene) return;
 
@@ -665,6 +675,7 @@ export class SceneDirector {
    * with the live viewport state. Useful for fine-tuning a shot in-place.
    */
   updateSelectedShot() {
+    if (!this._enabled) return false;
     const scene = this._getSelectedScene();
     if (!scene) return;
 
@@ -692,6 +703,7 @@ export class SceneDirector {
    * @param {string} shotId
    */
   deleteShot(sceneId, shotId) {
+    if (!this._enabled) return false;
     const { scene, shot } = this._getShot(sceneId, shotId);
     if (!scene || !shot) return;
 
@@ -720,6 +732,7 @@ export class SceneDirector {
    * @param {number} [options.flyDuration=2.2] - Camera flight duration in seconds
    */
   async loadShot(sceneId, shotId, { flyDuration = 2.2 } = {}) {
+    if (!this._enabled) return { loaded: false, reason: 'temporarily-disabled' };
     if (this._running) return;
     const { scene, shot } = this._getShot(sceneId, shotId);
     if (!scene || !shot) return;
@@ -849,6 +862,7 @@ export class SceneDirector {
    */
   getPlaybackStatus() {
     return {
+      enabled: this._enabled,
       running: this._running,
       selectedSceneId: this._selectedSceneId,
       sceneCount: this._project.scenes.length,
@@ -858,6 +872,11 @@ export class SceneDirector {
   /** @returns {boolean} Whether a scene run is currently in progress */
   get running() {
     return this._running;
+  }
+
+  /** @returns {boolean} Whether scene editing and playback are available. */
+  get enabled() {
+    return this._enabled;
   }
 
   /**
@@ -876,6 +895,7 @@ export class SceneDirector {
    * @returns {Promise<{started: boolean, reason?: string, shots?: number}>}
    */
   async startScene(sceneId, { single = false } = {}) {
+    if (!this._enabled) return { started: false, reason: 'temporarily-disabled' };
     if (this._running) return { started: false, reason: 'already-running' };
 
     const queue = this._buildPlaybackQueue(sceneId || this._selectedSceneId || this._project.scenes[0]?.id, { single });
@@ -1007,6 +1027,7 @@ export class SceneDirector {
    * it without starting a full run. Used for manual step-through navigation.
    */
   async runNextScene() {
+    if (!this._enabled) return { advanced: false, reason: 'temporarily-disabled' };
     if (this._running) return;
 
     const queue = this._buildPlaybackQueue(this._selectedSceneId || this._project.scenes[0]?.id);
@@ -1046,6 +1067,7 @@ export class SceneDirector {
 
   /** Export the entire project as a timestamped JSON file download. */
   exportProject() {
+    if (!this._enabled) return false;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `scene-presets-${stamp}.json`;
     const payload = JSON.stringify(this._project, null, 2);
@@ -1067,6 +1089,7 @@ export class SceneDirector {
    * @param {File} file - Browser File object from an <input type="file">
    */
   async importProjectFile(file) {
+    if (!this._enabled) return false;
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
@@ -1084,6 +1107,7 @@ export class SceneDirector {
 
   /** Download the telemetry metadata from the most recent completed run as JSON. */
   downloadLastRunMetadata() {
+    if (!this._enabled) return false;
     if (!this._lastRunJson) return;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `scene-run-${stamp}.json`;
@@ -1320,6 +1344,26 @@ export class SceneDirector {
    * @param {boolean} isRunning
    */
   _setButtons(isRunning) {
+    if (!this._enabled) {
+      // The recipe selector remains browsable, but every action is inert.
+      if (this._sceneSelect) this._sceneSelect.disabled = false;
+      for (const button of [
+        this._sceneStartBtn,
+        this._sceneStopBtn,
+        this._sceneNextBtn,
+        this._sceneNewBtn,
+        this._sceneDeleteBtn,
+        this._sceneCaptureBtn,
+        this._sceneUpdateShotBtn,
+        this._sceneExportBtn,
+        this._sceneImportBtn,
+        this._sceneDownloadBtn,
+      ]) {
+        if (button) button.disabled = true;
+      }
+      this._scenePanel?.classList.remove('running');
+      return;
+    }
     if (this._sceneStartBtn) this._sceneStartBtn.disabled = isRunning;
     if (this._sceneNextBtn) this._sceneNextBtn.disabled = isRunning;
     if (this._sceneSelect) this._sceneSelect.disabled = isRunning;
