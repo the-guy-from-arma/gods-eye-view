@@ -7566,11 +7566,26 @@ body.recording-mode #cesium-credits {
   display: flex;
   gap: 0.3rem;
   overflow-x: auto;
-  scrollbar-width: none;
+  padding-bottom: 0.28rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 212, 255, 0.58) rgba(123, 189, 211, 0.09);
 }
 
 #command-dock .location-pills::-webkit-scrollbar {
-  display: none;
+  display: block;
+  height: 0.22rem;
+}
+
+#command-dock .location-pills::-webkit-scrollbar-track,
+#command-dock .poi-row-container.expanded::-webkit-scrollbar-track {
+  background: rgba(123, 189, 211, 0.09);
+  border-radius: 999px;
+}
+
+#command-dock .location-pills::-webkit-scrollbar-thumb,
+#command-dock .poi-row-container.expanded::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.58);
+  border-radius: 999px;
 }
 
 #command-dock .location-pill,
@@ -7587,16 +7602,19 @@ body.recording-mode #cesium-credits {
   display: flex;
   justify-content: flex-start;
   gap: 0.3rem;
-  max-height: 2.1rem;
+  max-height: 2.4rem;
   margin: 0 0 0.35rem;
   overflow-x: auto;
   overflow-y: hidden;
   animation: command-dock-reveal 180ms ease-out both;
-  scrollbar-width: none;
+  padding-bottom: 0.28rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 212, 255, 0.58) rgba(123, 189, 211, 0.09);
 }
 
 #command-dock .poi-row-container.expanded::-webkit-scrollbar {
-  display: none;
+  display: block;
+  height: 0.22rem;
 }
 
 #command-dock .location-bar-divider.visible {

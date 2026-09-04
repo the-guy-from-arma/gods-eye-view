@@ -9268,6 +9268,20 @@ export class StyleManager {
       pill.addEventListener('click', () => this._onCityPillClick(cityId));
       this._locationPills.appendChild(pill);
     }
+    this._locationPills.setAttribute('tabindex', '0');
+    this._locationPills.setAttribute('role', 'region');
+    this._locationPills.setAttribute('aria-label', 'Defined locations; scroll horizontally for more');
+
+    // A vertical mouse wheel is the most discoverable way to traverse the
+    // horizontal city/landmark rails. The visible scrollbar remains draggable.
+    this._locationHorizontalWheelHandler = (event) => {
+      const rail = event.currentTarget;
+      if (!rail || rail.scrollWidth <= rail.clientWidth || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      rail.scrollLeft += event.deltaY;
+      event.preventDefault();
+    };
+    this._locationPills.addEventListener('wheel', this._locationHorizontalWheelHandler, { passive: false });
+    this._poiRow.addEventListener('wheel', this._locationHorizontalWheelHandler, { passive: false });
 
     // QWERTY keyboard navigation for POIs
     this._poiKeydownHandler = (e) => {
@@ -10233,6 +10247,11 @@ export class StyleManager {
     if (this._poiKeydownHandler) {
       document.removeEventListener('keydown', this._poiKeydownHandler);
       this._poiKeydownHandler = null;
+    }
+    if (this._locationHorizontalWheelHandler) {
+      this._locationPills?.removeEventListener('wheel', this._locationHorizontalWheelHandler);
+      this._poiRow?.removeEventListener('wheel', this._locationHorizontalWheelHandler);
+      this._locationHorizontalWheelHandler = null;
     }
     // Cancel the rAF animation loop and release its governor hold; also stop
     // the traffic-chip ticker the loop no longer carries. (perf wave 2 fix)

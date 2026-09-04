@@ -342,27 +342,25 @@ export function findPoiByName(query) {
 export const CANCELLED_SEARCH = Object.freeze({ cancelled: true });
 
 /**
- * Geocode a place name using Google Geocoding API, then fly there at a scale
- * appropriate to the request. Countries and cities use their viewport by
- * default; precise landmarks/buildings use close landmark framing.
+ * Resolve an address or place through the server's Google + OpenStreetMap
+ * search chain, then fly there at a scale appropriate to the result. Countries
+ * and cities use their viewport; exact addresses use close framing.
  */
 export async function searchAndFlyTo(viewer, query, options = {}) {
-  const apiKey = window.__GOOGLE_MAPS_API_KEY__ || import.meta.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) throw new Error('No Google Maps API key available for geocoding');
-
   const beforeFly = typeof options.beforeFly === 'function' ? options.beforeFly : null;
   const mayFly = () => beforeFly === null || beforeFly() !== false;
 
-  // Viewport-biased geocode — the same bias annotationResolver's geocodePlace uses:
-  // "Sixth Street" spoken over Austin must prefer the Sixth Street on screen, not a
-  // same-named road in another city (or the wrong end of town — the W 6th vs E 6th bug).
-  let url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`;
+  // Resolve through the same-origin Railway service. This keeps the provider key
+  // server-side and lets the service fall back from Google Geocoding to Places and
+  // OpenStreetMap. Addresses, intersections, cities and towns all share this path.
+  const params = new URLSearchParams({ q: String(query || '').trim() });
   const bias = viewportBias(viewer);
-  if (bias) url += `&bounds=${bias}`;
-  const response = await fetch(url);
+  if (bias) params.set('bounds', bias);
+  const response = await fetch(`/api/location/search?${params}`);
+  if (!response.ok) throw new Error(`Location service returned ${response.status}`);
   const data = await response.json();
 
-  const result = (data.status === 'OK' && data.results?.length) ? data.results[0] : null;
+  const result = data?.result || null;
   let lat = result?.geometry.location.lat;
   let lng = result?.geometry.location.lng;
   let label = result ? result.formatted_address : null;

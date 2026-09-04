@@ -46,6 +46,7 @@ import {
 import { filterTrailing24h, parseFirmsCsv } from './src/data/firmsCsv.js';
 import { accountApiPlugin } from './server/accountApi.js';
 import { broadcastifyApiPlugin } from './server/broadcastifyApi.js';
+import { locationSearchApiPlugin } from './server/locationSearchApi.js';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { defineConfig, loadEnv } from 'vite';
@@ -7822,6 +7823,7 @@ export default defineConfig(({ mode }) => {
       aisLiveProxy(),
       trackBackfillProxies(),
       openAiRealtimeProxy(),
+      locationSearchApiPlugin({ env }),
       googlePlacesContextProxy(),
       accountApiPlugin({ env }),
       keySetupEndpoint(),

@@ -59,7 +59,8 @@ async function runSearch(viewer, options, { result = AUSTIN_RESULT, query = 'aus
   const priorFetch = globalThis.fetch;
   globalThis.window = { __GOOGLE_MAPS_API_KEY__: 'test-key' };
   globalThis.fetch = async () => ({
-    json: async () => ({ status: 'OK', results: [result] }),
+    ok: true,
+    json: async () => ({ result }),
   });
   try {
     return await searchAndFlyTo(viewer, query, options);
@@ -98,6 +99,15 @@ test('parks / lakes / campuses frame as area-overview, not precise-place', () =>
 test('streets frame as street-corridor (rootcause doc §3 — Sixth Street)', () => {
   assert.equal(geocodeNavigationMode(['route']), 'street-corridor');
   assert.equal(geocodeNavigationMode(['intersection']), 'street-corridor');
+});
+
+test('free-text location lookup uses the same-origin server search chain', () => {
+  const source = fs.readFileSync(new URL('./locations.js', import.meta.url), 'utf8');
+  const start = source.indexOf('export async function searchAndFlyTo');
+  const end = source.indexOf('function placesViewportToBounds', start);
+  const search = source.slice(start, end);
+  assert.match(search, /fetch\(`\/api\/location\/search\?\$\{params\}`\)/);
+  assert.doesNotMatch(search, /maps\.googleapis\.com/, 'browser location search must not call Google directly');
 });
 
 test('existing modes unchanged: admin, city, neighborhood, precise POI', () => {
