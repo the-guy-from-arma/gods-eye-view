@@ -49,6 +49,7 @@ import { accountApiPlugin } from './server/accountApi.js';
 import { broadcastifyApiPlugin } from './server/broadcastifyApi.js';
 import { locationSearchApiPlugin } from './server/locationSearchApi.js';
 import { newsEventsApiPlugin } from './server/newsEventsApi.js';
+import { gamingDataApiPlugin } from './server/gamingDataApi.js';
 import { ttsForFreeApiPlugin } from './server/ttsForFreeApi.js';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -7914,6 +7915,7 @@ export default defineConfig(({ mode }) => {
       broadcastifyApiPlugin({ env }),
       ttsForFreeApiPlugin({ env }),
       newsEventsApiPlugin({ env }),
+      gamingDataApiPlugin({ env }),
       gbfsProxy(),
       adsbLolProxy(),
       aisLiveProxy(),

@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.04] — 2026-09-05 — BattleMetrics Gaming Data
+
+- Added an isolated, default-off Gaming Data layer and dedicated Gaming Data
+  Filters panel with dynamic game selection, server filters, clustered markers,
+  population-weighted globe heatmap, details cards, live overview, cache/freshness
+  state, manual/automatic refresh, and owner availability control.
+- Added a server-only BattleMetrics JSON:API provider with pagination, validation,
+  normalization, request coalescing, bounded retries, five-minute caching, and a
+  24-hour last-good fallback. Public reads work keylessly; the optional
+  `BATTLEMETRICS_API_TOKEN` never enters client code.
+- Added privacy wording that distinguishes approximate server/datacenter locations
+  from player locations, BattleMetrics attribution, documentation, and regression
+  coverage for provider and visualization behavior.
+- Advanced ThunderLink Oblivion to public build `0.3.04` and kernel
+  `TBSGE-KERNEL-030.005`; legal acceptance remains on bundle `0.3.02` because this
+  release adds a disclosed public data source without changing the legal contract.
+
 This changelog records public product changes. For the authoritative description
 of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
 

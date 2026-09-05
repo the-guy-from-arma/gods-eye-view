@@ -18,6 +18,7 @@ export const PUBLIC_LAYER_CATALOG = Object.freeze([
   ['flights', 'Live Flights'],
   ['flock-cameras', 'Flock Cameras'],
   ['global-news-reports', 'Global News Reports'],
+  ['gaming-data', 'Gaming Data', 'Gaming Data'],
   ['law-enforcement-transmissions', 'Law Enforcement Transmissions'],
   ['live-events', 'Live Global Events'],
   ['local-dams', 'Dams'],

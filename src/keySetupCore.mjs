@@ -14,7 +14,7 @@
 /** Longest accepted key/token value. Real provider keys are all far shorter. */
 export const KEY_SETUP_VALUE_LIMIT = 512;
 
-/** Most env vars accepted in one save. The registry defines ten. */
+/** Most env vars accepted in one save. */
 export const KEY_SETUP_UPDATE_LIMIT = 16;
 
 /** Header line written above keys the panel appends to a .env file. */
@@ -76,6 +76,14 @@ export const KEY_SETUP_KEYS = Object.freeze([
     getUrl: 'https://bcfy.io/dev',
     envVars: Object.freeze(['BROADCASTIFY_API_KEY']),
     tier: 'metered',
+  }),
+  Object.freeze({
+    id: 'battlemetrics',
+    title: 'BATTLEMETRICS',
+    unlocks: 'Higher Gaming Data read limits (public access works without it)',
+    getUrl: 'https://www.battlemetrics.com/developers',
+    envVars: Object.freeze(['BATTLEMETRICS_API_TOKEN']),
+    tier: 'free',
   }),
   Object.freeze({
     id: 'tomtom',

@@ -14,6 +14,7 @@ import cctvLayer from './data/cctv.js';
 import flockCamerasLayer from './data/flockCameras.js';
 import radioLayer from './data/radio.js';
 import lawEnforcementTransmissionsLayer from './data/lawEnforcementTransmissions.js';
+import gamingDataLayer from './data/gamingData.js';
 import bikeshareLayer from './data/bikeshare.js';
 import aisLiveVesselsLayer from './data/aisLiveVessels.js';
 import militaryInstallationsLayer from './data/militaryInstallations.js';
@@ -40,6 +41,7 @@ import { initKeySetup } from './keySetup.js';
 import { loadPhotorealisticTileset } from './mapStartup.js';
 import { initPublicSafetyPreview } from './publicSafetyPreview.js';
 import { applyInterfaceAvailability } from './interfaceAvailability.js';
+import { initGamingDataPanel } from './gamingDataPanel.js';
 
 initLogoGaze();
 const publicSafetyPreview = initPublicSafetyPreview();
@@ -238,6 +240,7 @@ async function init() {
     dataManager.register(flockCamerasLayer);
     dataManager.register(radioLayer);
     dataManager.register(lawEnforcementTransmissionsLayer);
+    dataManager.register(gamingDataLayer);
     dataManager.register(bikeshareLayer);
     dataManager.register(aisLiveVesselsLayer);
     dataManager.register(militaryInstallationsLayer);
@@ -289,6 +292,7 @@ async function init() {
       };
     }
     dataManager.buildTogglePanel(document.getElementById('data-toggles'));
+    initGamingDataPanel({ dataManager, layer: gamingDataLayer });
     styleManager.attachDataManager(dataManager);
 
     // Keep the recipe catalog visible as a preview while scene playback is

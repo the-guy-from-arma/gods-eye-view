@@ -160,6 +160,12 @@ export const DATA_CREDITS = [
       '(licensed catalog; listening opens the provider feed page)',
   },
   {
+    key: 'battlemetrics',
+    html:
+      'Gaming server data provided by ' +
+      '<a href="https://www.battlemetrics.com" target="_blank" rel="noopener">BattleMetrics</a>',
+  },
+  {
     key: 'reearth-terrain',
     html:
       'Terrain (keyless globe stacks): ' +

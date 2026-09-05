@@ -10153,3 +10153,311 @@ body.scene-playback-mode #key-setup {
   border-color: rgba(255, 170, 150, 0.65);
   outline: none;
 }
+/* ── Gaming Data / BattleMetrics (isolated additive panel) ─────────────── */
+#gaming-data-panel {
+  --gaming-cyan: #35e7ff;
+  --gaming-panel: rgba(3, 12, 18, 0.94);
+}
+
+.gaming-data-panel-inner {
+  padding: 0 8px 10px;
+}
+
+.gaming-data-layer-state {
+  color: var(--gaming-cyan);
+  font: 700 8px/1 var(--font-mono, monospace);
+  letter-spacing: 0.16em;
+}
+
+.gaming-data-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin: 4px 0 8px;
+}
+
+.gaming-data-overview > div {
+  min-width: 0;
+  padding: 7px 5px;
+  border: 1px solid rgba(53, 231, 255, 0.16);
+  background: rgba(14, 56, 69, 0.18);
+}
+
+.gaming-data-overview small,
+.gaming-data-overview strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+}
+
+.gaming-data-overview small {
+  margin-bottom: 3px;
+  color: rgba(176, 211, 219, 0.55);
+  font-size: 6px;
+  letter-spacing: 0.12em;
+}
+
+.gaming-data-overview strong {
+  color: #d7fbff;
+  font-size: 9px;
+}
+
+.gaming-data-master {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(53, 231, 255, 0.35);
+  background: rgba(19, 98, 120, 0.14);
+  color: #d4f9ff;
+  font: 700 9px/1 var(--font-mono, monospace);
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+
+.gaming-data-master input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gaming-data-master i {
+  position: relative;
+  width: 34px;
+  height: 16px;
+  border: 1px solid rgba(129, 181, 194, 0.42);
+  border-radius: 20px;
+  background: rgba(1, 7, 11, 0.8);
+}
+
+.gaming-data-master i::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #73828b;
+  transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.gaming-data-master input:checked + i::after {
+  transform: translateX(18px);
+  background: var(--gaming-cyan);
+  box-shadow: 0 0 10px rgba(53, 231, 255, 0.8);
+}
+
+.gaming-data-master:has(input:disabled) {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.gaming-data-status {
+  display: block;
+  min-height: 24px;
+  padding: 7px 2px 4px;
+  color: rgba(178, 220, 228, 0.68);
+  font: 600 7px/1.45 var(--font-mono, monospace);
+  letter-spacing: 0.08em;
+}
+
+.gaming-data-controls {
+  max-height: min(62vh, 680px);
+  overflow: auto;
+  padding-right: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(53, 231, 255, 0.3) rgba(0, 0, 0, 0.2);
+  transition: opacity 140ms ease;
+}
+
+.gaming-data-controls.disabled {
+  opacity: 0.48;
+}
+
+.gaming-data-controls fieldset {
+  min-width: 0;
+  margin: 7px 0 0;
+  padding: 8px;
+  border: 1px solid rgba(53, 231, 255, 0.15);
+  background: rgba(0, 8, 12, 0.46);
+}
+
+.gaming-data-controls legend {
+  padding: 0 5px;
+  color: rgba(53, 231, 255, 0.78);
+  font: 700 7px/1 var(--font-mono, monospace);
+  letter-spacing: 0.15em;
+}
+
+.gaming-data-check-grid,
+.gaming-data-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.gaming-data-check-grid label,
+.gaming-data-wide-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  color: rgba(207, 237, 242, 0.72);
+  font: 600 7px/1.35 var(--font-mono, monospace);
+}
+
+.gaming-data-check-grid input,
+.gaming-data-wide-check input {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  accent-color: var(--gaming-cyan);
+}
+
+.gaming-data-field-grid label,
+.gaming-data-text-field,
+.gaming-data-slider-list label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: rgba(142, 195, 207, 0.64);
+  font: 700 6px/1 var(--font-mono, monospace);
+  letter-spacing: 0.1em;
+}
+
+.gaming-data-text-field {
+  margin-top: 6px;
+}
+
+.gaming-data-controls input[type='text'],
+.gaming-data-controls input[type='search'],
+.gaming-data-controls input[type='number'],
+.gaming-data-controls select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 27px;
+  padding: 5px 6px;
+  border: 1px solid rgba(53, 231, 255, 0.22);
+  border-radius: 0;
+  outline: none;
+  background: rgba(2, 14, 20, 0.92);
+  color: #c7f8ff;
+  font: 600 8px/1 var(--font-mono, monospace);
+}
+
+.gaming-data-controls input:focus,
+.gaming-data-controls select:focus {
+  border-color: var(--gaming-cyan);
+  box-shadow: 0 0 0 1px rgba(53, 231, 255, 0.15);
+}
+
+.gaming-data-inline-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.gaming-data-inline-actions button {
+  min-height: 26px;
+  border: 1px solid rgba(53, 231, 255, 0.3);
+  background: rgba(17, 80, 98, 0.2);
+  color: #aeeff8;
+  font: 700 7px/1 var(--font-mono, monospace);
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.gaming-data-game-list {
+  max-height: 180px;
+  overflow-y: auto;
+  margin-top: 6px;
+  border: 1px solid rgba(53, 231, 255, 0.12);
+}
+
+.gaming-data-game-list label {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px;
+  border-bottom: 1px solid rgba(53, 231, 255, 0.08);
+  color: rgba(214, 243, 247, 0.75);
+  font: 600 7px/1.2 var(--font-mono, monospace);
+}
+
+.gaming-data-game-list label:last-child { border-bottom: 0; }
+.gaming-data-game-list output { color: rgba(53, 231, 255, 0.78); }
+.gaming-data-game-list p { margin: 0; padding: 10px; color: rgba(178, 210, 216, 0.55); font: 7px/1.4 var(--font-mono, monospace); }
+
+.gaming-data-slider-list {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+
+.gaming-data-slider-list label {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 38px;
+  align-items: center;
+}
+
+.gaming-data-slider-list input { width: 100%; accent-color: var(--gaming-cyan); }
+.gaming-data-slider-list output { color: #bceff5; text-align: right; }
+
+.gaming-data-freshness {
+  padding-top: 5px;
+  color: rgba(167, 211, 220, 0.58);
+  font: 600 6px/1.4 var(--font-mono, monospace);
+  letter-spacing: 0.08em;
+}
+
+.gaming-data-privacy {
+  margin: 8px 0 5px;
+  color: rgba(185, 224, 231, 0.64);
+  font: 600 7px/1.45 var(--font-mono, monospace);
+}
+
+.gaming-data-attribution {
+  color: rgba(53, 231, 255, 0.72);
+  font: 600 7px/1 var(--font-mono, monospace);
+  text-decoration: none;
+}
+
+.gaming-data-details {
+  position: fixed;
+  z-index: 1250;
+  right: 22px;
+  bottom: 92px;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 44px));
+  max-height: min(68vh, 620px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid rgba(53, 231, 255, 0.55);
+  background: rgba(2, 10, 15, 0.96);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.65), inset 0 0 24px rgba(53, 231, 255, 0.04);
+  color: #c9f7fc;
+  font: 8px/1.45 var(--font-mono, monospace);
+}
+
+.gaming-data-details header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.gaming-data-details h3 { margin: 0; color: #fff; font: 700 15px/1.2 var(--font-ui, sans-serif); }
+.gaming-data-details header button { border: 0; background: transparent; color: #9beef8; font-size: 20px; cursor: pointer; }
+.gaming-data-details-notice { display: block; margin: 8px 0; color: #ffcf67; letter-spacing: 0.08em; text-transform: uppercase; }
+.gaming-data-details dl { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 8px; margin: 10px 0; }
+.gaming-data-details dt { color: rgba(139, 192, 203, 0.7); text-transform: uppercase; }
+.gaming-data-details dd { margin: 0; overflow-wrap: anywhere; }
+.gaming-data-details p { color: rgba(195, 223, 228, 0.68); }
+.gaming-data-details > a { color: var(--gaming-cyan, #35e7ff); letter-spacing: 0.12em; }
+
+@media (max-width: 720px) {
+  .gaming-data-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gaming-data-controls { max-height: 54vh; }
+  .gaming-data-details { right: 12px; bottom: 72px; width: calc(100vw - 24px); }
+}

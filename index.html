@@ -37,8 +37,8 @@
   <div id="cesiumContainer"></div>
   <aside id="thunderlink-system-identity" aria-label="ThunderLink software identity">
     <span>OS <strong>THUNDERLINK OBLIVION</strong></span>
-    <span>VERSION <strong>0.3.03</strong></span>
-    <span>KERNEL <strong>TBSGE-KERNEL-030.004</strong></span>
+    <span>VERSION <strong>0.3.04</strong></span>
+    <span>KERNEL <strong>TBSGE-KERNEL-030.005</strong></span>
     <button id="credits-footer-button" type="button">CREDITS &amp; OPEN SOURCES</button>
   </aside>
   <footer id="platform-legal-footer" aria-label="Legal and privacy policies">
@@ -893,11 +893,108 @@
             </div>
           </div>
         </section>
+        <section id="gaming-data-panel" class="panel-collapsible collapsed" data-panel-id="gaming-data-panel" aria-label="Gaming Data Filters">
+          <div class="gaming-data-panel-inner">
+            <div class="panel-header">
+              <span class="panel-title">GAMING DATA FILTERS</span>
+              <span id="gaming-data-layer-state" class="gaming-data-layer-state">OFF</span>
+              <span class="panel-divider"></span>
+              <button class="panel-collapse-btn" data-collapse-target="gaming-data-panel" title="Expand Gaming Data Filters" aria-label="Expand Gaming Data Filters">+</button>
+            </div>
+            <div class="gaming-data-overview" aria-label="Filtered Gaming Data overview">
+              <div><small>VISIBLE</small><strong data-gaming-stat="visibleServers">0</strong></div>
+              <div><small>ONLINE</small><strong data-gaming-stat="onlineServers">0</strong></div>
+              <div><small>PLAYERS</small><strong data-gaming-stat="totalPlayers">0</strong></div>
+              <div><small>GAMES</small><strong data-gaming-stat="gamesRepresented">0</strong></div>
+              <div><small>TOP GAME</small><strong data-gaming-stat="mostPopulatedGame">—</strong></div>
+              <div><small>TOP SERVER</small><strong data-gaming-stat="mostPopulatedServer">—</strong></div>
+              <div><small>AVG USE</small><strong data-gaming-stat="averageUtilization">0%</strong></div>
+              <div><small>UPDATED</small><strong data-gaming-stat="lastUpdate">NEVER</strong></div>
+            </div>
+            <label class="gaming-data-master"><span>GAMING DATA</span><input type="checkbox" data-gaming-master /><i></i></label>
+            <output class="gaming-data-status" data-gaming-status role="status" aria-live="polite">Gaming Data is off. No provider requests are running.</output>
+            <div class="gaming-data-controls" data-gaming-controls aria-disabled="true">
+              <fieldset>
+                <legend>PROVIDER &amp; DISPLAY</legend>
+                <div class="gaming-data-check-grid">
+                  <label><input type="checkbox" data-gaming-key="providerEnabled" checked />BattleMetrics provider</label>
+                  <label><input type="checkbox" data-gaming-key="markersEnabled" checked />Live server markers</label>
+                  <label><input type="checkbox" data-gaming-key="heatmapEnabled" checked />Population heatmap</label>
+                  <label><input type="checkbox" data-gaming-key="clusteringEnabled" checked />Marker clustering</label>
+                  <label><input type="checkbox" data-gaming-key="autoRefresh" checked />Auto refresh</label>
+                  <label title="Public player lists are intentionally unavailable in this release"><input type="checkbox" data-gaming-key="publicPlayerNames" disabled />Public player names</label>
+                </div>
+              </fieldset>
+              <fieldset>
+                <legend>SUPPORTED GAMES</legend>
+                <input type="search" data-gaming-game-search placeholder="Search games, including Arma Reforger…" autocomplete="off" />
+                <div class="gaming-data-inline-actions">
+                  <button type="button" data-gaming-games-all>SELECT ALL</button>
+                  <button type="button" data-gaming-games-clear>CLEAR ALL</button>
+                </div>
+                <label class="gaming-data-wide-check"><input type="checkbox" data-gaming-key="allGames" checked />All Supported Games</label>
+                <label class="gaming-data-wide-check"><input type="checkbox" data-gaming-key="gamesWithResultsOnly" />Games with results only</label>
+                <div class="gaming-data-game-list" data-gaming-game-list><p>Enable Gaming Data to load supported games.</p></div>
+              </fieldset>
+              <fieldset>
+                <legend>SERVER FILTERS</legend>
+                <div class="gaming-data-check-grid">
+                  <label><input type="checkbox" data-gaming-key="onlineOnly" checked />Online only</label>
+                  <label><input type="checkbox" data-gaming-key="includeOffline" />Include offline</label>
+                </div>
+                <div class="gaming-data-field-grid">
+                  <label>MIN PLAYERS<input type="number" min="0" max="100000" value="0" data-gaming-key="minPlayers" /></label>
+                  <label>MAX PLAYERS<input type="number" min="0" max="100000" value="100000" data-gaming-key="maxPlayers" /></label>
+                  <label>MIN CAPACITY<input type="number" min="0" max="100000" value="0" data-gaming-key="minCapacity" /></label>
+                  <label>MAX CAPACITY<input type="number" min="0" max="100000" value="100000" data-gaming-key="maxCapacity" /></label>
+                  <label>MIN RANK<input type="number" min="0" max="1000000" value="0" data-gaming-key="minRank" /></label>
+                  <label>COUNTRY<input type="text" maxlength="2" placeholder="US" data-gaming-key="country" /></label>
+                  <label>REGION<input type="text" maxlength="80" data-gaming-key="region" /></label>
+                  <label>CURRENT MAP<input type="text" maxlength="80" data-gaming-key="map" /></label>
+                  <label>SCENARIO<input type="text" maxlength="80" data-gaming-key="scenario" /></label>
+                  <label>PASSWORD<select data-gaming-key="passwordMode"><option value="any">Any</option><option value="protected">Protected</option><option value="unprotected">Not protected</option></select></label>
+                  <label>SLOTS<select data-gaming-key="slotMode"><option value="any">Any</option><option value="full">Full servers</option><option value="open">Open slots</option></select></label>
+                  <label>UPDATED WITHIN<select data-gaming-key="recentlyUpdatedMinutes"><option value="0">Any time</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="360">6 hours</option><option value="1440">24 hours</option></select></label>
+                </div>
+                <label class="gaming-data-text-field">SERVER NAME<input type="search" data-gaming-key="serverSearch" placeholder="Search server names…" /></label>
+                <label class="gaming-data-text-field">SERVER ID OR ADDRESS<input type="search" data-gaming-key="identitySearch" placeholder="ID, hostname or IP…" /></label>
+              </fieldset>
+              <fieldset>
+                <legend>VISUALIZATION</legend>
+                <label class="gaming-data-text-field">MODE<select data-gaming-key="visualizationMode"><option value="combined">Combined markers + heatmap</option><option value="markers">Markers only</option><option value="heatmap">Heatmap only</option></select></label>
+                <div class="gaming-data-slider-list">
+                  <label>HEAT INTENSITY<input type="range" min="1" max="100" value="65" data-gaming-key="heatIntensity" /><output>65%</output></label>
+                  <label>HEAT RADIUS<input type="range" min="10" max="100" value="55" data-gaming-key="heatRadius" /><output>55%</output></label>
+                  <label>HEAT OPACITY<input type="range" min="5" max="100" value="52" data-gaming-key="heatOpacity" /><output>52%</output></label>
+                  <label>CLUSTER RADIUS<input type="range" min="20" max="120" value="46" data-gaming-key="clusterRadius" /><output>46 PX</output></label>
+                  <label>LABEL MIN ZOOM<input type="range" min="1" max="18" value="9" data-gaming-key="labelMinimumZoom" /><output>Z9</output></label>
+                </div>
+                <div class="gaming-data-check-grid">
+                  <label><input type="checkbox" data-gaming-key="markerScaleByPopulation" checked />Scale markers by population</label>
+                  <label><input type="checkbox" data-gaming-key="labelsVisible" />Show server labels</label>
+                </div>
+                <label class="gaming-data-text-field">COLOR BY<select data-gaming-key="colorMode"><option value="population">Population</option><option value="game">Game</option><option value="status">Server status</option></select></label>
+              </fieldset>
+              <fieldset>
+                <legend>REFRESH</legend>
+                <label class="gaming-data-text-field">INTERVAL<select data-gaming-key="refreshIntervalSec"><option value="300">5 minutes</option><option value="600">10 minutes</option><option value="900">15 minutes</option><option value="1800">30 minutes</option><option value="3600">60 minutes</option></select></label>
+                <div class="gaming-data-inline-actions">
+                  <button type="button" data-gaming-refresh>MANUAL REFRESH</button>
+                  <button type="button" data-gaming-reset>RESET FILTERS</button>
+                </div>
+                <div class="gaming-data-freshness" data-gaming-freshness>LAST SUCCESS · NEVER</div>
+              </fieldset>
+            </div>
+            <p class="gaming-data-privacy"><strong>Locations represent game servers or hosting regions, not the physical locations of individual players.</strong></p>
+            <a class="gaming-data-attribution" href="https://www.battlemetrics.com" target="_blank" rel="noopener noreferrer">Gaming server data provided by BattleMetrics</a>
+          </div>
+        </section>
       </div>
     </div>
   </aside>
 
   <div id="scene-runtime"></div>
+  <aside id="gaming-data-details" class="gaming-data-details" aria-live="polite" hidden></aside>
 
   <!-- Explicit mission choice on a fresh session. Live feeds are not auto-enabled
        until the visitor asks; shared links skip this surface entirely. It returns

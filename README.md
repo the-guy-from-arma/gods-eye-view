@@ -215,6 +215,10 @@ The cockpit even carries its own briefing strip: nearby live signals, regional h
 
 Spoken confirmations use TTSForFree exclusively. Set the server-only Railway variable `TTSFORFREE_API_KEY`; `TTSFORFREE_VOICE_ID` selects the provider voice. God’s Eye sends only its short command-result phrase to TTSForFree and caches repeated results. If the AI provider or quota is unavailable, the app stays silent and shows an error—it never falls back to the computer’s browser voice. Review the provider’s current plan and usage terms before commercial use.
 
+### Gaming Data
+
+The independent **Gaming Data Filters** panel maps public BattleMetrics game servers as clustered markers and a player-count-weighted heatmap. It is off by default and makes no BattleMetrics requests until enabled. Public API reads work keylessly; an optional server-only `BATTLEMETRICS_API_TOKEN` increases the provider rate allowance. Do not prefix it with `VITE_` or expose it to client code. Locations are approximate game-server or hosting-region locations, not player locations.
+
 The original conversational AI voice remains available as an explicit `?voice=ai` URL opt-in. It requires a funded `OPENAI_API_KEY`; the same key also drives the optional **AI HUD summary**. AI mode adds open-ended conversation and the advanced tools below:
 
 - **🧠 It knows what it's looking at.** The agent pulls live scene context before answering — including coordinates, street names, active layers, and view scale. Ask *"what city is this?"* mid-flight and it knows.
