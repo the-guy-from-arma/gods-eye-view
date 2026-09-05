@@ -6879,7 +6879,8 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 #left-panel-stack > #data-panel,
 #left-panel-stack > #cctv-panel,
 #left-panel-stack > #global-context-panel,
-#left-panel-stack > #scene-panel {
+#left-panel-stack > #scene-panel,
+#left-panel-stack > #gaming-data-panel {
   position: relative;
   top: auto;
   right: auto;
@@ -6901,6 +6902,7 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 }
 
 #left-panel-stack > #scene-panel { order: 4; }
+#left-panel-stack > #gaming-data-panel { order: 5; }
 
 /*
  * Runtime focus mode: the layout engine applies this only when the expanded
@@ -6913,7 +6915,8 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 
 #left-panel-stack > #data-panel:not(.collapsed),
 #left-panel-stack > #cctv-panel:not(.collapsed),
-#left-panel-stack > #scene-panel:not(.collapsed) {
+#left-panel-stack > #scene-panel:not(.collapsed),
+#left-panel-stack > #gaming-data-panel:not(.collapsed) {
   box-sizing: border-box;
   flex: 0 1 var(--left-panel-allocated-height, auto);
   height: var(--left-panel-allocated-height, auto);
@@ -6924,7 +6927,7 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
  * When an expanded panel and its collapsed siblings fit together, preserve
  * the canonical control order and center their combined stack at 50vh.
  */
-#left-panel-stack.layout-tail > :is(#data-panel, #cctv-panel, #scene-panel):not(.collapsed) {
+#left-panel-stack.layout-tail > :is(#data-panel, #cctv-panel, #scene-panel, #gaming-data-panel):not(.collapsed) {
   box-sizing: border-box;
   flex: 0 0 var(--left-panel-allocated-height);
   height: var(--left-panel-allocated-height);
@@ -6933,7 +6936,8 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 
 #left-panel-stack > #data-panel:not(.collapsed) .data-panel-inner,
 #left-panel-stack > #cctv-panel:not(.collapsed) .cctv-panel-inner,
-#left-panel-stack > #scene-panel:not(.collapsed) .scene-panel-inner {
+#left-panel-stack > #scene-panel:not(.collapsed) .scene-panel-inner,
+#left-panel-stack > #gaming-data-panel:not(.collapsed) .gaming-data-panel-inner {
   height: 100%;
   max-height: 100%;
 }
@@ -6943,7 +6947,8 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 }
 
 #left-panel-stack > #cctv-panel:not(.collapsed) .cctv-panel-inner,
-#left-panel-stack > #scene-panel:not(.collapsed) .scene-panel-inner {
+#left-panel-stack > #scene-panel:not(.collapsed) .scene-panel-inner,
+#left-panel-stack > #gaming-data-panel:not(.collapsed) .gaming-data-panel-inner {
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
@@ -6965,7 +6970,8 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   box-shadow: 0 0 7px rgba(0, 212, 255, 0.22);
 }
 
-#scene-panel .panel-glow {
+#scene-panel .panel-glow,
+#gaming-data-panel .panel-glow {
   position: absolute;
   inset: -18px;
   background: radial-gradient(ellipse at center, rgba(0, 212, 255, 0.16) 0%, transparent 65%);
@@ -7283,6 +7289,7 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 #scene-panel.collapsed .scene-shot-list,
 #scene-panel.collapsed .scene-progress,
 #scene-panel.collapsed #scene-status,
+#gaming-data-panel.collapsed .gaming-data-panel-inner > :not(.panel-header),
 #param-slider-panel.collapsed #param-sliders,
 #location-bar.collapsed .poi-row-container,
 #location-bar.collapsed .location-bar-divider,
@@ -7292,7 +7299,8 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 
 #data-panel.collapsed,
 #cctv-panel.collapsed,
-#scene-panel.collapsed {
+#scene-panel.collapsed,
+#gaming-data-panel.collapsed {
   width: var(--left-collapsed-width);
 }
 
@@ -7301,7 +7309,8 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 #data-panel.collapsed .panel-title,
 #cctv-panel.collapsed .panel-title,
 #radio-panel.collapsed .panel-title,
-#scene-panel.collapsed .panel-title {
+#scene-panel.collapsed .panel-title,
+#gaming-data-panel.collapsed .panel-title {
   font-size: 8px;
   letter-spacing: 1.8px;
 }
@@ -7311,6 +7320,7 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 #cctv-panel.collapsed .cctv-panel-inner,
 #radio-panel.collapsed .radio-panel-inner,
 #scene-panel.collapsed .scene-panel-inner,
+#gaming-data-panel.collapsed .gaming-data-panel-inner,
 #param-slider-panel.collapsed,
 #location-bar.collapsed .location-inner {
   padding-bottom: 10px;
@@ -7322,6 +7332,7 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 #radio-panel.collapsed .panel-header,
 #global-context-panel.collapsed .panel-header,
 #scene-panel.collapsed .panel-header,
+#gaming-data-panel.collapsed .panel-header,
 #param-slider-panel.collapsed .param-panel-header {
   margin-bottom: 2px;
 }
@@ -7343,7 +7354,8 @@ body.recording-mode #cctv-panel,
 body.recording-mode #radio-panel,
 body.recording-mode #global-context-panel,
 body.recording-mode #gev-voice-control,
-body.recording-mode #scene-panel {
+body.recording-mode #scene-panel,
+body.recording-mode #gaming-data-panel {
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
@@ -7507,6 +7519,11 @@ body.scene-playback-mode :is(#clear-selected-layers, #reset-globe-view) {
     width: auto;
   }
 
+  #gaming-data-panel,
+  #gaming-data-panel.collapsed {
+    width: auto;
+  }
+
   #left-panel-stack {
     top: 70px;
     right: 16px;
@@ -7556,10 +7573,12 @@ body.scene-playback-mode :is(#clear-selected-layers, #reset-globe-view) {
   #left-panel-stack > #cctv-panel,
   #left-panel-stack > #global-context-panel,
   #left-panel-stack > #scene-panel,
+  #left-panel-stack > #gaming-data-panel,
   #left-panel-stack > #data-panel.collapsed,
   #left-panel-stack > #cctv-panel.collapsed,
   #left-panel-stack > #global-context-panel.collapsed,
-  #left-panel-stack > #scene-panel.collapsed {
+  #left-panel-stack > #scene-panel.collapsed,
+  #left-panel-stack > #gaming-data-panel.collapsed {
     position: relative;
     top: auto;
     right: auto;
@@ -10155,12 +10174,36 @@ body.scene-playback-mode #key-setup {
 }
 /* ── Gaming Data / BattleMetrics (isolated additive panel) ─────────────── */
 #gaming-data-panel {
+  --panel-expanded-width: 360px;
   --gaming-cyan: #35e7ff;
   --gaming-panel: rgba(3, 12, 18, 0.94);
+  box-sizing: border-box;
+  width: var(--panel-expanded-width);
+  max-width: 100%;
 }
 
 .gaming-data-panel-inner {
-  padding: 0 8px 10px;
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 24px);
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--panel-radius);
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+#left-panel-stack > #gaming-data-panel .gaming-data-controls {
+  max-height: none;
+  overflow: visible;
 }
 
 .gaming-data-layer-state {

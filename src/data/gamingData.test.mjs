@@ -221,8 +221,13 @@ test('Gaming Data panel is isolated, responsive, private-by-default, and default
   const css = readFileSync(new URL('../../style.css', import.meta.url), 'utf8');
   const main = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
   assert.match(html, /id="gaming-data-panel"/);
+  assert.match(html, /<span class="panel-title">GAMING DATA<\/span>/);
   assert.match(html, /Locations represent game servers or hosting regions, not the physical locations of individual players\./);
   assert.match(html, /data-gaming-key="publicPlayerNames" disabled/);
+  assert.match(main, /mountGamingDataPanelInLeftRail\(\)/);
+  assert.match(main, /leftPanelStack\.append\(gamingDataPanel\)/);
+  assert.match(css, /#left-panel-stack > #gaming-data-panel \{ order: 5; \}/);
+  assert.match(css, /#gaming-data-panel\.collapsed \.gaming-data-panel-inner > :not\(\.panel-header\)/);
   assert.match(css, /@media \(max-width: 720px\)[\s\S]*gaming-data-details/);
   assert.match(main, /dataManager\.register\(gamingDataLayer\)/);
   assert.doesNotMatch(main, /setEnabled\(['"]gaming-data['"],\s*true/);

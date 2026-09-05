@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.06] — 2026-09-05 — Gaming Data left-rail panel
+
+- Moved Gaming Data into the adaptive left-side accordion as its own collapsible
+  card directly beneath Scenes, preventing the expanded filter controls from
+  inheriting the Context rail and bleeding through the center HUD.
+- Matched the existing glass panel frame, collapsed title treatment, scroll
+  allocation, focus mode, recording mode, and narrow-screen stack behavior.
+- Advanced ThunderLink Oblivion to public build `0.3.06` and kernel
+  `TBSGE-KERNEL-030.007`; the legal acceptance bundle remains `0.3.02`.
+
 ## [0.3.05] — 2026-09-05 — BattleMetrics production authentication
 
 - Verified the deployed integration against the live provider and now reports a

@@ -43,6 +43,20 @@ import { initPublicSafetyPreview } from './publicSafetyPreview.js';
 import { applyInterfaceAvailability } from './interfaceAvailability.js';
 import { initGamingDataPanel } from './gamingDataPanel.js';
 
+/**
+ * Gaming Data is authored beside the Context markup so its feature controls
+ * stay together, but it belongs to the independent left accordion at runtime.
+ * Mount it before StyleManager discovers panel children so stack sizing,
+ * collapse state, and focus mode treat it exactly like Data Layers and Scenes.
+ */
+function mountGamingDataPanelInLeftRail() {
+  const leftPanelStack = document.getElementById('left-panel-stack');
+  const gamingDataPanel = document.getElementById('gaming-data-panel');
+  if (!leftPanelStack || !gamingDataPanel) return;
+  leftPanelStack.append(gamingDataPanel);
+}
+
+mountGamingDataPanelInLeftRail();
 initLogoGaze();
 const publicSafetyPreview = initPublicSafetyPreview();
 
