@@ -164,6 +164,10 @@ body.phone-unsupported { overflow: auto; background: #02080d; }
   font-family: 'JetBrains Mono', monospace;
 }
 #account-dialog[hidden] { display: none; }
+/* The shutdown screen is intentionally above the entire public console. Once
+   its discreet owner entry is activated, only the authentication surface is
+   promoted above that gate so command recovery remains possible. */
+#account-dialog.system-owner-login { z-index: 5001; }
 .account-scanline { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(66, 224, 255, .018) 3px 4px); }
 .account-header, .account-activity-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .account-kicker { color: #54e8ff; font-size: 10px; letter-spacing: .15em; }

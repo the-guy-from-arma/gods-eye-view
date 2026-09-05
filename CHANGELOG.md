@@ -16,6 +16,17 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   project documentation as ThunderLink God's Eye while preserving the original
   MIT license, upstream attribution, and stable internal protocol identifiers.
 
+## [0.3.03] — 2026-09-05 — Owner maintenance recovery
+
+### Fixed
+
+- Promoted the owner authentication dialog above the site-wide shutdown gate
+  after the discreet information control is selected, restoring owner sign-in
+  during Maintenance, Feed Disconnected, and Restricted modes.
+- Advanced ThunderLink Oblivion to public build `0.3.03` and kernel
+  `TBSGE-KERNEL-030.004`; legal acceptance remains on bundle `0.3.02` because
+  this release does not change the governing terms.
+
 ## [0.3.02] — 2026-09-05 — Trust, consent, and operational truth
 
 ### Added

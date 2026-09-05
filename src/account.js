@@ -90,6 +90,7 @@ export function initAccounts(options = {}) {
     if (systemModeGate) systemModeGate.hidden = !blocked;
     if (!blocked) {
       ownerAccessRequested = false;
+      dialog.classList.remove('system-owner-login');
       return;
     }
     if (systemModeTitle) systemModeTitle.textContent = siteMode.label;
@@ -100,6 +101,7 @@ export function initAccounts(options = {}) {
       systemOwnerAccess.setAttribute('aria-label', label);
       systemOwnerAccess.title = label;
     }
+    dialog.classList.toggle('system-owner-login', ownerAccessRequested);
     if (!ownerAccessRequested) dialog.hidden = true;
   };
 
@@ -288,6 +290,7 @@ export function initAccounts(options = {}) {
       return;
     }
     ownerAccessRequested = true;
+    dialog.classList.add('system-owner-login');
     dialog.hidden = false;
     form.elements.email?.focus();
   });
