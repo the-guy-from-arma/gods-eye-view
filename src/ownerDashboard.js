@@ -203,6 +203,9 @@ document.querySelector('[data-system-apply]').addEventListener('click', async ()
   try {
     const payload = await api('/api/account/admin/system-mode', { method: 'POST', body: JSON.stringify({ mode: pendingMode }) });
     paintSiteMode(payload.siteMode);
+    try {
+      localStorage.setItem('gev:site-mode-pulse', JSON.stringify({ mode: payload.siteMode.mode, changedAt: Date.now() }));
+    } catch { /* Cross-tab acceleration is optional; server polling remains authoritative. */ }
     showStatus(`${payload.siteMode.label.toUpperCase()} IS NOW ACTIVE SITE-WIDE`);
   } catch (error) {
     showStatus(error.message, true);

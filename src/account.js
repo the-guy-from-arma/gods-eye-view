@@ -59,6 +59,7 @@ export function initAccounts(options = {}) {
   let user = null;
   let siteMode = { mode: 'online', label: 'Systems Online', message: '' };
   let authenticationHandled = false;
+  let ownerAccessRequested = false;
 
   if (!chip || !dialog || !form || !status) return null;
 
@@ -67,16 +68,23 @@ export function initAccounts(options = {}) {
     status.classList.toggle('error', error);
   };
 
-  const siteAccessBlocked = () => siteMode.mode !== 'online' && user?.role !== 'owner';
+  // A site-wide operating mode applies to every globe session, including the
+  // owner. Owners recover through the dedicated command page rather than a
+  // hidden bypass that makes Maintenance appear ineffective in their browser.
+  const siteAccessBlocked = () => siteMode.mode !== 'online';
 
   const paintSystemMode = () => {
     const blocked = siteAccessBlocked();
     if (systemModeGate) systemModeGate.hidden = !blocked;
-    if (!blocked) return;
+    if (!blocked) {
+      ownerAccessRequested = false;
+      return;
+    }
     if (systemModeTitle) systemModeTitle.textContent = siteMode.label;
     if (systemModeMessage) systemModeMessage.textContent = siteMode.message;
     if (systemModeCode) systemModeCode.textContent = `LINK STATUS · ${siteMode.mode.replaceAll('_', ' ').toUpperCase()}`;
-    dialog.hidden = true;
+    if (systemOwnerAccess) systemOwnerAccess.textContent = user?.role === 'owner' ? 'OPEN OWNER COMMAND' : 'OWNER ACCESS';
+    if (!ownerAccessRequested) dialog.hidden = true;
   };
 
   const closeDisclaimer = () => {
@@ -225,8 +233,13 @@ export function initAccounts(options = {}) {
     if (user?.role === 'owner') window.location.assign('/owner.html');
   });
   systemOwnerAccess?.addEventListener('click', () => {
+    if (user?.role === 'owner') {
+      window.location.assign('/owner.html');
+      return;
+    }
+    ownerAccessRequested = true;
     dialog.hidden = false;
-    form.elements.email.focus();
+    form.elements.email?.focus();
   });
 
   document.getElementById('location-search')?.addEventListener('keydown', (event) => {
@@ -249,6 +262,7 @@ export function initAccounts(options = {}) {
   const synchronizeSession = async ({ initial = false } = {}) => {
     const payload = await api('/api/account/session');
     const previousUser = user;
+    const previousSiteMode = siteMode.mode;
     user = payload.user;
     siteMode = payload.siteMode || siteMode;
     if (!initial && previousUser && !user) {
@@ -256,11 +270,22 @@ export function initAccounts(options = {}) {
       return;
     }
     paint();
+    // If a running console receives a shutdown mode, reload once so the heavy
+    // globe runtime and live-feed pollers are actually stopped behind the
+    // command gate. On this reload authentication never starts main.js while
+    // the mode remains blocked.
+    if (!initial && previousSiteMode === 'online' && siteAccessBlocked() && authenticationHandled) {
+      location.reload();
+      return;
+    }
     if (user) void continueAfterAuthentication();
   };
 
   synchronizeSession({ initial: true }).then(() => {
-    window.setInterval(() => synchronizeSession().catch(() => {}), 15_000);
+    window.setInterval(() => synchronizeSession().catch(() => {}), 5_000);
+    window.addEventListener('storage', (event) => {
+      if (event.key === 'gev:site-mode-pulse') void synchronizeSession().catch(() => {});
+    });
   }).catch(() => {
     chip.classList.add('account-unavailable');
     setStatus('Accounts are waiting for the Railway Postgres connection.', true);

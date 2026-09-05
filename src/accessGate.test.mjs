@@ -75,6 +75,10 @@ test('site-wide interruption states block the globe with an owner recovery path'
   assert.match(index, /data-system-owner-access>OWNER ACCESS/);
   assert.match(account, /siteAccessBlocked/);
   assert.match(account, /siteMode\.mode !== 'online'/);
+  assert.doesNotMatch(account, /siteMode\.mode !== 'online' && user\?\.role !== 'owner'/);
+  assert.match(account, /previousSiteMode === 'online' && siteAccessBlocked\(\) && authenticationHandled/);
+  assert.match(account, /window\.location\.assign\('\/owner\.html'\)/);
+  assert.match(account, /5_000/);
   assert.match(owner, /data-mode="maintenance"/);
   assert.match(owner, /data-mode="feed_disconnected"/);
   assert.match(owner, /data-mode="restricted"/);

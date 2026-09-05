@@ -27,6 +27,9 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   controls.
 - Added the ThunderLink Oblivion OS, version, and `TBSGE-KERNEL-030.001`
   identity readout while retaining the required map-provider attribution.
+- Made site-wide Maintenance, Feed Disconnected, and Restricted modes apply to
+  owner globe sessions as well as public operators, stop an already-running
+  globe after propagation, and synchronize open consoles within five seconds.
 
 ## [0.1.1] — 2026-09-01 — Installation and live-data fixes
 
