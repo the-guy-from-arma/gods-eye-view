@@ -86,8 +86,24 @@ async function providerJson(fetchImpl, url, options) {
   const response = await fetchImpl(url, { ...options, signal: AbortSignal.timeout(10_000) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(response.status === 429 ? 'TTS free quota is temporarily limited' : 'TTS provider request failed');
+    const providerReason = String(
+      payload?.message
+      || payload?.Message
+      || payload?.error?.message
+      || payload?.error
+      || '',
+    ).toLowerCase();
+    const quotaLimited = response.status === 429
+      && /credit|quota|balance|insufficient|exhaust|allowance/.test(providerReason);
+    const error = new Error(
+      quotaLimited
+        ? 'TTSForFree account credits are unavailable'
+        : response.status === 429
+          ? 'TTSForFree is rate limiting voice requests'
+          : 'TTS provider request failed',
+    );
     error.status = response.status === 429 ? 429 : 502;
+    error.code = quotaLimited ? 'tts_quota_limited' : response.status === 429 ? 'tts_rate_limited' : 'tts_provider_failed';
     throw error;
   }
   return payload;

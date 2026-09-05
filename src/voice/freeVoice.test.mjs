@@ -50,6 +50,8 @@ function voiceUi() {
     button: { setAttribute() {}, addEventListener() {}, removeEventListener() {} },
     status: { textContent: '' },
     detail: { textContent: '', title: '' },
+    errorDetail: { textContent: '' },
+    errorHint: { textContent: '' },
   };
 }
 
@@ -95,4 +97,24 @@ test('free voice never falls back to computer speech when AI voice is unavailabl
   assert.deepEqual(spoken, []);
   assert.equal(ui.status.textContent, 'ERROR');
   assert.equal(ui.detail.textContent, 'Natural voice unavailable');
+});
+
+test('free voice explains that a provider quota error is unrelated to microphone access', async () => {
+  const ui = voiceUi();
+  const windowRef = {
+    fetch: async () => ({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: 'TTSForFree account credits are unavailable', code: 'tts_quota_limited' }),
+    }),
+    Audio: class {},
+  };
+  const controller = new GevFreeVoiceController({
+    runner: async () => ({}), ui, windowRef,
+    documentRef: { addEventListener() {}, removeEventListener() {} },
+  });
+  controller.speak('Command complete');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(ui.status.textContent, 'ERROR');
+  assert.match(ui.errorHint.textContent, /Microphone access is not the cause/);
 });

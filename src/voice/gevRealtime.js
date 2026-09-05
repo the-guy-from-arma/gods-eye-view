@@ -2585,7 +2585,7 @@ function createVoiceControl({ reset = false } = {}) {
           <button class="gev-voice-error-dismiss" type="button">DISMISS</button>
         </div>
         <div id="gev-voice-error-detail"></div>
-        <div class="gev-voice-error-hint">Check microphone permission and network access, then try again.</div>
+        <div class="gev-voice-error-hint">Cause-specific recovery steps will appear here.</div>
       </div>
     `;
     const commandDock = document.getElementById('command-dock');
@@ -2610,6 +2610,7 @@ function createVoiceControl({ reset = false } = {}) {
     detail: root.querySelector('#gev-voice-detail'),
     helpDetail: root.querySelector('.gev-voice-help-detail'),
     errorDetail: root.querySelector('#gev-voice-error-detail'),
+    errorHint: root.querySelector('.gev-voice-error-hint'),
     tierButton: root.querySelector('#gev-voice-tier'),
     costValue: root.querySelector('#gev-voice-cost-value'),
   };

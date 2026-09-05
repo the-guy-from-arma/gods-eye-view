@@ -207,7 +207,11 @@ export class GevFreeVoiceController {
     if (this.isActive()) return;
     const Recognition = recognitionConstructor(this.windowRef);
     if (!Recognition) {
-      this.setStatus('error', 'Free voice requires Chrome or Edge speech recognition');
+      this.setStatus(
+        'error',
+        'Free voice requires Chrome or Edge speech recognition',
+        'Open this site in the latest Chrome or Edge browser.',
+      );
       return;
     }
     this.pushToTalk = Boolean(pushToTalk);
@@ -232,7 +236,11 @@ export class GevFreeVoiceController {
       recognition.start();
     } catch (error) {
       this.recognition = null;
-      this.setStatus('error', error?.message || 'Could not start microphone');
+      this.setStatus(
+        'error',
+        error?.message || 'Could not start microphone',
+        'Allow microphone access for this site in browser settings, then try again.',
+      );
     }
   }
 
@@ -279,7 +287,13 @@ export class GevFreeVoiceController {
       : code === 'no-speech'
         ? 'No speech heard — try again'
         : `Speech recognition error: ${code}`;
-    this.setStatus(code === 'no-speech' ? 'idle' : 'error', detail);
+    this.setStatus(
+      code === 'no-speech' ? 'idle' : 'error',
+      detail,
+      code === 'not-allowed' || code === 'service-not-allowed'
+        ? 'Allow microphone access for this site in browser settings, then try again.'
+        : 'Try the microphone again in a quiet room.',
+    );
   }
 
   speak(message) {
@@ -296,7 +310,11 @@ export class GevFreeVoiceController {
     const fetchImpl = this.windowRef?.fetch?.bind(this.windowRef);
     const AudioClass = this.windowRef?.Audio;
     if (!fetchImpl || !AudioClass) {
-      this.setStatus('error', 'AI voice playback is unavailable in this browser');
+      this.setStatus(
+        'error',
+        'AI voice playback is unavailable in this browser',
+        'Open this site in the latest Chrome or Edge browser.',
+      );
       return;
     }
 
@@ -308,7 +326,12 @@ export class GevFreeVoiceController {
       signal: this.ttsAbortController?.signal,
     }).then(async (response) => {
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.audioUrl) throw new Error(payload.error || 'Natural voice unavailable');
+      if (!response.ok || !payload.audioUrl) {
+        const error = new Error(payload.error || 'Natural voice unavailable');
+        error.code = payload.code || 'tts_unavailable';
+        error.status = response.status;
+        throw error;
+      }
       if (generation !== this.ttsGeneration) return;
       const audio = new AudioClass(payload.audioUrl);
       audio.preload = 'auto';
@@ -320,23 +343,37 @@ export class GevFreeVoiceController {
         await audio.play();
       } catch {
         if (generation === this.ttsGeneration) {
-          this.setStatus('error', 'AI voice playback was blocked — tap the mic and try again');
+          this.setStatus(
+            'error',
+            'AI voice playback was blocked — tap the mic and try again',
+            'The browser blocked audio playback; tapping the mic provides the required user interaction.',
+          );
         }
       }
     }).catch((error) => {
       if (error?.name !== 'AbortError' && generation === this.ttsGeneration) {
-        this.setStatus('error', error?.message || 'AI voice is temporarily unavailable');
+        const providerLimit = error?.code === 'tts_quota_limited' || error?.code === 'tts_rate_limited' || error?.status === 429;
+        this.setStatus(
+          'error',
+          error?.message || 'AI voice is temporarily unavailable',
+          providerLimit
+            ? 'TTSForFree rejected the request because of an account quota or rate limit. Microphone access is not the cause.'
+            : 'The AI voice service could not be reached. Check network access, then try again.',
+        );
       }
     });
   }
 
-  setStatus(status, detail) {
+  setStatus(status, detail, errorHint = '') {
     this.status = status;
     this.ui.root.dataset.status = status;
     this.ui.status.textContent = FREE_STATUS[status] || FREE_STATUS.idle;
     this.ui.detail.textContent = detail || (status === 'idle' ? 'AI VOICE READY' : 'VOICE ACTIVE');
     this.ui.detail.title = this.ui.detail.textContent;
     if (this.ui.errorDetail) this.ui.errorDetail.textContent = status === 'error' ? this.ui.detail.textContent : '';
+    if (this.ui.errorHint && status === 'error') {
+      this.ui.errorHint.textContent = errorHint || 'Review the error above, then try again.';
+    }
     if (this.ui.buttonLabel) this.ui.buttonLabel.textContent = this.isActive() ? 'STOP' : 'SPEAK';
   }
 

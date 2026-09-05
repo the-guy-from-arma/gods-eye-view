@@ -75,3 +75,21 @@ test('TTSForFree proxy refuses untrusted audio result hosts', async () => {
   assert.equal(res.statusCode, 504);
   assert.equal(JSON.parse(res.body).audioUrl, undefined);
 });
+
+test('TTSForFree proxy identifies an exhausted provider quota without exposing provider details', async () => {
+  const handler = routeFor(ttsForFreeApiPlugin({
+    env: { TTSFORFREE_API_KEY: 'server-secret' },
+    fetchImpl: async () => ({
+      ok: false,
+      status: 429,
+      json: async () => ({ message: 'Insufficient credit balance for account 123' }),
+    }),
+  }));
+  const res = responseRecorder();
+  await handler(request({ text: 'Command complete' }), res);
+  const payload = JSON.parse(res.body);
+  assert.equal(res.statusCode, 429);
+  assert.equal(payload.code, 'tts_quota_limited');
+  assert.equal(payload.error, 'TTSForFree account credits are unavailable');
+  assert.equal(res.body.includes('account 123'), false);
+});
