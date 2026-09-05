@@ -211,16 +211,31 @@ test('disabled Scene preview cannot apply visual state, layers, or camera moveme
   }
 });
 
-test('production wiring keeps Scene options visible in disabled translucent preview mode', () => {
+test('production wiring makes Scene availability owner-controlled', () => {
   const main = fs.readFileSync(new URL('../main.js', import.meta.url), 'utf8');
   const html = fs.readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
   const css = fs.readFileSync(new URL('../../style.css', import.meta.url), 'utf8');
 
-  assert.match(main, /new SceneDirector\([\s\S]*?\{ enabled: false \}\)/);
-  assert.match(html, /class="scene-preview-badge"[\s\S]*?>PREVIEW</);
-  assert.match(html, /SCENE TOOLS TEMPORARILY DISABLED/);
+  assert.match(main, /initialSceneStatus[\s\S]*?new SceneDirector/);
+  assert.match(main, /sceneDirector\?\.setAvailability\?/);
+  assert.match(html, /class="scene-preview-badge"[\s\S]*?>COMING SOON</);
+  assert.match(html, /SCENE TOOLS · COMING SOON/);
   assert.match(css, /#scene-panel\.scene-feature-disabled \.scene-panel-inner/);
   assert.match(css, /background:\s*rgba\(5, 10, 16, 0\.48\)/);
+});
+
+test('Scene availability can be enabled, paused for maintenance, or hidden', () => {
+  const { director, restore } = makeDirector({ director: { enabled: false } });
+  try {
+    assert.equal(director.setAvailability('live'), 'live');
+    assert.equal(director.enabled, true);
+    assert.equal(director.setAvailability('maintenance'), 'maintenance');
+    assert.equal(director.enabled, false);
+    assert.equal(director.setAvailability('disabled'), 'disabled');
+    assert.equal(director.enabled, false);
+  } finally {
+    restore();
+  }
 });
 
 /** The layer map a shipped recipe declares, in normalized form. */

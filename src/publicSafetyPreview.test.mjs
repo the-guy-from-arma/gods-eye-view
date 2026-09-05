@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   filterJurisdictionRows,
   matchCatalogJurisdiction,
@@ -51,4 +52,14 @@ test('accepts only credential-free HTTPS direct stream URLs', () => {
   assert.equal(normalizeDirectStreamUrl('http://audio.example/live.mp3'), null);
   assert.equal(normalizeDirectStreamUrl('https://user:pass@audio.example/live.mp3'), 'https://audio.example/live.mp3');
   assert.equal(normalizeDirectStreamUrl('not a url'), null);
+});
+
+test('catalog feed cards support documented in-app playback and owner availability', () => {
+  const source = readFileSync(new URL('./publicSafetyPreview.js', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(source, /play\.textContent = 'PLAY'/);
+  assert.match(source, /loadDirectStream\(selectedFeed\.streamUrl\)/);
+  assert.match(source, /law-enforcement-transmissions/);
+  assert.match(source, /availabilityStatus === 'disabled'/);
+  assert.match(html, /data-radio-source="scanner">LAW ENFORCEMENT/);
 });

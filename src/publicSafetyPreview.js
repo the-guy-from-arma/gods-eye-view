@@ -122,7 +122,7 @@ function viewCoordinates(viewer) {
     : null;
 }
 
-function feedRow(feed) {
+function feedRow(feed, onPlay) {
   const article = document.createElement('article');
   article.className = 'scanner-feed-card';
   const summary = document.createElement('div');
@@ -134,6 +134,16 @@ function feedRow(feed) {
   meta.textContent = [area, feed.service, listeners].filter(Boolean).join(' · ');
   summary.append(name, meta);
   article.append(summary);
+  const actions = document.createElement('div');
+  actions.className = 'scanner-feed-actions';
+  if (feed.streamUrl && feed.online !== false) {
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.textContent = 'PLAY';
+    play.setAttribute('aria-label', `Play ${feed.name || 'feed'} inside God’s Eye`);
+    play.addEventListener('click', () => onPlay(feed));
+    actions.append(play);
+  }
   if (feed.officialUrl) {
     const link = document.createElement('a');
     link.href = feed.officialUrl;
@@ -141,8 +151,9 @@ function feedRow(feed) {
     link.rel = 'noopener noreferrer';
     link.textContent = 'OPEN';
     link.setAttribute('aria-label', `Open ${feed.name || 'feed'} on Broadcastify`);
-    article.append(link);
+    actions.append(link);
   }
+  article.append(actions);
   return article;
 }
 
@@ -167,6 +178,7 @@ export function initPublicSafetyPreview() {
   let settleTimer = null;
   let reverseController = null;
   let lastViewKey = '';
+  let availabilityStatus = 'live';
 
   const selected = () => Object.fromEntries(FILTER_ORDER.map((key) => [key, controls[key]?.value || '']));
   const setStreamState = (message, error = false) => {
@@ -182,12 +194,14 @@ export function initPublicSafetyPreview() {
     if (streamStop) streamStop.disabled = true;
     setStreamState('Stream stopped. Paste or reload an authorized HTTPS audio URL.');
   };
-  const loadDirectStream = async () => {
-    const streamUrl = normalizeDirectStreamUrl(streamInput?.value);
+  const loadDirectStream = async (providedUrl = null) => {
+    const streamUrl = normalizeDirectStreamUrl(providedUrl || streamInput?.value);
     if (!streamUrl) {
       setStreamState('Enter a valid HTTPS direct audio URL. A webpage URL cannot be played as audio.', true);
       return false;
     }
+    if (streamInput) streamInput.value = streamUrl;
+    document.getElementById('radio-stop-btn')?.click();
     streamAudio.src = streamUrl;
     streamAudio.load();
     if (streamStop) streamStop.disabled = false;
@@ -218,7 +232,10 @@ export function initPublicSafetyPreview() {
       results.append(empty);
       return;
     }
-    results.append(...shown.map(feedRow));
+    results.append(...shown.map((feed) => feedRow(feed, (selectedFeed) => {
+      setStreamState(`CONNECTING · ${selectedFeed.name || 'Broadcastify feed'}`);
+      void loadDirectStream(selectedFeed.streamUrl);
+    })));
     if (visibleRows.length > shown.length) {
       const more = document.createElement('p');
       more.className = 'scanner-feed-more';
@@ -300,6 +317,7 @@ export function initPublicSafetyPreview() {
   };
 
   const setTab = (name) => {
+    if (name === 'scanner' && availabilityStatus !== 'live') return;
     activeTab = name;
     tabs.forEach((tab) => tab.setAttribute('aria-selected', String(tab.dataset.radioSource === name)));
     broadcast.hidden = name !== 'broadcast';
@@ -307,6 +325,29 @@ export function initPublicSafetyPreview() {
     if (name === 'scanner') {
       window.dispatchEvent(new CustomEvent('gev:activity', { detail: { type: 'scanner_interest', metadata: selected() } }));
       void matchCurrentView({ force: true });
+    }
+  };
+
+  const applyAvailability = (layers = []) => {
+    const configured = (Array.isArray(layers) ? layers : []).find((layer) => (
+      (layer.id || layer.layerId) === 'law-enforcement-transmissions'
+    ));
+    availabilityStatus = configured?.status || 'live';
+    const scannerTab = tabs.find((tab) => tab.dataset.radioSource === 'scanner');
+    if (!scannerTab) return;
+    const hidden = availabilityStatus === 'disabled';
+    const unavailable = availabilityStatus !== 'live';
+    scannerTab.hidden = hidden;
+    scannerTab.disabled = unavailable;
+    scannerTab.dataset.availabilityStatus = availabilityStatus;
+    scannerTab.textContent = availabilityStatus === 'coming_soon'
+      ? 'LAW ENFORCEMENT · SOON'
+      : availabilityStatus === 'maintenance'
+        ? 'LAW ENFORCEMENT · MAINT'
+        : 'LAW ENFORCEMENT';
+    if (activeTab === 'scanner' && unavailable) {
+      stopDirectStream();
+      setTab('broadcast');
     }
   };
 
@@ -359,6 +400,7 @@ export function initPublicSafetyPreview() {
         listeners: row.listeners,
         online: row.online,
         officialUrl: row.officialUrl,
+        streamUrl: row.streamUrl,
       })) : [];
       refresh();
       if (status) status.textContent = `${rows.length.toLocaleString()} AUTHORIZED CATALOG FEEDS · MOVE OR ZOOM TO MATCH`;
@@ -370,5 +412,6 @@ export function initPublicSafetyPreview() {
     });
 
   setTab('broadcast');
-  return { setTab, refresh, attachViewer, matchCurrentView, loadDirectStream, stopDirectStream };
+  window.addEventListener('gev:layer-availability-changed', (event) => applyAvailability(event.detail?.layers));
+  return { setTab, refresh, attachViewer, matchCurrentView, loadDirectStream, stopDirectStream, applyAvailability };
 }

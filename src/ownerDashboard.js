@@ -108,7 +108,7 @@ function renderLayers() {
     const select = document.createElement('select');
     select.dataset.layerId = layer.id;
     select.setAttribute('aria-label', `${layer.name} public availability`);
-    for (const [value, label] of [['live', 'LIVE'], ['coming_soon', 'COMING SOON'], ['maintenance', 'MAINTENANCE'], ['disabled', 'DISABLED']]) {
+    for (const [value, label] of [['live', 'ENABLED'], ['coming_soon', 'COMING SOON'], ['maintenance', 'DISABLED / MAINTENANCE'], ['disabled', 'HIDDEN']]) {
       const option = node('option', '', label);
       option.value = value;
       option.selected = layer.status === value;

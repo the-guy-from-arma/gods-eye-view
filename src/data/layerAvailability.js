@@ -26,6 +26,7 @@ export const PUBLIC_LAYER_CATALOG = Object.freeze([
   ['radio', 'Radio'],
   ['rocket-launches', 'Space Missions (30d)'],
   ['satellites', 'Satellites'],
+  ['scenes', 'Scenes'],
   ['telegeography-submarine-cables', 'Submarine Cables'],
   ['traffic', 'Street Traffic'],
 ].map(([id, name]) => Object.freeze({ id, name })));

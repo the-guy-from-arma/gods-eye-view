@@ -154,7 +154,7 @@ export function broadcastifyApiPlugin(options = {}) {
             degraded: catalog.degraded,
             optionalFailureCount: catalog.optionalFailureCount,
             provider: 'Broadcastify',
-            playbackMode: 'provider-link',
+            playbackMode: 'direct-stream',
           });
         } catch (error) {
           console.warn('[Broadcastify Proxy]', {

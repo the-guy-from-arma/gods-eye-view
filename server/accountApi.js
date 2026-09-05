@@ -213,6 +213,8 @@ export function createAccountApi(options = {}) {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_by BIGINT REFERENCES gev_users(id) ON DELETE SET NULL
       );
+      INSERT INTO gev_layer_availability (layer_id, status) VALUES ('scenes', 'coming_soon')
+        ON CONFLICT (layer_id) DO NOTHING;
       CREATE TABLE IF NOT EXISTS gev_public_safety_sources (
         id BIGSERIAL PRIMARY KEY,
         country_code TEXT NOT NULL,

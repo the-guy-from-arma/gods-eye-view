@@ -31,6 +31,8 @@ test('Broadcastify proxy keeps the credential server-side and returns normalized
   assert.equal(payload.feeds.length, 1);
   assert.equal(payload.activeEventCount, 1);
   assert.equal(payload.feeds[0].officialUrl, 'https://www.broadcastify.com/listen/feed/99');
+  assert.equal(payload.feeds[0].streamUrl, 'https://broadcastify.cdnstream1.com/99');
+  assert.equal(payload.playbackMode, 'direct-stream');
   assert.equal(payload.feeds[0].listeners, null);
   assert.equal(requestedUrls.length, 4);
   assert.ok(requestedUrls.some((url) => /genre=1/.test(url)));

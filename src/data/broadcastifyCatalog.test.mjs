@@ -12,7 +12,7 @@ test('recognizes law-enforcement and combined dispatch feed names', () => {
   assert.equal(isLawEnforcementBroadcast({ name: 'County Fire and EMS Dispatch' }), false);
 });
 
-test('normalizes a feed without exposing a stream URL or credential', () => {
+test('normalizes a feed with the documented public CDN stream URL and no credential', () => {
   const feed = normalizeBroadcastifyFeed({
     feedId: 42,
     description: 'Metro Police Dispatch',
@@ -29,7 +29,8 @@ test('normalizes a feed without exposing a stream URL or credential', () => {
   assert.equal(feed.lon, -97.75);
   assert.equal(feed.service, 'police');
   assert.equal(feed.officialUrl, 'https://www.broadcastify.com/listen/feed/42');
-  assert.equal('streamUrl' in feed, false);
+  assert.equal(feed.streamUrl, 'https://broadcastify.cdnstream1.com/42');
+  assert.equal(feed.streamUrl.includes('private'), false);
 });
 
 test('accepts common catalog envelopes, filters non-law feeds, and deduplicates ids', () => {

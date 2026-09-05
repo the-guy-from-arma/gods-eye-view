@@ -274,7 +274,7 @@ Sixteen live layers, with keyless coverage available immediately and optional cr
 | 🌍 **Earthquakes** | Global seismic activity, last 24h | USGS | 🟢 |
 | ⚡ **Live Global Events** | Near-real-time natural events and disaster alerts with source-linked globe cards | NASA EONET + GDACS | 🟢 |
 | 📰 **Global News Reports** | Recent incident reports from CNN, Fox News, and ABC News, shown as approximate `REPORTED · UNVERIFIED` markers with direct article links | GDELT + publishers | 🟡 Google geocoding key for markers |
-| 📡 **Law Enforcement Transmissions** | Licensed public-safety directory, special/disaster event feeds, and elevated listener-activity signals; listening opens the provider page | Broadcastify | 🟡 approved catalog key |
+| 📡 **Law Enforcement Transmissions** | Licensed public-safety directory, special/disaster event feeds, elevated listener-activity signals, and documented direct-stream playback inside the Radio panel | Broadcastify | 🟡 approved catalog key |
 | 🚗 **Traffic** | Live congestion driving per-vehicle flow at street level — dive below ~8 km and the dots color to real jams. Keyless it's an approximate simulation | TomTom + OSM | 🟢 (🟡 TomTom makes it real — get one) |
 | 📹 **CCTV Mesh** | ~800 public cameras projected *into* the 3D space — Austin · California (Caltrans) · London (TfL). Positions are published; poses are estimated priors **you calibrate by dragging a gizmo on the camera itself** | City APIs | 🟢 |
 | 🔴 **Flock Cameras** | 36,750 unique public camera placements, viewport-loaded as a separate static layer; no upstream map, network graph, precinct overlay, or live video | Ringmast4r/FLOCK + OSM contributors | 🟢 |

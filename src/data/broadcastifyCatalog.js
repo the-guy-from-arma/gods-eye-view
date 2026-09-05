@@ -108,6 +108,7 @@ export function normalizeBroadcastifyFeed(raw, index = 0, context = {}) {
     lat,
     lon,
     officialUrl: `https://www.broadcastify.com/listen/feed/${encodeURIComponent(feedId)}`,
+    streamUrl: `https://broadcastify.cdnstream1.com/${encodeURIComponent(feedId)}`,
   });
 }
 

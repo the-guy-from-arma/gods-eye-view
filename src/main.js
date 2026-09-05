@@ -240,21 +240,34 @@ async function init() {
     }
     // Restoration starts only after the complete production registry is sealed.
     dataManager.finalizeRegistrations(LAYER_STATE_REGISTRY);
+    let sceneDirector = null;
+    let latestLayerAvailability = [];
+    const applyAvailability = async (layers) => {
+      latestLayerAvailability = Array.isArray(layers) ? layers : [];
+      await dataManager.applyLayerAvailability(latestLayerAvailability);
+      const sceneState = latestLayerAvailability.find((layer) => (layer.id || layer.layerId) === 'scenes');
+      sceneDirector?.setAvailability?.(sceneState?.status || 'coming_soon');
+      window.dispatchEvent(new CustomEvent('gev:layer-availability-changed', {
+        detail: { layers: latestLayerAvailability },
+      }));
+    };
     const loadLayerAvailability = async () => {
       try {
         const response = await fetch('/api/account/layers', { credentials: 'same-origin' });
         if (!response.ok) throw new Error(`Layer availability request failed (${response.status})`);
         const payload = await response.json();
-        await dataManager.applyLayerAvailability(payload.layers);
+        await applyAvailability(payload.layers);
       } catch (error) {
         console.warn('[Layers] Availability sync unavailable; keeping layers live:', error);
       }
     };
     await loadLayerAvailability();
     window.addEventListener('gev:layer-availability-changed', (event) => {
-      void dataManager.applyLayerAvailability(event.detail?.layers);
+      const layers = event.detail?.layers;
+      if (layers === latestLayerAvailability) return;
+      void applyAvailability(layers);
     });
-    setInterval(loadLayerAvailability, 60_000);
+    setInterval(loadLayerAvailability, 15_000);
     bootPhase('feeds', 'DATA SYSTEMS REGISTERED');
     if (import.meta.env.DEV) {
       window.__gevQaRegisterLayer = (targetManager, layerModule) => {
@@ -272,7 +285,11 @@ async function init() {
     // Keep the recipe catalog visible as a preview while scene playback is
     // paused. This prevents recipes from applying CRT/retro visual state to the
     // live globe until the director is deliberately re-enabled.
-    const sceneDirector = new SceneDirector(viewer, styleManager, dataManager, { enabled: false });
+    const initialSceneStatus = latestLayerAvailability.find((layer) => (layer.id || layer.layerId) === 'scenes')?.status || 'coming_soon';
+    sceneDirector = new SceneDirector(viewer, styleManager, dataManager, {
+      enabled: initialSceneStatus === 'live',
+      availabilityStatus: initialSceneStatus,
+    });
 
     // Initialize the voice "whiteboard" annotation engine (world-space renderer)
     const annotations = initAnnotations({ viewer, tileset });

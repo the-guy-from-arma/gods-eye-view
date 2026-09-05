@@ -296,12 +296,14 @@ export class SceneDirector {
    * @param {Object} dataManager - Manages data layer enable/disable and per-layer params
    * @param {Object} [options]
    * @param {boolean} [options.enabled=true] - Whether scenes may mutate the live globe
+   * @param {'live'|'coming_soon'|'maintenance'|'disabled'} [options.availabilityStatus] - Owner-controlled public state
    */
-  constructor(viewer, styleManager, dataManager, { enabled = true } = {}) {
+  constructor(viewer, styleManager, dataManager, { enabled = true, availabilityStatus } = {}) {
     this.viewer = viewer;
     this.styleManager = styleManager;
     this.dataManager = dataManager;
     this._enabled = enabled !== false;
+    this._availabilityStatus = availabilityStatus || (this._enabled ? 'live' : 'coming_soon');
 
     /** @type {boolean} True while a scene run is in progress */
     this._running = false;
@@ -345,6 +347,8 @@ export class SceneDirector {
     this._sceneStatus = document.getElementById('scene-status');
     this._sceneProgressFill = document.getElementById('scene-progress-fill');
     this._sceneRuntime = document.getElementById('scene-runtime');
+    this._scenePreviewBadge = this._scenePanel?.querySelector('.scene-preview-badge');
+    this._sceneDisabledNotice = this._scenePanel?.querySelector('.scene-disabled-notice');
 
     this._initUI();
   }
@@ -404,9 +408,6 @@ export class SceneDirector {
 
     this._renderSceneSelect();
     this._renderShotList();
-    this._scenePanel?.classList.toggle('scene-feature-disabled', !this._enabled);
-    this._scenePanel?.setAttribute('aria-disabled', String(!this._enabled));
-
     this._sceneSelect.addEventListener('change', () => {
       this._selectedSceneId = this._sceneSelect.value;
       const scene = this._getSelectedScene();
@@ -450,9 +451,8 @@ export class SceneDirector {
       this.downloadLastRunMetadata();
     });
 
-    this._updateStatus(this._enabled ? 'Ready' : 'Preview only · Scene playback temporarily disabled');
     this._setProgress(0);
-    this._setButtons(false);
+    this.setAvailability(this._availabilityStatus);
   }
 
   /** Rebuild the scene dropdown options and sync the selected value. */
@@ -877,6 +877,34 @@ export class SceneDirector {
   /** @returns {boolean} Whether scene editing and playback are available. */
   get enabled() {
     return this._enabled;
+  }
+
+  /** Apply the owner-controlled Scene availability state without rebuilding the director. */
+  setAvailability(value = 'live') {
+    const status = ['live', 'coming_soon', 'maintenance', 'disabled'].includes(value) ? value : 'live';
+    if (status !== 'live' && this._running) this.stopScene(`Scenes ${status.replace('_', ' ')}`);
+    this._availabilityStatus = status;
+    this._enabled = status === 'live';
+    if (this._scenePanel) {
+      this._scenePanel.hidden = status === 'disabled';
+      this._scenePanel.classList.toggle('scene-feature-disabled', !this._enabled);
+      this._scenePanel.dataset.availabilityStatus = status;
+      this._scenePanel.setAttribute('aria-disabled', String(!this._enabled));
+    }
+    if (this._scenePreviewBadge) {
+      this._scenePreviewBadge.textContent = status === 'maintenance' ? 'MAINTENANCE' : 'COMING SOON';
+    }
+    if (this._sceneDisabledNotice) {
+      this._sceneDisabledNotice.textContent = status === 'maintenance'
+        ? 'SCENE TOOLS UNDER MAINTENANCE'
+        : 'SCENE TOOLS · COMING SOON';
+    }
+    this._renderShotList();
+    this._updateStatus(this._enabled ? 'Ready' : status === 'maintenance'
+      ? 'Maintenance · Scene tools temporarily unavailable'
+      : 'Preview only · Scene tools coming soon');
+    this._setButtons(this._running);
+    return status;
   }
 
   /**
