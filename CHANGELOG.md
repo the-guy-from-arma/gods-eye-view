@@ -33,6 +33,8 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 - Kept the owner-only command route available as the recovery surface during
   every shutdown mode, with direct owner routing and no dashboard-content flash
   before the role check succeeds.
+- Replaced the prominent shutdown-screen owner button with a discreet,
+  accessible information control in the bottom-right corner.
 
 ## [0.1.1] — 2026-09-01 — Installation and live-data fixes
 

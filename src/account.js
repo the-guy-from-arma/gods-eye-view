@@ -89,7 +89,11 @@ export function initAccounts(options = {}) {
     if (systemModeTitle) systemModeTitle.textContent = siteMode.label;
     if (systemModeMessage) systemModeMessage.textContent = siteMode.message;
     if (systemModeCode) systemModeCode.textContent = `LINK STATUS · ${siteMode.mode.replaceAll('_', ' ').toUpperCase()}`;
-    if (systemOwnerAccess) systemOwnerAccess.textContent = user?.role === 'owner' ? 'OPEN OWNER COMMAND' : 'OWNER ACCESS';
+    if (systemOwnerAccess) {
+      const label = user?.role === 'owner' ? 'Open Owner Command' : 'Owner sign in';
+      systemOwnerAccess.setAttribute('aria-label', label);
+      systemOwnerAccess.title = label;
+    }
     if (!ownerAccessRequested) dialog.hidden = true;
   };
 

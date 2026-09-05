@@ -72,7 +72,7 @@ test('public console exposes ThunderLink OS identity without removing map attrib
 
 test('site-wide interruption states block the globe with an owner recovery path', () => {
   assert.match(index, /id="system-mode-gate"[^>]*hidden/);
-  assert.match(index, /data-system-owner-access>OWNER ACCESS/);
+  assert.match(index, /class="system-owner-entry"[^>]*data-system-owner-access[^>]*aria-label="Owner sign in"/);
   assert.match(account, /siteAccessBlocked/);
   assert.match(account, /siteMode\.mode !== 'online'/);
   assert.doesNotMatch(account, /siteMode\.mode !== 'online' && user\?\.role !== 'owner'/);
@@ -86,6 +86,7 @@ test('site-wide interruption states block the globe with an owner recovery path'
   assert.match(owner, /data-mode="restricted"/);
   assert.match(ownerJs, /api\/account\/admin\/system-mode/);
   assert.match(css, /#system-mode-gate/);
+  assert.match(css, /#system-mode-gate \.system-owner-entry[\s\S]*?right: 18px;[\s\S]*?bottom: 18px;/);
   assert.match(ownerCss, /body\.owner-loading \.command-main,[\s\S]*?visibility:hidden/);
 });
 

@@ -101,6 +101,28 @@ body.phone-unsupported { overflow: auto; background: #02080d; }
 .system-mode-code i:last-child { transform: scaleX(-1); }
 #system-mode-gate button { min-height: 42px; margin-top: 12px; padding: 0 22px; border: 1px solid rgba(255, 76, 76, .55); background: rgba(94, 9, 9, .3); color: #ffb2b2; font: 700 9px/1 var(--font-mono); letter-spacing: .15em; cursor: pointer; }
 #system-mode-gate button:hover, #system-mode-gate button:focus-visible { border-color: #ff5d5d; background: rgba(135, 15, 15, .42); color: #fff; }
+#system-mode-gate .system-owner-entry {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2;
+  display: grid;
+  width: 22px;
+  min-height: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  place-items: center;
+  border-color: rgba(144, 90, 90, .32);
+  border-radius: 50%;
+  background: rgba(21, 8, 9, .45);
+  color: rgba(172, 116, 116, .58);
+  font: 500 9px/1 var(--font-mono);
+  letter-spacing: 0;
+  opacity: .7;
+}
+#system-mode-gate .system-owner-entry:hover,
+#system-mode-gate .system-owner-entry:focus-visible { border-color: rgba(255, 91, 91, .72); background: rgba(69, 10, 12, .62); color: #ffb2b2; opacity: 1; outline: none; }
 #system-mode-gate small { color: #6d4d4d; font: 400 8px/1.5 var(--font-mono); letter-spacing: .08em; }
 @media (prefers-reduced-motion: reduce) { .system-mode-signal span { animation: none; } }
 #account-signed-in[hidden], #account-signed-out[hidden] { display: none !important; }
