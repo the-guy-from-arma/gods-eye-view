@@ -79,3 +79,22 @@ test('Steam regional server feed fails closed when no server-side key is configu
   await assert.rejects(provider.getGames(), /STEAM_WEB_API_KEY/);
   assert.equal(calls, 1, 'only the keyless global player-count request may start');
 });
+
+test('Steam provider caps concurrent upstream requests during a cold all-games load', async () => {
+  let active = 0;
+  let maximumActive = 0;
+  const provider = createSteamGamingProvider({
+    key: 'steam-secret-key',
+    fetchImpl: async (url) => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 4));
+      active -= 1;
+      return String(url).includes('GetNumberOfCurrentPlayers')
+        ? jsonResponse({ response: { player_count: 100 } })
+        : jsonResponse({ response: { servers: [] } });
+    },
+  });
+  await provider.getGames();
+  assert.ok(maximumActive <= 3, `expected at most 3 concurrent requests, observed ${maximumActive}`);
+});

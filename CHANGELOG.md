@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.10] — 2026-09-05 — Steam request hardening
+
+- Added a provider-wide three-request concurrency ceiling so simultaneous game
+  totals and server-catalog refreshes cannot burst Steam with sixteen cold-start
+  requests.
+- Added one bounded retry for a transient Steam HTTP 403 before reporting an
+  authentication restriction, while preserving the existing timeout, rate-limit,
+  cache, and server-only-key boundaries.
+- Added regression coverage that proves a cold all-games refresh never exceeds
+  the concurrency ceiling.
+- Advanced ThunderLink Oblivion to public build `0.3.10` and kernel
+  `TBSGE-KERNEL-030.011`; the legal acceptance bundle remains `0.3.02`.
+
 ## [0.3.09] — 2026-09-05 — Multiplayer activity globe
 
 - Replaced Steam's oversized regional heat circles and clustered count badges

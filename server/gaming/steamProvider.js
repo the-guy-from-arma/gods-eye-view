@@ -3,6 +3,7 @@ const CACHE_TTL_MS = 5 * 60_000;
 const STALE_TTL_MS = 24 * 60 * 60_000;
 const MAX_GAMES = 24;
 const MAX_SERVERS_PER_GAME = 500;
+const MAX_CONCURRENT_REQUESTS = 3;
 
 export const DEFAULT_STEAM_GAMES = Object.freeze([
   Object.freeze({ id: '1874880', name: 'Arma Reforger' }),
@@ -117,6 +118,25 @@ function retryDelay(response, attempt) {
   return Math.min(5000, 350 * (2 ** attempt));
 }
 
+function createRequestQueue(maxConcurrent = MAX_CONCURRENT_REQUESTS) {
+  let active = 0;
+  const pending = [];
+  const drain = () => {
+    while (active < maxConcurrent && pending.length) {
+      const entry = pending.shift();
+      active += 1;
+      Promise.resolve()
+        .then(entry.run)
+        .then(entry.resolve, entry.reject)
+        .finally(() => { active -= 1; drain(); });
+    }
+  };
+  return (run) => new Promise((resolve, reject) => {
+    pending.push({ run, resolve, reject });
+    drain();
+  });
+}
+
 export function createSteamGamingProvider(options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const now = options.now || Date.now;
@@ -125,14 +145,15 @@ export function createSteamGamingProvider(options = {}) {
   const gamesCatalog = configuredGames(options.appIds);
   const cache = new Map();
   const inFlight = new Map();
+  const requestQueue = createRequestQueue();
 
   const requestJson = async (url, attempt = 0) => {
     let response;
     try {
-      response = await fetchImpl(url, {
-        headers: { Accept: 'application/json', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.09' },
+      response = await requestQueue(() => fetchImpl(url, {
+        headers: { Accept: 'application/json', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.10' },
         signal: AbortSignal.timeout(15_000),
-      });
+      }));
     } catch (cause) {
       if (attempt < 2) {
         await sleep(350 * (2 ** attempt));
@@ -144,6 +165,10 @@ export function createSteamGamingProvider(options = {}) {
     }
     if ((response.status === 429 || response.status >= 500) && attempt < 2) {
       await sleep(retryDelay(response, attempt));
+      return requestJson(url, attempt + 1);
+    }
+    if (response.status === 403 && attempt < 1) {
+      await sleep(1200);
       return requestJson(url, attempt + 1);
     }
     if (response.status === 401 || response.status === 403) {
@@ -256,4 +281,5 @@ export const STEAM_GAMING_LIMITS = Object.freeze({
   staleTtlMs: STALE_TTL_MS,
   maxGames: MAX_GAMES,
   maxServersPerGame: MAX_SERVERS_PER_GAME,
+  maxConcurrentRequests: MAX_CONCURRENT_REQUESTS,
 });
