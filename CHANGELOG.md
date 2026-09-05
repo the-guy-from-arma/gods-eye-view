@@ -16,6 +16,15 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   project documentation as ThunderLink God's Eye while preserving the original
   MIT license, upstream attribution, and stable internal protocol identifiers.
 
+## [0.3.01] — 2026-09-05 — Release discipline
+
+### Changed
+
+- Advanced ThunderLink Oblivion to public build `0.3.01` and kernel
+  `TBSGE-KERNEL-030.002`.
+- Added a repository-level rule requiring every future update to increment both
+  identifiers while reserving `0.4.0` for explicit owner authorization.
+
 ## [0.3.0] — 2026-09-05 — ThunderLink Oblivion command system
 
 ### Added
