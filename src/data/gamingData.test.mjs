@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   aggregateGamingHeat,
+  buildGamingActivityField,
   clusterGamingServers,
   filterGamingServers,
   markerDescriptor,
@@ -74,6 +75,7 @@ test('Gaming query preserves documented defaults when optional numeric parameter
   assert.equal(query.minPlayers, 50);
   assert.equal(query.maxPlayers, 100000);
   assert.equal(query.limit, 600);
+  assert.equal(normalizeGamingQuery(new URLSearchParams('limit=999999')).limit, 5000);
 });
 
 test('Gaming filters isolate games, population, status, geography and identity', () => {
@@ -106,7 +108,28 @@ test('heat aggregation is population weighted, clustered, deduplicated, and skip
   assert.ok(heat[0].latitude < 10.02, 'larger server must pull weighted center closer');
   assert.equal(clusterGamingServers(rows, 1)[0].count, 2);
   assert.equal(markerDescriptor(rows[2], resetGamingDataFilters()), null);
-  assert.ok(markerDescriptor(rows[0], resetGamingDataFilters()).size > markerDescriptor(rows[1], resetGamingDataFilters()).size);
+  assert.ok(markerDescriptor(rows[0], { markerScaleByPopulation: true }).size > markerDescriptor(rows[1], { markerScaleByPopulation: true }).size);
+});
+
+test('Steam-style activity field renders deterministic small dots without inventing player records', () => {
+  const servers = [
+    { id: 'east-1', gameId: '730', region: 'US East', latitude: 38.5, longitude: -77.5, players: 80 },
+    { id: 'east-2', gameId: '440', region: 'US East', latitude: 38.5, longitude: -77.5, players: 20 },
+    { id: 'eu-1', gameId: '730', region: 'Europe', latitude: 50.1, longitude: 10.2, players: 50 },
+  ];
+  const games = [
+    { id: '730', name: 'Counter-Strike 2', players: 900000 },
+    { id: '440', name: 'Team Fortress 2', players: 100000 },
+  ];
+  const filters = { ...resetGamingDataFilters(), allGames: true, heatRadius: 50, heatOpacity: 60, heatIntensity: 70 };
+  const first = buildGamingActivityField(servers, games, filters, { maxDots: 240 });
+  const second = buildGamingActivityField(servers, games, filters, { maxDots: 240 });
+  assert.deepEqual(first, second, 'the visual field must not flicker between refreshes');
+  assert.equal(first.globalPlayers, 1000000);
+  assert.equal(first.regions.reduce((sum, region) => sum + region.estimatedPlayers, 0), 1000000);
+  assert.ok(first.dots.length >= 230 && first.dots.length <= 250);
+  assert.ok(first.dots.every((dot) => dot.pixelSize < 5 && !Object.hasOwn(dot, 'playerId')));
+  assert.match(first.methodology, /not people/i);
 });
 
 test('Gaming Data reset cannot retain player names or mutate unrelated state', () => {
@@ -118,6 +141,8 @@ test('Gaming Data reset cannot retain player names or mutate unrelated state', (
   assert.deepEqual(unrelated, { flights: true, radio: { volume: 0.4 } });
   assert.deepEqual(resetGamingDataFilters().selectedGames, []);
   assert.equal(resetGamingDataFilters().allGames, true);
+  assert.equal(resetGamingDataFilters().visualizationMode, 'heatmap');
+  assert.equal(resetGamingDataFilters().markersEnabled, false);
   assert.deepEqual(filterGamingServers([normalizeBattleMetricsServer(resource())], {
     ...resetGamingDataFilters(), allGames: false, selectedGames: [],
   }), []);
@@ -263,7 +288,8 @@ test('Gaming Data panel is isolated, responsive, private-by-default, and default
   const main = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
   assert.match(html, /id="gaming-data-panel"/);
   assert.match(html, /<span class="panel-title">GAMING DATA<\/span>/);
-  assert.match(html, /Locations represent game servers or hosting regions, not the physical locations of individual players\./);
+  assert.match(html, /Every dot is visual—not an individual person or location\./);
+  assert.match(html, /id="gaming-data-hover"[^>]*role="tooltip"/);
   assert.match(html, /data-gaming-key="publicPlayerNames" disabled/);
   assert.match(main, /mountGamingDataPanelInLeftRail\(\)/);
   assert.match(main, /leftPanelStack\.append\(gamingDataPanel\)/);

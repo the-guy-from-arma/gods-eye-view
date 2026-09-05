@@ -1,10 +1,10 @@
-export const GAMING_DATA_STORAGE_KEY = 'thunderlink:gamingData:filters:v1';
+export const GAMING_DATA_STORAGE_KEY = 'thunderlink:gamingData:filters:v2';
 
 export const DEFAULT_GAMING_DATA_FILTERS = Object.freeze({
   providerEnabled: true,
-  markersEnabled: true,
+  markersEnabled: false,
   heatmapEnabled: true,
-  clusteringEnabled: true,
+  clusteringEnabled: false,
   autoRefresh: true,
   publicPlayerNames: false,
   allGames: true,
@@ -26,7 +26,7 @@ export const DEFAULT_GAMING_DATA_FILTERS = Object.freeze({
   recentlyUpdatedMinutes: 0,
   serverSearch: '',
   identitySearch: '',
-  visualizationMode: 'combined',
+  visualizationMode: 'heatmap',
   heatIntensity: 65,
   heatRadius: 55,
   heatOpacity: 52,
@@ -224,6 +224,109 @@ export function aggregateGamingHeat(servers, cellSizeDegrees = 4) {
     serverCount: cell.serverCount,
     cellSizeDegrees: size,
   }));
+}
+
+function stableHash(value) {
+  let hash = 2166136261;
+  for (const character of String(value)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function stableUnit(value) {
+  let state = stableHash(value) || 1;
+  state ^= state << 13;
+  state ^= state >>> 17;
+  state ^= state << 5;
+  return (state >>> 0) / 4294967296;
+}
+
+function wrapLongitude(value) {
+  return ((value + 540) % 360) - 180;
+}
+
+/**
+ * Builds a Call-of-Duty-style globe activity field from aggregate Steam data.
+ * Dots are deterministic visual samples, not individual people. Their regional
+ * allocation estimates the selected games' global concurrency using the public
+ * game-server distribution observed in the same response.
+ */
+export function buildGamingActivityField(servers, games, filters = {}, options = {}) {
+  const rows = (Array.isArray(servers) ? servers : []).filter(serverHasCoordinates);
+  const selected = new Set(Array.isArray(filters.selectedGames) ? filters.selectedGames : []);
+  const allGames = filters.allGames !== false;
+  const gameRows = (Array.isArray(games) ? games : []).filter((game) => allGames || selected.has(String(game.id)));
+  const globalPlayers = gameRows.reduce((sum, game) => sum + Math.max(0, Number(game.players) || 0), 0);
+  const groups = new Map();
+  for (const server of rows) {
+    const regionName = String(server.region || server.country || 'Unspecified region');
+    const coordinateKey = `${Number(server.latitude).toFixed(2)}:${Number(server.longitude).toFixed(2)}`;
+    const key = `${regionName}|${coordinateKey}`;
+    const group = groups.get(key) || {
+      id: `gaming-region:${stableHash(key).toString(36)}`,
+      name: regionName,
+      latitude: Number(server.latitude),
+      longitude: Number(server.longitude),
+      serverCount: 0,
+      observedPlayers: 0,
+      gameIds: new Set(),
+    };
+    group.serverCount += 1;
+    group.observedPlayers += Math.max(0, Number(server.players) || 0);
+    group.gameIds.add(String(server.gameId || 'unknown'));
+    groups.set(key, group);
+  }
+  const regions = [...groups.values()];
+  const totalObservedPlayers = regions.reduce((sum, region) => sum + region.observedPlayers, 0);
+  const totalServers = regions.reduce((sum, region) => sum + region.serverCount, 0);
+  for (const region of regions) {
+    const share = totalObservedPlayers > 0
+      ? region.observedPlayers / totalObservedPlayers
+      : (totalServers > 0 ? region.serverCount / totalServers : 0);
+    region.estimatedPlayers = globalPlayers > 0 ? Math.round(globalPlayers * share) : region.observedPlayers;
+    region.share = share;
+    region.gameCount = region.gameIds.size;
+    delete region.gameIds;
+  }
+  regions.sort((left, right) => right.estimatedPlayers - left.estimatedPlayers || left.name.localeCompare(right.name));
+
+  const maxDots = Math.max(180, Math.min(2400, Number(options.maxDots) || 1400));
+  const densityWeights = regions.map((region) => Math.sqrt(Math.max(1, region.estimatedPlayers || region.serverCount)));
+  const densityTotal = densityWeights.reduce((sum, value) => sum + value, 0) || 1;
+  const spread = 1.8 + Math.max(0, Math.min(100, Number(filters.heatRadius) || 55)) * 0.105;
+  const opacity = Math.max(0.12, Math.min(1, (Number(filters.heatOpacity) || 52) / 100));
+  const intensity = Math.max(0.2, Math.min(1, (Number(filters.heatIntensity) || 65) / 100));
+  const dots = [];
+  regions.forEach((region, regionIndex) => {
+    const dotCount = Math.max(3, Math.round(maxDots * densityWeights[regionIndex] / densityTotal));
+    for (let index = 0; index < dotCount; index += 1) {
+      const radial = Math.sqrt(stableUnit(`${region.id}:radius:${index}`));
+      const angle = stableUnit(`${region.id}:angle:${index}`) * Math.PI * 2;
+      const latitude = Math.max(-84, Math.min(84, region.latitude + Math.sin(angle) * radial * spread));
+      const longitudeScale = Math.max(0.24, Math.cos(region.latitude * Math.PI / 180));
+      const longitude = wrapLongitude(region.longitude + Math.cos(angle) * radial * spread / longitudeScale);
+      const pulse = stableUnit(`${region.id}:pulse:${index}`);
+      dots.push(Object.freeze({
+        id: `${region.id}:dot:${index}`,
+        regionId: region.id,
+        latitude,
+        longitude,
+        pixelSize: 1.6 + pulse * 2.2 + intensity * 0.7,
+        opacity: opacity * (0.58 + pulse * 0.42),
+        green: pulse < (0.3 + Math.min(0.5, region.share * 2.5)),
+      }));
+    }
+  });
+  return Object.freeze({
+    dots: Object.freeze(dots),
+    regions: Object.freeze(regions.map((region) => Object.freeze({ ...region }))),
+    globalPlayers,
+    observedPlayers: totalObservedPlayers,
+    serverCount: totalServers,
+    methodology: 'Regional estimate from Steam global concurrency and public game-server distribution; dots are not people.',
+  });
 }
 
 export function clusterGamingServers(servers, radiusDegrees = 4) {

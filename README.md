@@ -217,7 +217,7 @@ Spoken confirmations use TTSForFree exclusively. Set the server-only Railway var
 
 ### Gaming Data
 
-The independent **Gaming Data** panel maps aggregate game-server activity as clustered markers and a player-count-weighted heatmap. Steam is the preferred provider when `STEAM_WEB_API_KEY` is configured in Railway; it combines Valve's per-game global active-player totals with public dedicated-server population grouped only to Steam's coarse regions. BattleMetrics remains an optional fallback through `BATTLEMETRICS_API_TOKEN`. Neither key may use a `VITE_` prefix or enter client code. The map represents game-server activity—not individual users, Steam IDs, home locations, or a claim that every connected player is physically near the server.
+The independent **Gaming Data** panel maps aggregate game-server activity as a globe-hugging field of small white and green points. Steam is the preferred provider when `STEAM_WEB_API_KEY` is configured in Railway; it combines Valve's per-game global active-player totals with the current public dedicated-server catalog window grouped only to Steam's coarse regions. Hovering the field explains the regional estimate. BattleMetrics remains an optional fallback through `BATTLEMETRICS_API_TOKEN`. Neither key may use a `VITE_` prefix or enter client code. Every rendered activity dot is a visualization sample—not an individual user, Steam ID, home location, or a claim that a connected player is physically near the server.
 
 The original conversational AI voice remains available as an explicit `?voice=ai` URL opt-in. It requires a funded `OPENAI_API_KEY`; the same key also drives the optional **AI HUD summary**. AI mode adds open-ended conversation and the advanced tools below:
 

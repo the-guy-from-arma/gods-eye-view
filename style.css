@@ -10499,8 +10499,36 @@ body.scene-playback-mode #key-setup {
 .gaming-data-details p { color: rgba(195, 223, 228, 0.68); }
 .gaming-data-details > a { color: var(--gaming-cyan, #35e7ff); letter-spacing: 0.12em; }
 
+.gaming-data-hover {
+  position: fixed;
+  z-index: 1260;
+  width: 264px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid rgba(89, 255, 154, 0.58);
+  border-radius: 3px;
+  background:
+    linear-gradient(135deg, rgba(8, 29, 27, 0.96), rgba(2, 10, 15, 0.94)),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, 0.018) 3px 4px);
+  box-shadow: 0 0 22px rgba(70, 255, 156, 0.16), inset 0 0 20px rgba(72, 255, 170, 0.04);
+  color: rgba(222, 255, 244, 0.82);
+  pointer-events: none;
+  font: 600 8px/1.45 var(--font-mono, monospace);
+  letter-spacing: 0.04em;
+}
+
+.gaming-data-hover small,
+.gaming-data-hover strong,
+.gaming-data-hover span,
+.gaming-data-hover em { display: block; }
+.gaming-data-hover small { color: #59ff9a; font-size: 7px; letter-spacing: 0.13em; }
+.gaming-data-hover strong { margin: 3px 0 5px; color: #fff; font-size: 13px; letter-spacing: 0.08em; }
+.gaming-data-hover span + span { margin-top: 2px; color: rgba(180, 229, 217, 0.68); }
+.gaming-data-hover em { margin-top: 6px; color: rgba(255, 223, 145, 0.74); font-style: normal; }
+
 @media (max-width: 720px) {
   .gaming-data-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .gaming-data-controls { max-height: 54vh; }
   .gaming-data-details { right: 12px; bottom: 72px; width: calc(100vw - 24px); }
+  .gaming-data-hover { display: none; }
 }

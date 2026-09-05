@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.09] — 2026-09-05 — Multiplayer activity globe
+
+- Replaced Steam's oversized regional heat circles and clustered count badges
+  with a globe-hugging field of small, deterministic white and green activity
+  points inspired by classic multiplayer population globes.
+- Added pointer hover cards with regional concurrency estimates, observed public
+  server/slot counts, and an explicit warning that dots are visualization samples
+  rather than individual players or player locations.
+- Raised the client/server response window to cover the complete bounded Steam
+  catalog returned for all configured games, eliminating the artificial 1,200-row
+  truncation and its misleading `PARTIAL` state.
+- Added a direct Steam global-statistics directory link and renamed visualization
+  controls around activity points, regional spread, and exact server points.
+- Advanced ThunderLink Oblivion to public build `0.3.09` and kernel
+  `TBSGE-KERNEL-030.010`; the legal acceptance bundle remains `0.3.02`.
+
 ## [0.3.08] — 2026-09-05 — Steam regional game activity
 
 - Added a server-only Steam Web API provider for global per-game activity totals

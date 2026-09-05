@@ -125,14 +125,17 @@ export function initGamingDataPanel({ dataManager, layer }) {
       status.textContent = 'Gaming Data is off. No provider requests are running.';
     } else if (state.loading) {
       stateChip.textContent = 'SYNC';
-      status.textContent = 'Loading cached and live BattleMetrics server data…';
+      status.textContent = `Loading cached and live ${state.provider === 'steam' ? 'Steam activity' : 'BattleMetrics server'} data…`;
     } else if (state.error && !state.serverCount) {
       stateChip.textContent = 'UNAVAILABLE';
       status.textContent = `LAYER ACTIVE · ${state.error}`;
     } else {
-      stateChip.textContent = state.stale ? 'STALE' : (state.partial ? 'PARTIAL' : 'LIVE');
+      stateChip.textContent = state.stale ? 'STALE' : (state.partial ? 'CATALOG WINDOW' : 'LIVE');
       const cacheLabel = state.stale ? 'STALE CACHE' : (state.cached ? 'CACHE' : 'FRESH');
-      status.textContent = `${state.filteredCount.toLocaleString()} FILTERED · ${state.mappedCount.toLocaleString()} MAPPED · ${cacheLabel} · ${state.authMode.toUpperCase()} API${state.error ? ` · ${state.error}` : ''}`;
+      const visualLabel = state.provider === 'steam'
+        ? `${Number(state.activityField?.dots?.length || 0).toLocaleString()} ACTIVITY POINTS · REGIONAL ESTIMATE`
+        : `${state.mappedCount.toLocaleString()} MAPPED`;
+      status.textContent = `${state.filteredCount.toLocaleString()} FILTERED · ${visualLabel} · ${cacheLabel} · ${state.authMode.toUpperCase()} API${state.error ? ` · ${state.error}` : ''}`;
     }
     freshness.textContent = `LAST SUCCESS · ${relativeAge(state.lastUpdate)} · DATA AGE ${relativeAge(state.lastUpdate)}${state.cached ? ' · CACHED' : ''}${state.stale ? ' · STALE WARNING' : ''}`;
     paintStats(state.overview);

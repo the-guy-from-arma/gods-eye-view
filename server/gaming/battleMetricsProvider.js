@@ -176,7 +176,7 @@ export function normalizeGamingQuery(searchParams = new URLSearchParams()) {
     minPlayers,
     maxPlayers,
     country: /^[A-Z]{2}$/.test(country || '') ? country : null,
-    limit: boundedInteger(searchParams.get('limit'), 600, 1, 1200),
+    limit: boundedInteger(searchParams.get('limit'), 600, 1, 5000),
     bbox: bbox && bbox.south <= bbox.north ? bbox : null,
   });
 }
@@ -248,7 +248,7 @@ export function createBattleMetricsProvider(options = {}) {
       response = await fetchImpl(url, {
         headers: {
           Accept: 'application/json',
-          'User-Agent': 'ThunderLink-Gods-Eye/0.3.08',
+          'User-Agent': 'ThunderLink-Gods-Eye/0.3.09',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         signal: AbortSignal.timeout(15_000),

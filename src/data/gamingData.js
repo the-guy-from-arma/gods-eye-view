@@ -4,6 +4,7 @@ import {
   DEFAULT_GAMING_DATA_FILTERS,
   GAMING_DATA_STORAGE_KEY,
   aggregateGamingHeat,
+  buildGamingActivityField,
   filterGamingServers,
   gamingOverview,
   heatCellSizeDegrees,
@@ -142,6 +143,43 @@ function showDetails(server) {
   card.hidden = false;
 }
 
+function propertyValue(property, time) {
+  return property?.getValue?.(time) ?? property;
+}
+
+function showActivityHover(card, region, position) {
+  if (!card || !region || !position) return;
+  card.replaceChildren();
+  const kicker = document.createElement('small');
+  const title = document.createElement('strong');
+  const estimate = document.createElement('span');
+  const observed = document.createElement('span');
+  const note = document.createElement('em');
+  kicker.textContent = 'STEAM REGIONAL ACTIVITY ESTIMATE';
+  title.textContent = region.name;
+  estimate.textContent = `~${Number(region.estimatedPlayers || 0).toLocaleString()} concurrent across selected games`;
+  observed.textContent = `${Number(region.serverCount || 0).toLocaleString()} public servers · ${Number(region.observedPlayers || 0).toLocaleString()} connected slots observed`;
+  note.textContent = 'Visual dots are a density field—not individual people or player locations.';
+  card.append(kicker, title, estimate, observed, note);
+  card.style.left = `${Math.min(window.innerWidth - 292, Math.max(12, position.x + 14))}px`;
+  card.style.top = `${Math.min(window.innerHeight - 126, Math.max(12, position.y + 14))}px`;
+  card.hidden = false;
+}
+
+function overviewWithActivity(servers, games, filters, lastUpdate, activity) {
+  const overview = gamingOverview(servers, lastUpdate);
+  if (!activity) return overview;
+  const selected = new Set(filters.selectedGames || []);
+  const eligibleGames = games.filter((game) => filters.allGames || selected.has(String(game.id)));
+  const topGame = [...eligibleGames].sort((left, right) => (right.players || 0) - (left.players || 0))[0];
+  return {
+    ...overview,
+    totalPlayers: activity.globalPlayers,
+    gamesRepresented: eligibleGames.length,
+    mostPopulatedGame: topGame ? [topGame.name, topGame.players] : null,
+  };
+}
+
 export function createGamingDataLayer() {
   let viewer = null;
   let markerSource = null;
@@ -160,6 +198,7 @@ export function createGamingDataLayer() {
   let partial = false;
   let authMode = 'public';
   let provider = 'battlemetrics';
+  let activityField = null;
   let abortController = null;
   let autoRefreshTimer = null;
   let cameraRefreshTimer = null;
@@ -167,6 +206,7 @@ export function createGamingDataLayer() {
   let clickHandler = null;
   const listeners = new Set();
   const serverById = new Map();
+  const activityRegionById = new Map();
 
   const emit = () => {
     const state = layer.getUIState();
@@ -189,7 +229,7 @@ export function createGamingDataLayer() {
     const mode = filters.visualizationMode;
     markerSource.show = enabled && filters.markersEnabled && mode !== 'heatmap';
     heatSource.show = enabled && filters.heatmapEnabled && mode !== 'markers';
-    markerSource.clustering.enabled = filters.clusteringEnabled;
+    markerSource.clustering.enabled = provider !== 'steam' && filters.clusteringEnabled;
     markerSource.clustering.pixelRange = filters.clusterRadius;
     markerSource.clustering.minimumClusterSize = 3;
     const zoom = currentZoom(viewer);
@@ -225,44 +265,69 @@ export function createGamingDataLayer() {
     });
 
     const cameraHeight = viewer.camera.positionCartographic?.height || 20_000_000;
-    const cells = aggregateGamingHeat(mapped, heatCellSizeDegrees(cameraHeight));
-    const maximumWeight = Math.max(1, ...cells.map((cell) => cell.weight));
-    const heatRows = cells.flatMap((cell) => [0, 1, 2].map((ring) => ({
-      ...cell,
-      id: `gaming-heat:${cell.id}:${ring}`,
-      ring,
-      ratio: Math.log1p(cell.weight * filters.heatIntensity / 50) / Math.log1p(maximumWeight * filters.heatIntensity / 50),
-    })));
-    const heatGeometry = (descriptor) => {
-      const base = Math.max(8_000, descriptor.cellSizeDegrees * 70_000 * (filters.heatRadius / 55));
-      return {
-        position: Cesium.Cartesian3.fromDegrees(descriptor.longitude, descriptor.latitude),
-        radius: base * (1 + descriptor.ring * 0.48),
-        color: heatColor(descriptor.ratio, (filters.heatOpacity / 100) * [0.35, 0.18, 0.08][descriptor.ring]),
-      };
-    };
-    syncEntitySet(heatSource.entities, heatRows, (descriptor) => {
-      const geometry = heatGeometry(descriptor);
-      return {
+    activityRegionById.clear();
+    if (provider === 'steam') {
+      activityField = buildGamingActivityField(mapped, games, filters, { maxDots: 1400 });
+      for (const region of activityField.regions) activityRegionById.set(region.id, region);
+      syncEntitySet(heatSource.entities, activityField.dots, (descriptor) => ({
         id: descriptor.id,
-        position: geometry.position,
-        ellipse: {
-          semiMajorAxis: geometry.radius,
-          semiMinorAxis: geometry.radius,
-          material: geometry.color,
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        position: Cesium.Cartesian3.fromDegrees(descriptor.longitude, descriptor.latitude, 12_000),
+        point: {
+          pixelSize: descriptor.pixelSize,
+          color: Cesium.Color.fromCssColorString(descriptor.green ? '#59ff9a' : '#efffff').withAlpha(descriptor.opacity),
+          outlineColor: Cesium.Color.fromCssColorString('#65ffd0').withAlpha(descriptor.opacity * 0.38),
+          outlineWidth: 1,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 40_000_000),
         },
-        properties: { gamingHeatPlayers: descriptor.players, gamingHeatServers: descriptor.serverCount },
+        properties: { gamingActivityRegionId: descriptor.regionId },
+      }), (entity, descriptor) => {
+        entity.position = Cesium.Cartesian3.fromDegrees(descriptor.longitude, descriptor.latitude, 12_000);
+        entity.point.pixelSize = descriptor.pixelSize;
+        entity.point.color = Cesium.Color.fromCssColorString(descriptor.green ? '#59ff9a' : '#efffff').withAlpha(descriptor.opacity);
+        entity.point.outlineColor = Cesium.Color.fromCssColorString('#65ffd0').withAlpha(descriptor.opacity * 0.38);
+      });
+    } else {
+      activityField = null;
+      const cells = aggregateGamingHeat(mapped, heatCellSizeDegrees(cameraHeight));
+      const maximumWeight = Math.max(1, ...cells.map((cell) => cell.weight));
+      const heatRows = cells.flatMap((cell) => [0, 1, 2].map((ring) => ({
+        ...cell,
+        id: `gaming-heat:${cell.id}:${ring}`,
+        ring,
+        ratio: Math.log1p(cell.weight * filters.heatIntensity / 50) / Math.log1p(maximumWeight * filters.heatIntensity / 50),
+      })));
+      const heatGeometry = (descriptor) => {
+        const base = Math.max(8_000, descriptor.cellSizeDegrees * 70_000 * (filters.heatRadius / 55));
+        return {
+          position: Cesium.Cartesian3.fromDegrees(descriptor.longitude, descriptor.latitude),
+          radius: base * (1 + descriptor.ring * 0.48),
+          color: heatColor(descriptor.ratio, (filters.heatOpacity / 100) * [0.35, 0.18, 0.08][descriptor.ring]),
+        };
       };
-    }, (entity, descriptor) => {
-      const geometry = heatGeometry(descriptor);
-      entity.position = geometry.position;
-      entity.ellipse.semiMajorAxis = geometry.radius;
-      entity.ellipse.semiMinorAxis = geometry.radius;
-      entity.ellipse.material = geometry.color;
-    });
+      syncEntitySet(heatSource.entities, heatRows, (descriptor) => {
+        const geometry = heatGeometry(descriptor);
+        return {
+          id: descriptor.id,
+          position: geometry.position,
+          ellipse: {
+            semiMajorAxis: geometry.radius,
+            semiMinorAxis: geometry.radius,
+            material: geometry.color,
+            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          },
+          properties: { gamingHeatPlayers: descriptor.players, gamingHeatServers: descriptor.serverCount },
+        };
+      }, (entity, descriptor) => {
+        const geometry = heatGeometry(descriptor);
+        entity.position = geometry.position;
+        entity.ellipse.semiMajorAxis = geometry.radius;
+        entity.ellipse.semiMinorAxis = geometry.radius;
+        entity.ellipse.material = geometry.color;
+      });
+    }
     const visible = filterGamingServers(filteredServers, filters, bounds);
-    const overview = gamingOverview(visible, lastUpdate);
+    const overview = overviewWithActivity(visible, games, filters, lastUpdate, activityField);
     window.dispatchEvent(new CustomEvent('gev:gaming-data-visible-change', { detail: overview }));
     governorRequestRender('gaming-data-render');
     emit();
@@ -273,7 +338,7 @@ export function createGamingDataLayer() {
       status: filters.onlineOnly && !filters.includeOffline ? 'online' : 'all',
       minPlayers: String(filters.minPlayers),
       maxPlayers: String(filters.maxPlayers),
-      limit: '1200',
+      limit: '5000',
     });
     if (!filters.allGames) for (const game of filters.selectedGames) params.append('game', game);
     if (filters.country) params.set('country', filters.country);
@@ -288,7 +353,7 @@ export function createGamingDataLayer() {
     id: 'gaming-data',
     name: 'Gaming Data',
     icon: '◈',
-    source: 'BattleMetrics',
+    source: 'Steam / BattleMetrics',
     showInTogglePanel: false,
     updateInterval: 0,
 
@@ -316,9 +381,18 @@ export function createGamingDataLayer() {
       clickHandler.setInputAction((movement) => {
         const picked = viewer.scene.pick(movement.position);
         const property = picked?.id?.properties?.gamingServerId;
-        const id = property?.getValue?.(viewer.clock.currentTime) || property;
+        const id = propertyValue(property, viewer.clock.currentTime);
         if (id && serverById.has(String(id))) showDetails(serverById.get(String(id)));
       }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+      clickHandler.setInputAction((movement) => {
+        const card = document.getElementById('gaming-data-hover');
+        const picked = viewer.scene.pick(movement.endPosition);
+        const property = picked?.id?.properties?.gamingActivityRegionId;
+        const id = propertyValue(property, viewer.clock.currentTime);
+        const region = id ? activityRegionById.get(String(id)) : null;
+        if (region) showActivityHover(card, region, movement.endPosition);
+        else if (card) card.hidden = true;
+      }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
     },
 
     enable() {
@@ -340,6 +414,8 @@ export function createGamingDataLayer() {
       if (heatSource) heatSource.show = false;
       const card = document.getElementById('gaming-data-details');
       if (card) card.hidden = true;
+      const hover = document.getElementById('gaming-data-hover');
+      if (hover) hover.hidden = true;
       governorRequestRender('gaming-data-disable');
       emit();
     },
@@ -386,7 +462,7 @@ export function createGamingDataLayer() {
         return true;
       } catch (caught) {
         if (caught?.name === 'AbortError') return true;
-        error = caught?.message || 'BattleMetrics is temporarily unavailable';
+        error = caught?.message || 'Gaming Data provider is temporarily unavailable';
         stale = servers.length > 0;
         render();
         // Gaming Data is an optional, isolated surface. A missing/rejected
@@ -458,7 +534,7 @@ export function createGamingDataLayer() {
         serverCount: servers.length,
         mappedCount: filteredServers.filter(serverHasCoordinates).length,
         filteredCount: filteredServers.length,
-        overview: gamingOverview(visible, lastUpdate),
+        overview: overviewWithActivity(visible, games, filters, lastUpdate, activityField),
         lastUpdate,
         lastAttempt,
         error,
@@ -468,6 +544,7 @@ export function createGamingDataLayer() {
         partial,
         authMode,
         provider,
+        activityField,
       };
     },
 

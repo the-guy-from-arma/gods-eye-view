@@ -37,8 +37,8 @@
   <div id="cesiumContainer"></div>
   <aside id="thunderlink-system-identity" aria-label="ThunderLink software identity">
     <span>OS <strong>THUNDERLINK OBLIVION</strong></span>
-    <span>VERSION <strong>0.3.08</strong></span>
-    <span>KERNEL <strong>TBSGE-KERNEL-030.009</strong></span>
+    <span>VERSION <strong>0.3.09</strong></span>
+    <span>KERNEL <strong>TBSGE-KERNEL-030.010</strong></span>
     <button id="credits-footer-button" type="button">CREDITS &amp; OPEN SOURCES</button>
   </aside>
   <footer id="platform-legal-footer" aria-label="Legal and privacy policies">
@@ -919,9 +919,9 @@
                 <legend>PROVIDER &amp; DISPLAY</legend>
                 <div class="gaming-data-check-grid">
                   <label><input type="checkbox" data-gaming-key="providerEnabled" checked />Steam / BattleMetrics provider</label>
-                  <label><input type="checkbox" data-gaming-key="markersEnabled" checked />Live server markers</label>
-                  <label><input type="checkbox" data-gaming-key="heatmapEnabled" checked />Population heatmap</label>
-                  <label><input type="checkbox" data-gaming-key="clusteringEnabled" checked />Marker clustering</label>
+                  <label><input type="checkbox" data-gaming-key="markersEnabled" />Exact server points</label>
+                  <label><input type="checkbox" data-gaming-key="heatmapEnabled" checked />Globe activity field</label>
+                  <label><input type="checkbox" data-gaming-key="clusteringEnabled" />Server clustering</label>
                   <label><input type="checkbox" data-gaming-key="autoRefresh" checked />Auto refresh</label>
                   <label title="Public player lists are intentionally unavailable in this release"><input type="checkbox" data-gaming-key="publicPlayerNames" disabled />Public player names</label>
                 </div>
@@ -962,16 +962,16 @@
               </fieldset>
               <fieldset>
                 <legend>VISUALIZATION</legend>
-                <label class="gaming-data-text-field">MODE<select data-gaming-key="visualizationMode"><option value="combined">Combined markers + heatmap</option><option value="markers">Markers only</option><option value="heatmap">Heatmap only</option></select></label>
+                <label class="gaming-data-text-field">MODE<select data-gaming-key="visualizationMode"><option value="heatmap" selected>Player activity field</option><option value="combined">Activity field + server points</option><option value="markers">Server points only</option></select></label>
                 <div class="gaming-data-slider-list">
-                  <label>HEAT INTENSITY<input type="range" min="1" max="100" value="65" data-gaming-key="heatIntensity" /><output>65%</output></label>
-                  <label>HEAT RADIUS<input type="range" min="10" max="100" value="55" data-gaming-key="heatRadius" /><output>55%</output></label>
-                  <label>HEAT OPACITY<input type="range" min="5" max="100" value="52" data-gaming-key="heatOpacity" /><output>52%</output></label>
+                  <label>DOT INTENSITY<input type="range" min="1" max="100" value="65" data-gaming-key="heatIntensity" /><output>65%</output></label>
+                  <label>REGION SPREAD<input type="range" min="10" max="100" value="55" data-gaming-key="heatRadius" /><output>55%</output></label>
+                  <label>DOT OPACITY<input type="range" min="5" max="100" value="52" data-gaming-key="heatOpacity" /><output>52%</output></label>
                   <label>CLUSTER RADIUS<input type="range" min="20" max="120" value="46" data-gaming-key="clusterRadius" /><output>46 PX</output></label>
                   <label>LABEL MIN ZOOM<input type="range" min="1" max="18" value="9" data-gaming-key="labelMinimumZoom" /><output>Z9</output></label>
                 </div>
                 <div class="gaming-data-check-grid">
-                  <label><input type="checkbox" data-gaming-key="markerScaleByPopulation" checked />Scale markers by population</label>
+                  <label><input type="checkbox" data-gaming-key="markerScaleByPopulation" />Scale server points by population</label>
                   <label><input type="checkbox" data-gaming-key="labelsVisible" />Show server labels</label>
                 </div>
                 <label class="gaming-data-text-field">COLOR BY<select data-gaming-key="colorMode"><option value="population">Population</option><option value="game">Game</option><option value="status">Server status</option></select></label>
@@ -986,8 +986,9 @@
                 <div class="gaming-data-freshness" data-gaming-freshness>LAST SUCCESS · NEVER</div>
               </fieldset>
             </div>
-            <p class="gaming-data-privacy"><strong>Locations represent game servers or hosting regions, not the physical locations of individual players.</strong></p>
+            <p class="gaming-data-privacy"><strong>The glowing field is a regional activity estimate derived from global game concurrency and public server distribution. Every dot is visual—not an individual person or location.</strong></p>
             <a class="gaming-data-attribution" href="https://store.steampowered.com/" target="_blank" rel="noopener noreferrer">Game activity and regional dedicated-server data provided by Steam</a>
+            <a class="gaming-data-attribution" href="https://store.steampowered.com/stats/" target="_blank" rel="noopener noreferrer">OPEN STEAM GLOBAL STATS DIRECTORY</a>
           </div>
         </section>
       </div>
@@ -996,6 +997,7 @@
 
   <div id="scene-runtime"></div>
   <aside id="gaming-data-details" class="gaming-data-details" aria-live="polite" hidden></aside>
+  <aside id="gaming-data-hover" class="gaming-data-hover" role="tooltip" hidden></aside>
 
   <!-- Explicit mission choice on a fresh session. Live feeds are not auto-enabled
        until the visitor asks; shared links skip this surface entirely. It returns
