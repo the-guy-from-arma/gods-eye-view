@@ -16,6 +16,29 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   project documentation as ThunderLink God's Eye while preserving the original
   MIT license, upstream attribution, and stable internal protocol identifiers.
 
+## [0.3.02] — 2026-09-05 — Trust, consent, and operational truth
+
+### Added
+
+- Added a versioned legal bundle covering the EULA, Terms of Service, Privacy
+  Policy, Acceptable Use Policy, and Data & AI Disclaimer, with persistent
+  footer access from the public console.
+- Added explicit, recorded legal acceptance to sign-in and registration, plus
+  a renewal gate that blocks existing sessions until the current bundle is
+  accepted.
+- Added real owner telemetry sourced from Railway Postgres: active and recent
+  sessions, failed logins, searches, audit activity, policy acceptances, locked
+  accounts, layer governance, and snapshot freshness.
+
+### Changed
+
+- Removed the owner dashboard's simulated relay mesh, invented latency and
+  threat level, animated spectrum, and decorative telemetry canvas.
+- Added 180-day activity-event cleanup and expired-session cleanup during
+  account schema maintenance.
+- Advanced ThunderLink Oblivion to public build `0.3.02` and kernel
+  `TBSGE-KERNEL-030.003`.
+
 ## [0.3.01] — 2026-09-05 — Release discipline
 
 ### Changed

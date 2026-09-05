@@ -1,3 +1,5 @@
+import { CURRENT_LEGAL_VERSION } from './legalPolicy.js';
+
 function sendActivity(type, metadata = {}) {
   const body = JSON.stringify({ type, metadata });
   if (navigator.sendBeacon) {
@@ -47,6 +49,9 @@ export function initAccounts(options = {}) {
   const activityPanel = dialog?.querySelector('[data-account-activity-panel]');
   const eventsHost = dialog?.querySelector('[data-account-events]');
   const ownerDashboardButton = dialog?.querySelector('[data-owner-dashboard]');
+  const legalRenewal = dialog?.querySelector('[data-account-legal-renewal]');
+  const legalRenewalCheck = dialog?.querySelector('[data-account-legal-renewal-check]');
+  const legalAcceptButton = dialog?.querySelector('[data-account-legal-accept]');
   const systemModeGate = document.getElementById('system-mode-gate');
   const systemModeTitle = systemModeGate?.querySelector('[data-system-mode-title]');
   const systemModeMessage = systemModeGate?.querySelector('[data-system-mode-message]');
@@ -59,6 +64,7 @@ export function initAccounts(options = {}) {
   let user = null;
   let siteMode = { mode: 'online', label: 'Systems Online', message: '' };
   let authenticationHandled = false;
+  let legalAcceptanceRequired = false;
   let ownerAccessRequested = false;
 
   if (!chip || !dialog || !form || !status) return null;
@@ -122,15 +128,16 @@ export function initAccounts(options = {}) {
     if (!user) return;
     signedIn.querySelector('[data-account-email]').textContent = user.email;
     signedIn.querySelector('[data-account-role]').textContent = user.role === 'owner' ? 'OWNER ACCESS' : 'APPROVED OPERATOR';
-    activityButton.hidden = user.role !== 'owner';
-    ownerDashboardButton.hidden = user.role !== 'owner';
+    if (legalRenewal) legalRenewal.hidden = !legalAcceptanceRequired;
+    activityButton.hidden = user.role !== 'owner' || legalAcceptanceRequired;
+    ownerDashboardButton.hidden = user.role !== 'owner' || legalAcceptanceRequired;
     if (user.role !== 'owner') {
       activityPanel.hidden = true;
     }
   };
 
   const continueAfterAuthentication = async () => {
-    if (!user || authenticationHandled || siteAccessBlocked()) return;
+    if (!user || legalAcceptanceRequired || authenticationHandled || siteAccessBlocked()) return;
     authenticationHandled = true;
     try {
       await onAuthenticated?.(user);
@@ -177,14 +184,14 @@ export function initAccounts(options = {}) {
     dialog.querySelector('input:not([hidden]), button:not([hidden])')?.focus();
   });
   close?.addEventListener('click', () => {
-    if (accessRequired && !user) return;
+    if (accessRequired && (!user || legalAcceptanceRequired)) return;
     dialog.hidden = true;
     chip.focus();
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && disclaimerDialog?.open) return;
     if (event.key === 'Escape' && !dialog.hidden) {
-      if (accessRequired && !user) return;
+      if (accessRequired && (!user || legalAcceptanceRequired)) return;
       dialog.hidden = true;
       chip.focus();
     }
@@ -199,6 +206,8 @@ export function initAccounts(options = {}) {
       email: form.elements.email.value,
       password: form.elements.password.value,
       ownerSetupToken: mode === 'register' ? form.elements.ownerSetupToken.value : '',
+      legalAccepted: form.elements.legalAccepted.checked,
+      legalVersion: CURRENT_LEGAL_VERSION,
     });
     try {
       const payload = await api(`/api/account/${mode === 'register' ? 'register' : 'login'}`, { method: 'POST', body });
@@ -207,6 +216,7 @@ export function initAccounts(options = {}) {
       if (mode === 'register') {
         if (payload.user) {
           user = payload.user;
+          legalAcceptanceRequired = false;
           setStatus(payload.message || 'Account approved.');
           paint();
           if (routeOwnerToCommand()) return;
@@ -217,6 +227,7 @@ export function initAccounts(options = {}) {
         }
       } else {
         user = payload.user;
+        legalAcceptanceRequired = false;
         setStatus('Signed in.');
         paint();
         if (routeOwnerToCommand()) return;
@@ -232,9 +243,36 @@ export function initAccounts(options = {}) {
   dialog.querySelector('[data-account-logout]')?.addEventListener('click', async () => {
     try { await api('/api/account/logout', { method: 'POST', body: '{}' }); } catch { /* Clear local UI anyway. */ }
     user = null;
+    legalAcceptanceRequired = false;
     paint();
     setStatus('Signed out.');
     if (accessRequired) location.reload();
+  });
+  legalAcceptButton?.addEventListener('click', async () => {
+    if (!legalRenewalCheck?.checked) {
+      setStatus('You must affirmatively accept the complete legal bundle to continue.', true);
+      legalRenewalCheck?.focus();
+      return;
+    }
+    legalAcceptButton.disabled = true;
+    setStatus('Recording legal acceptance…');
+    try {
+      const payload = await api('/api/account/accept-legal', {
+        method: 'POST',
+        body: JSON.stringify({ legalAccepted: true, legalVersion: CURRENT_LEGAL_VERSION }),
+      });
+      legalAcceptanceRequired = false;
+      user = { ...user, legalAccepted: true, legalAcceptedAt: payload.acceptedAt };
+      legalRenewalCheck.checked = false;
+      setStatus('Terms accepted. Starting command console.');
+      paint();
+      if (routeOwnerToCommand()) return;
+      await continueAfterAuthentication();
+    } catch (error) {
+      setStatus(error.message, true);
+    } finally {
+      legalAcceptButton.disabled = false;
+    }
   });
   activityButton?.addEventListener('click', () => {
     activityPanel.hidden = !activityPanel.hidden;
@@ -276,6 +314,7 @@ export function initAccounts(options = {}) {
     const previousUser = user;
     const previousSiteMode = siteMode.mode;
     user = payload.user;
+    legalAcceptanceRequired = Boolean(payload.legalAcceptanceRequired);
     siteMode = payload.siteMode || siteMode;
     if (!initial && previousUser && !user) {
       location.reload();
@@ -291,6 +330,11 @@ export function initAccounts(options = {}) {
     // the mode remains blocked.
     if (!initial && previousSiteMode === 'online' && siteAccessBlocked() && authenticationHandled) {
       location.reload();
+      return;
+    }
+    if (user && legalAcceptanceRequired) {
+      dialog.hidden = false;
+      setStatus(`Review and accept legal version ${payload.legalVersion || CURRENT_LEGAL_VERSION} to continue.`);
       return;
     }
     if (user) void continueAfterAuthentication();

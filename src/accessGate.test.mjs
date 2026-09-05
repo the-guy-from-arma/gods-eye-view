@@ -9,6 +9,10 @@ const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
 const owner = readFileSync(new URL('../owner.html', import.meta.url), 'utf8');
 const ownerJs = readFileSync(new URL('./ownerDashboard.js', import.meta.url), 'utf8');
 const ownerCss = readFileSync(new URL('../owner.css', import.meta.url), 'utf8');
+const terms = readFileSync(new URL('../legal/terms.html', import.meta.url), 'utf8');
+const privacy = readFileSync(new URL('../legal/privacy.html', import.meta.url), 'utf8');
+const acceptableUse = readFileSync(new URL('../legal/acceptable-use.html', import.meta.url), 'utf8');
+const dataAi = readFileSync(new URL('../legal/data-ai.html', import.meta.url), 'utf8');
 
 test('the app document starts locked and loads only the access bootstrap', () => {
   assert.match(index, /<body class="auth-pending">/);
@@ -25,7 +29,7 @@ test('Gods Eye runtime is dynamically imported only after authentication', () =>
 });
 
 test('the locked gate cannot be dismissed and hidden account states stay hidden', () => {
-  assert.match(account, /if \(accessRequired && !user\) return/);
+  assert.match(account, /if \(accessRequired && \(!user \|\| legalAcceptanceRequired\)\) return/);
   assert.match(css, /#account-signed-in\[hidden\], #account-signed-out\[hidden\]/);
   assert.match(css, /body\.auth-pending > :not\(#account-dialog\)/);
 });
@@ -49,9 +53,14 @@ test('owner access opens a dedicated full-page command center', () => {
   assert.match(owner, /data-owner-accounts/);
   assert.match(owner, /data-owner-layers/);
   assert.match(owner, /data-owner-activity/);
-  assert.match(owner, /id="owner-telemetry-canvas"/);
+  assert.doesNotMatch(owner, /owner-telemetry-canvas|GLOBAL RELAY MESH|LATENCY · 24 MS|THREAT LEVEL · LOW/);
+  assert.match(owner, /SESSION ACTIVITY/);
+  assert.match(owner, /FAILED LOGINS/);
+  assert.match(owner, /OPERATOR ACTIVITY · 24H/);
+  assert.match(ownerJs, /paintOperationalMetrics/);
+  assert.match(ownerJs, /10_000/);
   assert.match(owner, /THUNDERLINK OBLIVION/);
-  assert.match(owner, /TBSGE-KERNEL-030\.002/);
+  assert.match(owner, /TBSGE-KERNEL-030\.003/);
   assert.match(ownerJs, /api\/account\/admin\/autopilot/);
   assert.match(ownerJs, /api\/account\/admin\/users/);
   assert.match(ownerJs, /api\/account\/admin\/layers/);
@@ -62,12 +71,34 @@ test('owner access opens a dedicated full-page command center', () => {
 test('public console exposes ThunderLink OS identity without removing map attribution', () => {
   assert.match(index, /id="thunderlink-system-identity"/);
   assert.match(index, /OS <strong>THUNDERLINK OBLIVION<\/strong>/);
-  assert.match(index, /VERSION <strong>0\.3\.01<\/strong>/);
-  assert.match(index, /KERNEL <strong>TBSGE-KERNEL-030\.002<\/strong>/);
+  assert.match(index, /VERSION <strong>0\.3\.02<\/strong>/);
+  assert.match(index, /KERNEL <strong>TBSGE-KERNEL-030\.003<\/strong>/);
   assert.match(index, /id="credits-footer-button"[^>]*>CREDITS &amp; OPEN SOURCES<\/button>/);
   assert.match(css, /#thunderlink-system-identity/);
   assert.match(css, /#cesium-credits/);
   assert.match(readFileSync(new URL('./main.js', import.meta.url), 'utf8'), /cesium-credit-expand-link/);
+});
+
+test('all operators must affirmatively accept the versioned legal bundle', () => {
+  assert.match(index, /name="legalAccepted" type="checkbox" required/);
+  assert.match(index, /data-account-legal-renewal/);
+  for (const path of ['/legal/eula.html', '/legal/terms.html', '/legal/privacy.html', '/legal/acceptable-use.html', '/legal/data-ai.html']) {
+    assert.match(index, new RegExp(path.replaceAll('/', '\\/')));
+  }
+  assert.match(account, /CURRENT_LEGAL_VERSION/);
+  assert.match(account, /api\/account\/accept-legal/);
+  assert.match(account, /legalAcceptanceRequired/);
+});
+
+test('legal documents cover high-risk data, enforcement, identity verification, privacy, and AI', () => {
+  assert.match(terms, /government-issued photo ID/i);
+  assert.match(terms, /valid legal process/i);
+  assert.match(acceptableUse, /stalk, harass/i);
+  assert.match(acceptableUse, /high-impact decisions/i);
+  assert.match(privacy, /automatically removed after 180 days/i);
+  assert.match(privacy, /We do not currently collect government ID/i);
+  assert.match(dataAi, /not operational intelligence/i);
+  assert.match(dataAi, /AI output must be treated as an unverified suggestion/i);
 });
 
 test('site-wide interruption states block the globe with an owner recovery path', () => {

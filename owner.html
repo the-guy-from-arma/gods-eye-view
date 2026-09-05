@@ -13,7 +13,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" rel="stylesheet" />
 </head>
 <body class="owner-loading">
-  <canvas id="owner-telemetry-canvas" aria-hidden="true"></canvas>
   <div class="owner-grid" aria-hidden="true"></div>
   <div class="owner-hud-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <aside class="command-rail">
@@ -31,8 +30,8 @@
     <div class="command-rail-footer">
       <div class="rail-os-readout">
         <small>OS</small><strong>THUNDERLINK OBLIVION</strong>
-        <small>VERSION</small><strong>0.3.01</strong>
-        <small>KERNEL</small><strong>TBSGE-KERNEL-030.002</strong>
+        <small>VERSION</small><strong>0.3.02</strong>
+        <small>KERNEL</small><strong>TBSGE-KERNEL-030.003</strong>
       </div>
       <span><i></i>OWNER SESSION</span>
       <strong data-owner-email>VERIFYING…</strong>
@@ -42,11 +41,11 @@
 
   <main class="command-main">
     <div class="system-telemetry-bar" aria-label="System telemetry">
-      <span><i></i>OBLIVION CORE · NOMINAL</span>
-      <span>POSTGRES · LINKED</span>
-      <span>POLICY SYNC · 5S</span>
-      <span>ENCRYPTED COMMAND CHANNEL</span>
-      <span>TBSGE-KERNEL-030.002</span>
+      <span><i></i>OBLIVION CORE · <b data-owner-core-state>SYNCING</b></span>
+      <span>POSTGRES · <b data-owner-db-state>CHECKING</b></span>
+      <span>SNAPSHOT · <b data-owner-snapshot-age>WAITING</b></span>
+      <span>LEGAL · <b data-owner-legal-version>0.3.02</b></span>
+      <span>TBSGE-KERNEL-030.003</span>
     </div>
     <header class="command-topbar">
       <div>
@@ -61,38 +60,39 @@
 
     <div class="command-content">
       <section id="overview" class="system-hero" data-site-mode="online">
-        <div class="hero-coordinate-rail" aria-hidden="true">LAT 38.9072° N · LON 77.0369° W · ORBITAL CONTROL PLANE 03</div>
         <div class="system-hero-copy">
           <span class="section-kicker">GLOBAL OPERATING STATE</span>
           <div class="system-title-line"><i></i><h2 data-site-mode-label>Systems Online</h2></div>
           <p data-site-mode-message>Satellite link established. Public command access is available.</p>
           <small>Changes reach open public consoles within 5 seconds. Owner recovery remains available through this dedicated command page.</small>
         </div>
-        <div class="orbital-status" aria-hidden="true">
-          <span></span><span></span><span></span>
-          <div><img src="/logo.svg" alt="" /></div>
-          <b class="orbit-node orbit-node-a"></b><b class="orbit-node orbit-node-b"></b>
+        <div class="system-hero-state" aria-label="Current control state">
+          <div><small>DATABASE</small><strong data-owner-db-hero>CHECKING</strong></div>
+          <div><small>ACTIVE SESSIONS</small><strong data-owner-hero-sessions>0</strong></div>
+          <div><small>LAST ACTIVITY</small><strong data-owner-hero-last-activity>NO EVENTS</strong></div>
         </div>
-        <div class="hero-signal-bank" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><small>UPLINK SPECTRUM</small></div>
       </section>
 
-      <section class="telemetry-matrix" aria-label="Command network telemetry">
+      <section class="telemetry-matrix operational-metrics" aria-label="Live operational metrics">
         <article>
-          <header><span>GLOBAL RELAY MESH</span><strong>STABLE</strong></header>
-          <div class="relay-map" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><b></b><b></b><b></b></div>
-          <footer><span>EDGE NODES · 08</span><span>LATENCY · 24 MS</span></footer>
+          <header><span>SESSION ACTIVITY</span><strong>POSTGRES LIVE</strong></header>
+          <div class="operational-readouts"><div><b data-owner-live-metric="activeSessions">0</b><small>ACTIVE NOW</small></div><div><b data-owner-live-metric="sessions24h">0</b><small>CREATED · 24H</small></div></div>
+          <footer><span>30-DAY SESSION EXPIRY</span><span data-owner-session-note>SYNCING</span></footer>
         </article>
         <article>
-          <header><span>SECURITY ENVELOPE</span><strong>SEALED</strong></header>
-          <div class="signal-spectrum" aria-hidden="true">
-            <i style="--h:34%"></i><i style="--h:62%"></i><i style="--h:45%"></i><i style="--h:84%"></i><i style="--h:57%"></i><i style="--h:92%"></i><i style="--h:68%"></i><i style="--h:39%"></i><i style="--h:76%"></i><i style="--h:51%"></i><i style="--h:88%"></i><i style="--h:64%"></i>
-          </div>
-          <footer><span>SESSION GUARD · ACTIVE</span><span>THREAT LEVEL · LOW</span></footer>
+          <header><span>SECURITY EVENTS · 24H</span><strong data-owner-security-state>MONITORING</strong></header>
+          <div class="operational-readouts"><div><b data-owner-live-metric="failedLogins24h">0</b><small>FAILED LOGINS</small></div><div><b data-owner-live-metric="lockedAccounts">0</b><small>LOCKED USERS</small></div></div>
+          <footer><span>REAL AUTH EVENTS</span><span>NO INFERRED “THREAT LEVEL”</span></footer>
         </article>
-        <article class="identity-module">
-          <header><span>OPERATING SYSTEM</span><strong>ONLINE</strong></header>
-          <div><small>OS</small><b>THUNDERLINK OBLIVION</b><small>VERSION</small><b>0.3.01</b><small>KERNEL</small><b>TBSGE-KERNEL-030.002</b></div>
-          <footer><span>BUILD CHANNEL · PRODUCTION</span></footer>
+        <article>
+          <header><span>OPERATOR ACTIVITY · 24H</span><strong>AUDIT LOG</strong></header>
+          <div class="operational-readouts"><div><b data-owner-live-metric="events24h">0</b><small>EVENTS</small></div><div><b data-owner-live-metric="searches24h">0</b><small>SEARCHES</small></div></div>
+          <footer><span>RETENTION · 180 DAYS</span><span data-owner-last-event>NO EVENTS</span></footer>
+        </article>
+        <article>
+          <header><span>DATA GOVERNANCE</span><strong data-owner-live-layer-summary>SYNCING</strong></header>
+          <div class="operational-readouts"><div><b data-owner-live-metric="liveLayers">0</b><small>PUBLIC / LIVE</small></div><div><b data-owner-live-metric="restrictedLayers">0</b><small>RESTRICTED</small></div></div>
+          <footer><span>LEGAL ACCEPTANCE · 24H</span><span data-owner-live-metric="legalAcceptances24h">0</span></footer>
         </article>
       </section>
 

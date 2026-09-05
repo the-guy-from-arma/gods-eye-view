@@ -7960,6 +7960,11 @@ export default defineConfig(({ mode }) => {
         input: {
           app: path.resolve(__dirname, 'index.html'),
           owner: path.resolve(__dirname, 'owner.html'),
+          terms: path.resolve(__dirname, 'legal/terms.html'),
+          privacy: path.resolve(__dirname, 'legal/privacy.html'),
+          eula: path.resolve(__dirname, 'legal/eula.html'),
+          acceptableUse: path.resolve(__dirname, 'legal/acceptable-use.html'),
+          dataAi: path.resolve(__dirname, 'legal/data-ai.html'),
         },
       },
     },

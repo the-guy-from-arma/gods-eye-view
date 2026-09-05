@@ -16,7 +16,7 @@ const modeControls = document.querySelector('[data-mode-controls]');
 const confirmBar = document.querySelector('[data-system-confirm]');
 const accountSearch = document.querySelector('[data-account-search]');
 const accountFilter = document.querySelector('[data-account-filter]');
-let dashboard = { accounts: [], layers: [], autopilot: false, siteMode: { mode: 'online' } };
+let dashboard = { accounts: [], layers: [], autopilot: false, siteMode: { mode: 'online' }, telemetry: {} };
 let pendingMode = null;
 let toastTimer;
 
@@ -32,6 +32,15 @@ function formatDate(value) {
   if (!value) return 'NOT RECORDED';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? 'NOT RECORDED' : date.toLocaleString();
+}
+
+function relativeAge(value) {
+  const elapsed = Date.now() - new Date(value).getTime();
+  if (!value || !Number.isFinite(elapsed)) return 'NO EVENTS';
+  if (elapsed < 5_000) return 'JUST NOW';
+  if (elapsed < 60_000) return `${Math.floor(elapsed / 1000)}S AGO`;
+  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}M AGO`;
+  return `${Math.floor(elapsed / 3_600_000)}H AGO`;
 }
 
 function node(tag, className, text) {
@@ -53,6 +62,39 @@ function paintMetrics(accounts) {
     if (target) target.textContent = String(value);
   }
   document.querySelector('[data-owner-account-count]').textContent = `${values.pending} PENDING · ${values.locked} LOCKED · ${values.total} TOTAL`;
+}
+
+function paintOperationalMetrics(telemetry = {}) {
+  const liveLayers = Number(telemetry.layerCounts?.live || 0);
+  const restrictedLayers = Number(telemetry.layerCounts?.coming_soon || 0)
+    + Number(telemetry.layerCounts?.maintenance || 0)
+    + Number(telemetry.layerCounts?.disabled || 0);
+  const values = {
+    activeSessions: Number(telemetry.activeSessions || 0),
+    sessions24h: Number(telemetry.sessions24h || 0),
+    failedLogins24h: Number(telemetry.failedLogins24h || 0),
+    lockedAccounts: dashboard.accounts.filter((account) => account.locked).length,
+    events24h: Number(telemetry.events24h || 0),
+    searches24h: Number(telemetry.searches24h || 0),
+    legalAcceptances24h: Number(telemetry.legalAcceptances24h || 0),
+    liveLayers,
+    restrictedLayers,
+  };
+  for (const [key, value] of Object.entries(values)) {
+    document.querySelectorAll(`[data-owner-live-metric="${key}"]`).forEach((target) => { target.textContent = String(value); });
+  }
+  const connected = telemetry.database === 'connected';
+  document.querySelector('[data-owner-core-state]').textContent = connected ? 'OPERATIONAL' : 'DEGRADED';
+  document.querySelector('[data-owner-db-state]').textContent = connected ? 'CONNECTED' : 'UNAVAILABLE';
+  document.querySelector('[data-owner-db-hero]').textContent = connected ? 'CONNECTED' : 'UNAVAILABLE';
+  document.querySelector('[data-owner-hero-sessions]').textContent = String(values.activeSessions);
+  document.querySelector('[data-owner-hero-last-activity]').textContent = relativeAge(telemetry.lastActivityAt);
+  document.querySelector('[data-owner-last-event]').textContent = relativeAge(telemetry.lastActivityAt);
+  document.querySelector('[data-owner-legal-version]').textContent = telemetry.legalVersion || 'UNKNOWN';
+  document.querySelector('[data-owner-live-layer-summary]').textContent = `${liveLayers} LIVE · ${restrictedLayers} CONTROLLED`;
+  document.querySelector('[data-owner-security-state]').textContent = values.failedLogins24h || values.lockedAccounts ? 'REVIEW' : 'CLEAR';
+  document.querySelector('[data-owner-session-note]').textContent = `${values.activeSessions} ACTIVE`;
+  document.querySelector('[data-owner-snapshot-age]').textContent = relativeAge(telemetry.generatedAt);
 }
 
 function accountMatches(account) {
@@ -82,6 +124,10 @@ function renderAccounts() {
       node('strong', '', account.email),
       node('span', '', `${String(account.status).toUpperCase()} · CREATED ${formatDate(account.createdAt)}`),
     );
+    identity.append(node('small', account.legalAcceptedVersion === dashboard.telemetry?.legalVersion ? 'legal-current' : 'legal-renewal',
+      account.legalAcceptedVersion === dashboard.telemetry?.legalVersion
+        ? `LEGAL ${account.legalAcceptedVersion} · ACCEPTED ${formatDate(account.legalAcceptedAt)}`
+        : `LEGAL RENEWAL REQUIRED · CURRENT ${dashboard.telemetry?.legalVersion || 'UNKNOWN'}`));
     if (account.locked) identity.append(node('small', '', `SECURITY LOCK · ${account.lockReason || 'Suspicious activity review'} · ${formatDate(account.lockedAt)}`));
     const actions = node('div', 'owner-account-actions');
     if (account.status !== 'approved') actions.append(actionButton(account, 'approve', 'APPROVE'));
@@ -179,6 +225,7 @@ async function loadDashboard(quiet = false) {
   renderActivity(activity.events);
   paintAutopilot(Boolean(admin.autopilot));
   paintSiteMode(admin.siteMode);
+  paintOperationalMetrics(admin.telemetry);
   if (!quiet) showStatus(`SYNC COMPLETE · ${admin.accounts.length} ACCOUNTS`);
 }
 
@@ -270,90 +317,14 @@ document.querySelector('[data-owner-refresh]').addEventListener('click', () => l
 
 function updateClock() {
   document.querySelector('[data-owner-clock]').textContent = `${new Date().toISOString().slice(11, 19)} UTC`;
+  if (dashboard.telemetry?.generatedAt) document.querySelector('[data-owner-snapshot-age]').textContent = relativeAge(dashboard.telemetry.generatedAt);
+  if (dashboard.telemetry?.lastActivityAt) {
+    document.querySelector('[data-owner-hero-last-activity]').textContent = relativeAge(dashboard.telemetry.lastActivityAt);
+    document.querySelector('[data-owner-last-event]').textContent = relativeAge(dashboard.telemetry.lastActivityAt);
+  }
 }
 updateClock();
 setInterval(updateClock, 1000);
-
-function initTelemetryCanvas() {
-  const canvas = document.getElementById('owner-telemetry-canvas');
-  const context = canvas?.getContext('2d');
-  if (!context) return;
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let width = 0;
-  let height = 0;
-  let frame = 0;
-  let raf = 0;
-  let points = [];
-
-  const resize = () => {
-    const ratio = Math.min(devicePixelRatio || 1, 1.5);
-    width = innerWidth;
-    height = innerHeight;
-    canvas.width = Math.round(width * ratio);
-    canvas.height = Math.round(height * ratio);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    points = Array.from({ length: Math.max(24, Math.floor(width / 42)) }, (_, index) => ({
-      x: (index * 83.17) % width,
-      y: (index * 137.39) % height,
-      phase: index * 0.71,
-    }));
-  };
-
-  const draw = () => {
-    context.clearRect(0, 0, width, height);
-    context.save();
-    context.strokeStyle = 'rgba(58, 218, 243, .055)';
-    context.lineWidth = 1;
-    for (let x = 238; x < width; x += 96) {
-      context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke();
-    }
-    for (let y = 0; y < height; y += 96) {
-      context.beginPath(); context.moveTo(238, y); context.lineTo(width, y); context.stroke();
-    }
-
-    const cx = width * 0.77;
-    const cy = Math.min(390, height * 0.34);
-    const radius = Math.min(width, height) * 0.22;
-    context.strokeStyle = 'rgba(70, 225, 249, .075)';
-    for (let ring = 1; ring <= 3; ring += 1) {
-      context.beginPath();
-      context.ellipse(cx, cy, radius * ring * 0.58, radius * ring * 0.22, -0.32, 0, Math.PI * 2);
-      context.stroke();
-    }
-    context.setLineDash([3, 11]);
-    context.beginPath(); context.arc(cx, cy, radius, 0, Math.PI * 2); context.stroke();
-    context.setLineDash([]);
-
-    for (const point of points) {
-      const pulse = 0.25 + (Math.sin(frame * 0.018 + point.phase) + 1) * 0.18;
-      context.fillStyle = `rgba(73, 230, 250, ${pulse})`;
-      context.fillRect(point.x, point.y, 1.2, 1.2);
-    }
-    const sweepY = (frame * 0.55) % Math.max(height, 1);
-    const sweep = context.createLinearGradient(0, sweepY - 18, 0, sweepY + 18);
-    sweep.addColorStop(0, 'rgba(46, 222, 249, 0)');
-    sweep.addColorStop(0.5, 'rgba(46, 222, 249, .045)');
-    sweep.addColorStop(1, 'rgba(46, 222, 249, 0)');
-    context.fillStyle = sweep;
-    context.fillRect(238, sweepY - 18, width - 238, 36);
-    context.restore();
-    frame += 1;
-    if (!reducedMotion && !document.hidden) raf = requestAnimationFrame(draw);
-  };
-
-  const syncAnimation = () => {
-    cancelAnimationFrame(raf);
-    if (!document.hidden) draw();
-  };
-  resize();
-  draw();
-  addEventListener('resize', resize, { passive: true });
-  document.addEventListener('visibilitychange', syncAnimation);
-}
-
-initTelemetryCanvas();
 
 api('/api/account/session').then(async ({ user }) => {
   if (user?.role !== 'owner') {
@@ -363,6 +334,7 @@ api('/api/account/session').then(async ({ user }) => {
   document.querySelector('[data-owner-email]').textContent = user.email;
   document.body.classList.remove('owner-loading');
   await loadDashboard();
+  window.setInterval(() => loadDashboard(true).catch((error) => showStatus(error.message, true)), 10_000);
 }).catch((error) => {
   document.querySelector('[data-owner-denied]').hidden = false;
   showStatus(error.message, true);

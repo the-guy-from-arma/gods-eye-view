@@ -6,7 +6,6 @@ button,input,select { font:inherit; }
 button,a,select { cursor:pointer; }
 .owner-grid { position:fixed; inset:0; z-index:1; background:radial-gradient(circle at 72% 12%,rgba(0,194,238,.08),transparent 28%),linear-gradient(rgba(65,190,211,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(65,190,211,.025) 1px,transparent 1px); background-size:auto,48px 48px,48px 48px; pointer-events:none; }
 .owner-grid::after { position:absolute; inset:0; background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(65,220,246,.013) 3px 4px); content:''; }
-#owner-telemetry-canvas { position:fixed; inset:0; z-index:0; width:100%; height:100%; pointer-events:none; }
 .owner-hud-frame { position:fixed; inset:9px; z-index:50; pointer-events:none; }
 .owner-hud-frame i { position:absolute; width:28px; height:28px; border-color:rgba(77,228,250,.55); }
 .owner-hud-frame i:nth-child(1) { top:0;left:0;border-top:1px solid;border-left:1px solid; }
@@ -60,6 +59,7 @@ button,a,select { cursor:pointer; }
 .system-hero:not([data-site-mode="online"]) .system-title-line i { background:var(--red); box-shadow:0 0 15px var(--red); }
 .system-hero-copy p { max-width:700px; color:#83a9b1; font:400 12px/1.65 var(--mono); }
 .system-hero-copy small { max-width:680px; color:#496970; font-size:8px; line-height:1.5; }
+.system-hero-state{display:grid;gap:8px;align-self:stretch;align-content:center}.system-hero-state div{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 14px;border-left:2px solid rgba(85,233,255,.48);background:rgba(2,17,23,.72)}.system-hero-state small{color:#54747b;font-size:7px;letter-spacing:.12em}.system-hero-state strong{color:#bff4fa;font-size:9px;text-align:right}.system-hero:not([data-site-mode="online"]) .system-hero-state div{border-left-color:rgba(255,83,83,.62)}
 .orbital-status { position:relative; display:grid; place-items:center; width:250px; height:250px; justify-self:end; }
 .orbital-status > span { position:absolute; inset:10px; border:1px solid rgba(62,220,247,.22); border-radius:50%; }
 .orbital-status > span:nth-child(2) { inset:35px; border-style:dashed; animation:orbit-spin 18s linear infinite; }
@@ -78,11 +78,12 @@ button,a,select { cursor:pointer; }
 @keyframes orbit-spin { to { transform:rotate(360deg); } }
 @keyframes node-pulse { to { opacity:.25;transform:scale(.65); } }
 @keyframes signal-bank { to { height:18%;opacity:.35; } }
-.telemetry-matrix { display:grid; grid-template-columns:1.15fr 1fr .9fr; gap:10px; }
+.telemetry-matrix { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
 .telemetry-matrix article { position:relative; display:grid; min-height:142px; grid-template-rows:auto 1fr auto; padding:14px; overflow:hidden; border:1px solid rgba(73,208,230,.17); background:linear-gradient(135deg,rgba(7,28,36,.72),rgba(3,11,17,.8)); }
 .telemetry-matrix article::before { position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 31px,rgba(70,210,233,.025) 31px 32px);content:'';pointer-events:none; }
 .telemetry-matrix header,.telemetry-matrix footer { position:relative;z-index:1;display:flex;justify-content:space-between;gap:12px;color:#4f7880;font-size:6px;letter-spacing:.12em; }
 .telemetry-matrix header strong { color:var(--green);font-weight:500; }.telemetry-matrix footer { padding-top:8px;border-top:1px solid rgba(69,197,219,.09); }
+.operational-readouts{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;margin:10px 0}.operational-readouts div{display:grid;gap:4px;padding:11px;border-left:1px solid rgba(79,220,244,.28);background:rgba(3,18,25,.56)}.operational-readouts b{color:#ddfbff;font:500 28px/1 var(--sans)}.operational-readouts small{color:#52777e;font-size:6px;letter-spacing:.12em}
 .relay-map { position:relative;min-height:72px;margin:8px 0;background:radial-gradient(ellipse at center,rgba(58,205,229,.12),transparent 58%); }
 .relay-map::before,.relay-map::after { position:absolute;inset:50% 7%;height:1px;background:rgba(68,204,226,.13);content:'';transform:rotate(8deg); }.relay-map::after{transform:rotate(-11deg)}
 .relay-map i { position:absolute;width:4px;height:4px;border:1px solid #50d9ec;border-radius:50%;box-shadow:0 0 8px rgba(74,221,243,.6); }.relay-map i:nth-child(1){left:8%;top:24%}.relay-map i:nth-child(2){left:28%;top:64%}.relay-map i:nth-child(3){left:51%;top:30%}.relay-map i:nth-child(4){right:20%;top:70%}.relay-map i:nth-child(5){right:7%;top:18%}
@@ -144,6 +145,7 @@ button,a,select { cursor:pointer; }
 .owner-account-identity strong { overflow:hidden; color:#c9edf2; font-size:10px; text-overflow:ellipsis; }
 .owner-account-identity span { color:#698990; font-size:7px; letter-spacing:.05em; }
 .owner-account-identity small { color:#ff7f75; font-size:7px; }
+.owner-account-identity small.legal-current{color:#64cda9}.owner-account-identity small.legal-renewal{color:var(--amber)}
 .owner-account-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
 .owner-account-actions button { min-height:31px; padding:0 9px; border:1px solid rgba(69,206,228,.27); background:rgba(10,45,56,.45); color:#83dae6; font-size:7px; letter-spacing:.08em; }
 .owner-account-actions [data-action="reject"],.owner-account-actions [data-action="lock"] { border-color:rgba(255,77,77,.38); color:#ff9289; }
@@ -172,8 +174,7 @@ button,a,select { cursor:pointer; }
 .owner-denied a { padding:12px 16px; border:1px solid rgba(78,220,247,.35); color:#9cebf6; font-size:8px; text-decoration:none; }
 body.owner-loading .command-main,
 body.owner-loading .command-rail,
-body.owner-loading #owner-telemetry-canvas,
 body.owner-loading .owner-grid,
 body.owner-loading .owner-hud-frame { visibility:hidden; opacity:0; pointer-events:none; }
-@media (max-width:1100px) { .mode-grid { grid-template-columns:1fr 1fr; } .system-hero { grid-template-columns:1fr 220px; } .orbital-status { width:200px;height:200px; } }
-@media (prefers-reduced-motion:reduce) { html{scroll-behavior:auto}.orbital-status>span:nth-child(2),.orbit-node,.hero-signal-bank span,.signal-spectrum i{animation:none} }
+@media (max-width:1250px) { .telemetry-matrix{grid-template-columns:1fr 1fr}.mode-grid { grid-template-columns:1fr 1fr; } .system-hero { grid-template-columns:1fr 260px; } }
+@media (prefers-reduced-motion:reduce) { html{scroll-behavior:auto} }

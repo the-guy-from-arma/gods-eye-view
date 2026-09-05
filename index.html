@@ -37,10 +37,17 @@
   <div id="cesiumContainer"></div>
   <aside id="thunderlink-system-identity" aria-label="ThunderLink software identity">
     <span>OS <strong>THUNDERLINK OBLIVION</strong></span>
-    <span>VERSION <strong>0.3.01</strong></span>
-    <span>KERNEL <strong>TBSGE-KERNEL-030.002</strong></span>
+    <span>VERSION <strong>0.3.02</strong></span>
+    <span>KERNEL <strong>TBSGE-KERNEL-030.003</strong></span>
     <button id="credits-footer-button" type="button">CREDITS &amp; OPEN SOURCES</button>
   </aside>
+  <footer id="platform-legal-footer" aria-label="Legal and privacy policies">
+    <a href="/legal/eula.html" target="_blank" rel="noopener">EULA</a>
+    <a href="/legal/terms.html" target="_blank" rel="noopener">TERMS</a>
+    <a href="/legal/privacy.html" target="_blank" rel="noopener">PRIVACY</a>
+    <a href="/legal/acceptable-use.html" target="_blank" rel="noopener">ACCEPTABLE USE</a>
+    <a href="/legal/data-ai.html" target="_blank" rel="noopener">DATA &amp; AI</a>
+  </footer>
   <div id="world-overlay-root" aria-hidden="true">
     <canvas id="world-overlay-canvas"></canvas>
   </div>
@@ -989,6 +996,7 @@
         <label>EMAIL<input name="email" type="email" autocomplete="email" required maxlength="254" /></label>
         <label>PASSWORD<input name="password" type="password" autocomplete="current-password" required minlength="12" maxlength="256" /></label>
         <label data-owner-setup-field hidden>OWNER SETUP CODE · OPTIONAL<input name="ownerSetupToken" type="password" autocomplete="one-time-code" maxlength="256" /></label>
+        <label class="account-legal-consent"><input name="legalAccepted" type="checkbox" required /><span>I am 18 or older and agree to the <a href="/legal/eula.html" target="_blank" rel="noopener">EULA</a>, <a href="/legal/terms.html" target="_blank" rel="noopener">Terms</a>, <a href="/legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>, <a href="/legal/acceptable-use.html" target="_blank" rel="noopener">Acceptable Use Policy</a>, and <a href="/legal/data-ai.html" target="_blank" rel="noopener">Data &amp; AI Notice</a> (version 0.3.02).</span></label>
         <button type="submit" data-account-submit>SIGN IN</button>
       </form>
       <section class="account-disclaimer-summary" aria-labelledby="account-disclaimer-title">
@@ -1001,6 +1009,12 @@
     <div id="account-signed-in" hidden>
       <strong data-account-email></strong>
       <span data-account-role></span>
+      <section class="account-legal-renewal" data-account-legal-renewal hidden>
+        <strong>UPDATED TERMS REQUIRE ACCEPTANCE</strong>
+        <p>Review the legal bundle for version 0.3.02. The command console stays locked until you affirmatively accept it.</p>
+        <label><input type="checkbox" data-account-legal-renewal-check /><span>I am 18 or older and agree to the <a href="/legal/eula.html" target="_blank" rel="noopener">EULA</a>, <a href="/legal/terms.html" target="_blank" rel="noopener">Terms</a>, <a href="/legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>, <a href="/legal/acceptable-use.html" target="_blank" rel="noopener">Acceptable Use Policy</a>, and <a href="/legal/data-ai.html" target="_blank" rel="noopener">Data &amp; AI Notice</a>.</span></label>
+        <button type="button" data-account-legal-accept>ACCEPT VERSION 0.3.02 &amp; CONTINUE</button>
+      </section>
       <button type="button" data-owner-dashboard hidden>OPEN OWNER COMMAND</button>
       <button type="button" data-account-activity hidden>VIEW ACTIVITY LOG</button>
       <button type="button" data-account-logout>SIGN OUT</button>

@@ -31,7 +31,7 @@
 }
 
 /* ThunderLink accounts and public-safety preview */
-body.auth-pending > :not(#account-dialog):not(#platform-disclaimer-dialog):not(#phone-compatibility-gate):not(#system-mode-gate):not(script) { visibility: hidden !important; }
+body.auth-pending > :not(#account-dialog):not(#platform-disclaimer-dialog):not(#platform-legal-footer):not(#phone-compatibility-gate):not(#system-mode-gate):not(script) { visibility: hidden !important; }
 body.auth-pending #account-dialog, body.auth-pending #platform-disclaimer-dialog, body.auth-pending #phone-compatibility-gate, body.auth-pending #system-mode-gate { visibility: visible; }
 body.auth-pending #account-chip { display: none; }
 body.auth-pending .account-close { visibility: hidden; pointer-events: none; }
@@ -192,6 +192,15 @@ body.phone-unsupported { overflow: auto; background: #02080d; }
   font: 13px 'JetBrains Mono', monospace;
 }
 #account-form input:focus { border-color: #54e8ff; }
+.account-legal-consent,
+.account-legal-renewal label { grid-template-columns:18px 1fr !important;align-items:start;gap:9px !important;padding:10px;border:1px solid rgba(84,232,255,.22);background:rgba(3,25,33,.55);letter-spacing:0 !important;line-height:1.5; }
+#account-form .account-legal-consent input,
+.account-legal-renewal input { width:15px;height:15px;min-height:0;margin:1px 0 0;accent-color:#39d8ef; }
+.account-legal-consent span,.account-legal-renewal span { color:#91aab0;font-size:8px; }
+.account-legal-consent a,.account-legal-renewal a { color:#65ddea; }
+.account-legal-renewal { display:grid;gap:9px;padding:13px;border:1px solid rgba(255,191,102,.42);background:rgba(74,38,7,.2); }
+.account-legal-renewal[hidden] { display:none; }
+.account-legal-renewal>strong{color:#ffc36c;font-size:9px;letter-spacing:.12em}.account-legal-renewal p{margin:0;color:#a89982;font-size:8px;line-height:1.55}.account-legal-renewal button{min-height:36px;border:1px solid #50eaff;background:rgba(13,103,126,.34);color:#fff;font:600 9px 'JetBrains Mono',monospace;letter-spacing:.1em}
 .account-disclaimer-summary {
   display: grid;
   gap: 7px;
@@ -713,6 +722,11 @@ body.cockpit-mode #cockpit-cloud-effects.active {
 }
 #credits-footer-button:hover,
 #credits-footer-button:focus-visible { border-color: rgba(193, 239, 247, 0.85); color: #d9f8fc; outline: none; }
+#platform-legal-footer { position:fixed;right:1.5rem;bottom:.55rem;z-index:1001;display:flex;gap:10px;pointer-events:auto; }
+#platform-legal-footer a { color:rgba(156,180,185,.82);border-bottom:1px solid rgba(123,163,171,.35);text-decoration:none;font:500 7px/1 var(--font-mono);letter-spacing:.08em;text-shadow:0 1px 2px #000; }
+#platform-legal-footer a:hover,#platform-legal-footer a:focus-visible{color:#d9f8fc;border-color:#c1eff7;outline:none}
+body.auth-pending #platform-legal-footer { left:50%;right:auto;bottom:12px;transform:translateX(-50%);white-space:nowrap; }
+body.ui-clean-view #platform-legal-footer,body.recording-mode #platform-legal-footer{display:none}
 
 /* Owner-governed interface modules use the same four-state policy as data
    feeds. HIDDEN removes the module; Coming Soon/Maintenance leave a truthful,

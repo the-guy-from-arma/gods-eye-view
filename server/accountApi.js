@@ -6,6 +6,7 @@ import {
   mergeLayerAvailability,
   normalizeLayerAvailabilityStatus,
 } from '../src/data/layerAvailability.js';
+import { CURRENT_LEGAL_VERSION, legalAcceptanceIsCurrent } from '../src/legalPolicy.js';
 
 const { Pool } = pg;
 const scrypt = promisify(crypto.scrypt);
@@ -178,6 +179,8 @@ export function createAccountApi(options = {}) {
       ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS security_locked BOOLEAN NOT NULL DEFAULT FALSE;
       ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS security_lock_reason TEXT;
       ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS security_locked_at TIMESTAMPTZ;
+      ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS legal_accepted_version TEXT;
+      ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS legal_accepted_at TIMESTAMPTZ;
       UPDATE gev_users SET approval_status = 'approved', approved_at = COALESCE(approved_at, email_verified_at)
         WHERE email_verified_at IS NOT NULL AND approval_status = 'pending';
       CREATE TABLE IF NOT EXISTS gev_sessions (
@@ -197,6 +200,8 @@ export function createAccountApi(options = {}) {
       );
       CREATE INDEX IF NOT EXISTS gev_activity_created_idx ON gev_activity_events(created_at DESC);
       CREATE INDEX IF NOT EXISTS gev_activity_user_idx ON gev_activity_events(user_id, created_at DESC);
+      DELETE FROM gev_activity_events WHERE created_at < NOW() - INTERVAL '180 days';
+      DELETE FROM gev_sessions WHERE expires_at <= NOW();
       CREATE TABLE IF NOT EXISTS gev_settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
@@ -244,7 +249,8 @@ export function createAccountApi(options = {}) {
     const raw = parseCookies(req).gev_session;
     if (!raw) return null;
     const result = await pool.query(`
-      SELECT u.id, u.email, u.email_verified_at
+      SELECT u.id, u.email, u.email_verified_at,
+        u.legal_accepted_version, u.legal_accepted_at
       FROM gev_sessions s JOIN gev_users u ON u.id = s.user_id
       WHERE s.token_digest = $1 AND s.expires_at > NOW()
         AND u.approval_status = 'approved' AND COALESCE(u.security_locked, FALSE) = FALSE
@@ -256,6 +262,8 @@ export function createAccountApi(options = {}) {
       email: user.email,
       verified: Boolean(user.email_verified_at),
       role: ownerEmail && user.email === ownerEmail ? 'owner' : 'user',
+      legalAccepted: legalAcceptanceIsCurrent(user.legal_accepted_version),
+      legalAcceptedAt: user.legal_accepted_at || null,
     };
   };
 
@@ -298,6 +306,7 @@ export function createAccountApi(options = {}) {
           ownerConfigured: Boolean(ownerEmail),
           ownerLoginConfigured: ownerVariableLoginEnabled,
           ownerSetupConfigured: Boolean(ownerEmail && ownerSetupToken),
+          legalVersion: CURRENT_LEGAL_VERSION,
         });
       }
       await ensureSchema();
@@ -339,6 +348,9 @@ export function createAccountApi(options = {}) {
         const body = await readJson(req);
         const email = cleanEmail(body.email);
         const password = String(body.password || '');
+        if (body.legalAccepted !== true || !legalAcceptanceIsCurrent(body.legalVersion)) {
+          return json(res, 428, { error: 'Accept the current EULA, Terms, Privacy Policy, Acceptable Use Policy, and Data & AI Notice to continue.', legalVersion: CURRENT_LEGAL_VERSION });
+        }
         if (!EMAIL_RE.test(email)) return json(res, 400, { error: 'Enter a valid email address' });
         if (password.length < 12 || password.length > 256) return json(res, 400, { error: 'Password must be 12–256 characters' });
         const suppliedSetupDigest = tokenDigest(String(body.ownerSetupToken || ''));
@@ -354,13 +366,13 @@ export function createAccountApi(options = {}) {
           if (existing.rows[0]?.approval_status === 'approved') return json(res, 409, { error: 'Owner account is already configured' });
           const digest = await passwordDigest(password);
           const result = existing.rows[0]
-            ? await pool.query("UPDATE gev_users SET password_digest = $1, email_verified_at = NOW(), approval_status = 'approved', approved_at = NOW() WHERE id = $2 RETURNING id, email", [digest, existing.rows[0].id])
-            : await pool.query("INSERT INTO gev_users (email, password_digest, email_verified_at, approval_status, approved_at) VALUES ($1, $2, NOW(), 'approved', NOW()) RETURNING id, email", [email, digest]);
+            ? await pool.query("UPDATE gev_users SET password_digest = $1, email_verified_at = NOW(), approval_status = 'approved', approved_at = NOW(), legal_accepted_version = $2, legal_accepted_at = NOW() WHERE id = $3 RETURNING id, email", [digest, CURRENT_LEGAL_VERSION, existing.rows[0].id])
+            : await pool.query("INSERT INTO gev_users (email, password_digest, email_verified_at, approval_status, approved_at, legal_accepted_version, legal_accepted_at) VALUES ($1, $2, NOW(), 'approved', NOW(), $3, NOW()) RETURNING id, email", [email, digest, CURRENT_LEGAL_VERSION]);
           const row = result.rows[0];
           const rawSession = crypto.randomBytes(32).toString('base64url');
           await pool.query(`INSERT INTO gev_sessions (user_id, token_digest, expires_at)
             VALUES ($1, $2, NOW() + INTERVAL '${SESSION_DAYS} days')`, [row.id, tokenDigest(rawSession)]);
-          const user = { id: String(row.id), email: row.email, verified: true, role: 'owner' };
+          const user = { id: String(row.id), email: row.email, verified: true, role: 'owner', legalAccepted: true, legalAcceptedAt: new Date().toISOString() };
           await record(req, 'account_register', { ownerSetup: true }, user);
           return json(res, 201, { ok: true, user, message: 'Owner account secured.' }, {
             'Set-Cookie': cookie('gev_session', rawSession, req, SESSION_DAYS * 86400),
@@ -375,13 +387,14 @@ export function createAccountApi(options = {}) {
         const result = existing.rows[0]
           ? await pool.query(`UPDATE gev_users SET password_digest = $1, approval_status = $2,
               email_verified_at = CASE WHEN $2 = 'approved' THEN NOW() ELSE NULL END,
-              approved_at = CASE WHEN $2 = 'approved' THEN NOW() ELSE NULL END
-            WHERE id = $3 RETURNING id, email`, [digest, approvalStatus, existing.rows[0].id])
+              approved_at = CASE WHEN $2 = 'approved' THEN NOW() ELSE NULL END,
+              legal_accepted_version = $3, legal_accepted_at = NOW()
+            WHERE id = $4 RETURNING id, email`, [digest, approvalStatus, CURRENT_LEGAL_VERSION, existing.rows[0].id])
           : await pool.query(`INSERT INTO gev_users
-              (email, password_digest, email_verified_at, approval_status, approved_at)
+              (email, password_digest, email_verified_at, approval_status, approved_at, legal_accepted_version, legal_accepted_at)
             VALUES ($1, $2, CASE WHEN $3 = 'approved' THEN NOW() ELSE NULL END, $3,
-              CASE WHEN $3 = 'approved' THEN NOW() ELSE NULL END)
-            RETURNING id, email`, [email, digest, approvalStatus]);
+              CASE WHEN $3 = 'approved' THEN NOW() ELSE NULL END, $4, NOW())
+            RETURNING id, email`, [email, digest, approvalStatus, CURRENT_LEGAL_VERSION]);
         const row = result.rows[0];
         const registeringUser = { id: String(row.id), email: row.email };
         await record(req, 'account_register', { approval: approvalStatus, emailDomain: email.split('@')[1] }, registeringUser);
@@ -389,7 +402,7 @@ export function createAccountApi(options = {}) {
         const rawSession = crypto.randomBytes(32).toString('base64url');
         await pool.query(`INSERT INTO gev_sessions (user_id, token_digest, expires_at)
           VALUES ($1, $2, NOW() + INTERVAL '${SESSION_DAYS} days')`, [row.id, tokenDigest(rawSession)]);
-        const user = { id: String(row.id), email: row.email, verified: true, role: 'user' };
+        const user = { id: String(row.id), email: row.email, verified: true, role: 'user', legalAccepted: true, legalAcceptedAt: new Date().toISOString() };
         return json(res, 201, { ok: true, status: 'approved', user, message: 'Account approved by Autopilot.' }, {
           'Set-Cookie': cookie('gev_session', rawSession, req, SESSION_DAYS * 86400),
         });
@@ -400,12 +413,19 @@ export function createAccountApi(options = {}) {
         const body = await readJson(req);
         const email = cleanEmail(body.email);
         const password = String(body.password || '');
+        if (body.legalAccepted !== true || !legalAcceptanceIsCurrent(body.legalVersion)) {
+          return json(res, 428, { error: 'Accept the current EULA, Terms, Privacy Policy, Acceptable Use Policy, and Data & AI Notice to continue.', legalVersion: CURRENT_LEGAL_VERSION });
+        }
         if (ownerVariableLoginEnabled && email === ownerEmail) {
-          if (!secretMatches(password, ownerPassword)) return json(res, 401, { error: 'Invalid email or password' });
+          if (!secretMatches(password, ownerPassword)) {
+            await record(req, 'auth_failure', { email, reason: 'invalid_credentials' });
+            return json(res, 401, { error: 'Invalid email or password' });
+          }
           const digest = await passwordDigest(password);
           const ownerResult = await pool.query(`
-            INSERT INTO gev_users (email, password_digest, email_verified_at, approval_status, approved_at)
-            VALUES ($1, $2, NOW(), 'approved', NOW())
+            INSERT INTO gev_users
+              (email, password_digest, email_verified_at, approval_status, approved_at, legal_accepted_version, legal_accepted_at)
+            VALUES ($1, $2, NOW(), 'approved', NOW(), $3, NOW())
             ON CONFLICT (email) DO UPDATE SET
               password_digest = EXCLUDED.password_digest,
               email_verified_at = COALESCE(gev_users.email_verified_at, NOW()),
@@ -413,30 +433,34 @@ export function createAccountApi(options = {}) {
               approved_at = COALESCE(gev_users.approved_at, NOW()),
               security_locked = FALSE,
               security_lock_reason = NULL,
-              security_locked_at = NULL
+              security_locked_at = NULL,
+              legal_accepted_version = EXCLUDED.legal_accepted_version,
+              legal_accepted_at = NOW()
             RETURNING id, email
-          `, [email, digest]);
+          `, [email, digest, CURRENT_LEGAL_VERSION]);
           const owner = ownerResult.rows[0];
           const rawSession = crypto.randomBytes(32).toString('base64url');
           await pool.query(`INSERT INTO gev_sessions (user_id, token_digest, expires_at)
             VALUES ($1, $2, NOW() + INTERVAL '${SESSION_DAYS} days')`, [owner.id, tokenDigest(rawSession)]);
-          const user = { id: String(owner.id), email: owner.email, verified: true, role: 'owner' };
+          const user = { id: String(owner.id), email: owner.email, verified: true, role: 'owner', legalAccepted: true, legalAcceptedAt: new Date().toISOString() };
           await record(req, 'account_login', { ownerVariable: true }, user);
           return json(res, 200, { user }, { 'Set-Cookie': cookie('gev_session', rawSession, req, SESSION_DAYS * 86400) });
         }
         const result = await pool.query('SELECT id, email, password_digest, email_verified_at, approval_status, security_locked FROM gev_users WHERE email = $1', [email]);
         const row = result.rows[0];
         if (!row || !(await passwordMatches(password, row.password_digest))) {
+          await record(req, 'auth_failure', { email, reason: 'invalid_credentials' });
           return json(res, 401, { error: 'Invalid email or password' });
         }
         if (row.approval_status === 'pending') return json(res, 403, { error: 'Your access request is awaiting owner approval.' });
         if (row.approval_status === 'rejected') return json(res, 403, { error: 'Your access request was not approved.' });
         if (row.approval_status !== 'approved') return json(res, 403, { error: 'Account access is not active.' });
         if (row.security_locked) return json(res, 423, { error: 'Account locked for security review. Contact the owner.' });
+        await pool.query('UPDATE gev_users SET legal_accepted_version = $1, legal_accepted_at = NOW() WHERE id = $2', [CURRENT_LEGAL_VERSION, row.id]);
         const rawToken = crypto.randomBytes(32).toString('base64url');
         await pool.query(`INSERT INTO gev_sessions (user_id, token_digest, expires_at)
           VALUES ($1, $2, NOW() + INTERVAL '${SESSION_DAYS} days')`, [row.id, tokenDigest(rawToken)]);
-        const user = { id: String(row.id), email: row.email, verified: true, role: ownerEmail && row.email === ownerEmail ? 'owner' : 'user' };
+        const user = { id: String(row.id), email: row.email, verified: true, role: ownerEmail && row.email === ownerEmail ? 'owner' : 'user', legalAccepted: true, legalAcceptedAt: new Date().toISOString() };
         await record(req, 'account_login', {}, user);
         return json(res, 200, { user }, { 'Set-Cookie': cookie('gev_session', rawToken, req, SESSION_DAYS * 86400) });
       }
@@ -449,7 +473,24 @@ export function createAccountApi(options = {}) {
 
       if (url.pathname === '/api/account/session' && req.method === 'GET') {
         const [user, siteMode] = await Promise.all([currentUser(req), getSiteMode()]);
-        return json(res, 200, { user, siteMode });
+        return json(res, 200, {
+          user,
+          siteMode,
+          legalVersion: CURRENT_LEGAL_VERSION,
+          legalAcceptanceRequired: Boolean(user && !user.legalAccepted),
+        });
+      }
+
+      if (url.pathname === '/api/account/accept-legal' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (!user) return json(res, 401, { error: 'Sign in required' });
+        const body = await readJson(req);
+        if (body.legalAccepted !== true || !legalAcceptanceIsCurrent(body.legalVersion)) {
+          return json(res, 428, { error: 'Explicit acceptance of the current legal terms is required.', legalVersion: CURRENT_LEGAL_VERSION });
+        }
+        await pool.query('UPDATE gev_users SET legal_accepted_version = $1, legal_accepted_at = NOW() WHERE id = $2', [CURRENT_LEGAL_VERSION, user.id]);
+        await record(req, 'legal_acceptance', { legalVersion: CURRENT_LEGAL_VERSION }, user);
+        return json(res, 200, { ok: true, legalVersion: CURRENT_LEGAL_VERSION, acceptedAt: new Date().toISOString() });
       }
 
       if (url.pathname === '/api/account/layers' && req.method === 'GET') {
@@ -461,12 +502,13 @@ export function createAccountApi(options = {}) {
       if (url.pathname === '/api/account/admin' && req.method === 'GET') {
         const user = await currentUser(req);
         if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
-        const [autopilot, siteMode, accounts, layers] = await Promise.all([
+        const [autopilot, siteMode, accounts, layers, sessionMetrics, activityMetrics] = await Promise.all([
           isAutopilotEnabled(),
           getSiteMode(),
           pool.query(`
             SELECT id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt",
-              security_locked AS locked, security_lock_reason AS "lockReason", security_locked_at AS "lockedAt"
+              security_locked AS locked, security_lock_reason AS "lockReason", security_locked_at AS "lockedAt",
+              legal_accepted_version AS "legalAcceptedVersion", legal_accepted_at AS "legalAcceptedAt"
             FROM gev_users
             WHERE email <> $1
             ORDER BY CASE approval_status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
@@ -474,12 +516,44 @@ export function createAccountApi(options = {}) {
             LIMIT 250
           `, [ownerEmail]),
           getLayerAvailability(),
+          pool.query(`
+            SELECT COUNT(*) FILTER (WHERE expires_at > NOW()) AS "activeSessions",
+              COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS "sessions24h"
+            FROM gev_sessions
+          `),
+          pool.query(`
+            SELECT COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS "events24h",
+              COUNT(*) FILTER (WHERE event_type = 'search' AND created_at >= NOW() - INTERVAL '24 hours') AS "searches24h",
+              COUNT(*) FILTER (WHERE event_type = 'auth_failure' AND created_at >= NOW() - INTERVAL '24 hours') AS "failedLogins24h",
+              COUNT(*) FILTER (WHERE event_type = 'legal_acceptance' AND created_at >= NOW() - INTERVAL '24 hours') AS "legalAcceptances24h",
+              MAX(created_at) AS "lastActivityAt"
+            FROM gev_activity_events
+          `),
         ]);
+        const sessionRow = sessionMetrics.rows[0] || {};
+        const activityRow = activityMetrics.rows[0] || {};
+        const layerCounts = layers.reduce((counts, layer) => {
+          counts[layer.status] = (counts[layer.status] || 0) + 1;
+          return counts;
+        }, {});
         return json(res, 200, {
           autopilot,
           siteMode,
           accounts: accounts.rows.map((account) => ({ ...account, id: String(account.id) })),
           layers,
+          telemetry: {
+            generatedAt: new Date().toISOString(),
+            database: 'connected',
+            activeSessions: Number(sessionRow.activeSessions || 0),
+            sessions24h: Number(sessionRow.sessions24h || 0),
+            events24h: Number(activityRow.events24h || 0),
+            searches24h: Number(activityRow.searches24h || 0),
+            failedLogins24h: Number(activityRow.failedLogins24h || 0),
+            legalAcceptances24h: Number(activityRow.legalAcceptances24h || 0),
+            lastActivityAt: activityRow.lastActivityAt || null,
+            legalVersion: CURRENT_LEGAL_VERSION,
+            layerCounts,
+          },
         });
       }
 

@@ -52,6 +52,7 @@ test('account status is honest when Railway Postgres is not attached', async () 
     ownerConfigured: false,
     ownerLoginConfigured: false,
     ownerSetupConfigured: false,
+    legalVersion: '0.3.02',
   });
   assert.equal(headers['Cache-Control'], 'no-store');
 });
@@ -73,12 +74,46 @@ test('manual approval mode stores a registration as pending without email delive
   await middleware(request('POST', '/api/account/register', {
     email: 'new@example.com',
     password: 'valid-new-password',
+    legalAccepted: true,
+    legalVersion: '0.3.02',
   }), res, () => assert.fail('account path must not fall through'));
 
   assert.equal(res.statusCode, 202);
   assert.equal(JSON.parse(res.body).status, 'pending');
   assert.equal(calls.some(({ sql }) => /gev_email_verifications|resend/i.test(sql)), false);
   assert.equal(calls.some(({ sql }) => /INSERT INTO gev_sessions/.test(sql)), false);
+});
+
+test('registration and login reject missing or stale legal acceptance', async () => {
+  const pool = { async query() { return { rows: [] }; } };
+  const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
+  for (const [path, payload] of [
+    ['/api/account/register', { email: 'new@example.com', password: 'valid-new-password' }],
+    ['/api/account/login', { email: 'new@example.com', password: 'valid-new-password', legalAccepted: true, legalVersion: '0.3.01' }],
+  ]) {
+    const res = response();
+    await middleware(request('POST', path, payload), res, () => assert.fail('account path must not fall through'));
+    assert.equal(res.statusCode, 428);
+    assert.equal(JSON.parse(res.body).legalVersion, '0.3.02');
+  }
+});
+
+test('an existing session reports when renewed legal acceptance is required', async () => {
+  const pool = {
+    async query(sql) {
+      if (/FROM gev_sessions s JOIN gev_users/.test(sql)) return { rows: [{ id: 5, email: 'member@example.com', email_verified_at: new Date(), legal_accepted_version: '0.3.01', legal_accepted_at: new Date() }] };
+      if (/site_operating_mode/.test(sql)) return { rows: [{ value: 'online' }] };
+      return { rows: [] };
+    },
+  };
+  const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
+  const req = request('GET', '/api/account/session');
+  req.headers.cookie = 'gev_session=existing-session';
+  const res = response();
+  await middleware(req, res, () => assert.fail('account path must not fall through'));
+  const payload = JSON.parse(res.body);
+  assert.equal(payload.legalVersion, '0.3.02');
+  assert.equal(payload.legalAcceptanceRequired, true);
 });
 
 test('Autopilot approves a new registration and creates its session', async () => {
@@ -98,6 +133,8 @@ test('Autopilot approves a new registration and creates its session', async () =
   await middleware(request('POST', '/api/account/register', {
     email: 'auto@example.com',
     password: 'valid-auto-password',
+    legalAccepted: true,
+    legalVersion: '0.3.02',
   }), res, () => assert.fail('account path must not fall through'));
 
   const payload = JSON.parse(res.body);
@@ -111,7 +148,9 @@ test('Autopilot approves a new registration and creates its session', async () =
 test('owner dashboard is session-protected and returns Autopilot plus the account queue', async () => {
   const pool = {
     async query(sql) {
-      if (/FROM gev_sessions/.test(sql)) return { rows: [{ id: 1, email: 'owner@example.com', email_verified_at: new Date() }] };
+      if (/FROM gev_sessions s JOIN gev_users/.test(sql)) return { rows: [{ id: 1, email: 'owner@example.com', email_verified_at: new Date() }] };
+      if (/COUNT\(\*\) FILTER[\s\S]*FROM gev_sessions/.test(sql)) return { rows: [{ activeSessions: '3', sessions24h: '7' }] };
+      if (/COUNT\(\*\) FILTER[\s\S]*FROM gev_activity_events/.test(sql)) return { rows: [{ events24h: '44', searches24h: '9', failedLogins24h: '2', legalAcceptances24h: '4', lastActivityAt: new Date('2026-09-05T12:00:00Z') }] };
       if (/SELECT value FROM gev_settings/.test(sql)) return { rows: [{ value: 'false' }] };
       if (/FROM gev_users\s+WHERE email <>/.test(sql)) return { rows: [{ id: 9, email: 'wait@example.com', status: 'pending', createdAt: new Date(), approvedAt: null }] };
       return { rows: [] };
@@ -130,6 +169,10 @@ test('owner dashboard is session-protected and returns Autopilot plus the accoun
   assert.equal(payload.siteMode.mode, 'online');
   assert.equal(payload.accounts[0].id, '9');
   assert.equal(payload.accounts[0].status, 'pending');
+  assert.equal(payload.telemetry.activeSessions, 3);
+  assert.equal(payload.telemetry.searches24h, 9);
+  assert.equal(payload.telemetry.failedLogins24h, 2);
+  assert.equal(payload.telemetry.legalVersion, '0.3.02');
 });
 
 test('owner can enable Autopilot and manually approve or reject accounts', async () => {
@@ -256,7 +299,7 @@ test('a security-locked operator cannot create a new session', async () => {
   };
   const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
   const res = response();
-  await middleware(request('POST', '/api/account/login', { email: 'locked@example.com', password: 'valid-user-password' }), res, () => assert.fail('account path must not fall through'));
+  await middleware(request('POST', '/api/account/login', { email: 'locked@example.com', password: 'valid-user-password', legalAccepted: true, legalVersion: '0.3.02' }), res, () => assert.fail('account path must not fall through'));
   assert.equal(res.statusCode, 423);
   assert.match(JSON.parse(res.body).error, /locked for security review/i);
 });
@@ -281,6 +324,8 @@ test('a pending account cannot sign in before owner approval', async () => {
   await middleware(request('POST', '/api/account/login', {
     email: 'pending@example.com',
     password: 'valid-user-password',
+    legalAccepted: true,
+    legalVersion: '0.3.02',
   }), res, () => assert.fail('account path must not fall through'));
   assert.equal(res.statusCode, 403);
   assert.match(JSON.parse(res.body).error, /awaiting owner approval/i);
@@ -308,6 +353,8 @@ test('Railway owner variables create a verified owner session without exposing t
   const req = request('POST', '/api/account/login', {
     email: 'OWNER@example.com',
     password: 'unique-owner-password',
+    legalAccepted: true,
+    legalVersion: '0.3.02',
   });
   const res = response();
 
@@ -315,10 +362,8 @@ test('Railway owner variables create a verified owner session without exposing t
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(JSON.parse(res.body).user, {
-    id: '42',
-    email: 'owner@example.com',
-    verified: true,
-    role: 'owner',
+    id: '42', email: 'owner@example.com', verified: true, role: 'owner',
+    legalAccepted: true, legalAcceptedAt: JSON.parse(res.body).user.legalAcceptedAt,
   });
   assert.match(res.headers['Set-Cookie'], /^gev_session=/);
   assert.equal(res.headers['Set-Cookie'].includes('unique-owner-password'), false);
@@ -343,6 +388,8 @@ test('Railway owner login rejects an incorrect variable password before creating
   await middleware(request('POST', '/api/account/login', {
     email: 'owner@example.com',
     password: 'incorrect-password',
+    legalAccepted: true,
+    legalVersion: '0.3.02',
   }), res, () => assert.fail('account path must not fall through'));
 
   assert.equal(res.statusCode, 401);
