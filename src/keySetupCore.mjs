@@ -80,7 +80,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
   Object.freeze({
     id: 'battlemetrics',
     title: 'BATTLEMETRICS',
-    unlocks: 'Higher Gaming Data read limits (public access works without it)',
+    unlocks: 'Live Gaming Data through a BattleMetrics subscriber token',
     getUrl: 'https://www.battlemetrics.com/developers',
     envVars: Object.freeze(['BATTLEMETRICS_API_TOKEN']),
     tier: 'free',

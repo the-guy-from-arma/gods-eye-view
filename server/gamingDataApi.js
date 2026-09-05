@@ -33,12 +33,18 @@ export function gamingDataApiPlugin(options = {}) {
           if (url.pathname === '/status') {
             return respond(res, 200, {
               provider: 'battlemetrics',
-              configured: true,
-              authMode: provider.tokenConfigured ? 'authenticated' : 'public',
+              configured: provider.tokenConfigured,
+              authMode: provider.tokenConfigured ? 'authenticated' : 'unconfigured',
               tokenConfigured: provider.tokenConfigured,
               refreshIntervalSec: 300,
               privacy: 'Game-server locations only; player physical locations are never collected.',
             }, 60);
+          }
+          if (!provider.tokenConfigured && (url.pathname === '/games' || url.pathname === '/servers')) {
+            return respond(res, 503, {
+              error: 'Gaming Data requires a BattleMetrics subscriber token configured in Railway.',
+              code: 'provider_not_configured',
+            });
           }
           if (url.pathname === '/games') {
             const result = await provider.getGames();

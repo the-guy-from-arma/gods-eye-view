@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.05] — 2026-09-05 — BattleMetrics production authentication
+
+- Verified the deployed integration against the live provider and now reports a
+  clear, isolated setup message instead of repeatedly calling BattleMetrics when
+  the required subscriber Personal Access Token is absent.
+- Updated setup guidance for the provider's enforced subscription requirement;
+  the token remains server-only as `BATTLEMETRICS_API_TOKEN` in Railway.
+- Advanced ThunderLink Oblivion to public build `0.3.05` and kernel
+  `TBSGE-KERNEL-030.006`; the legal acceptance bundle remains `0.3.02`.
+
 ## [0.3.04] — 2026-09-05 — BattleMetrics Gaming Data
 
 - Added an isolated, default-off Gaming Data layer and dedicated Gaming Data
@@ -8,8 +18,8 @@
   state, manual/automatic refresh, and owner availability control.
 - Added a server-only BattleMetrics JSON:API provider with pagination, validation,
   normalization, request coalescing, bounded retries, five-minute caching, and a
-  24-hour last-good fallback. Public reads work keylessly; the optional
-  `BATTLEMETRICS_API_TOKEN` never enters client code.
+  24-hour last-good fallback. The server-only `BATTLEMETRICS_API_TOKEN` never
+  enters client code.
 - Added privacy wording that distinguishes approximate server/datacenter locations
   from player locations, BattleMetrics attribution, documentation, and regression
   coverage for provider and visualization behavior.
