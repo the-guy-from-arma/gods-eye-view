@@ -49,6 +49,7 @@ import { accountApiPlugin } from './server/accountApi.js';
 import { broadcastifyApiPlugin } from './server/broadcastifyApi.js';
 import { locationSearchApiPlugin } from './server/locationSearchApi.js';
 import { newsEventsApiPlugin } from './server/newsEventsApi.js';
+import { ttsForFreeApiPlugin } from './server/ttsForFreeApi.js';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { defineConfig, loadEnv } from 'vite';
@@ -7911,6 +7912,7 @@ export default defineConfig(({ mode }) => {
       cctvProxy(),
       radioBrowserProxy(),
       broadcastifyApiPlugin({ env }),
+      ttsForFreeApiPlugin({ env }),
       newsEventsApiPlugin({ env }),
       gbfsProxy(),
       adsbLolProxy(),

@@ -213,6 +213,8 @@ The cockpit even carries its own briefing strip: nearby live signals, regional h
 
 > Voice commands are **free by default** in Chrome and Edge through the browser Speech Recognition API. Click the mic and speak one command such as *"fly to London,"* *"show breaking news,"* or *"use night vision."* No OpenAI key or paid request is used.
 
+For more natural spoken confirmations, set the server-only Railway variable `TTSFORFREE_API_KEY`. God’s Eye sends only its short command-result phrase to TTSForFree, caches repeated results, and falls back to the browser voice automatically. `TTSFORFREE_VOICE_ID` optionally selects another provider voice. The provider’s free API plan is limited to non-commercial use; review its current terms before using it commercially.
+
 The original conversational AI voice remains available as an explicit `?voice=ai` URL opt-in. It requires a funded `OPENAI_API_KEY`; the same key also drives the optional **AI HUD summary**. AI mode adds open-ended conversation and the advanced tools below:
 
 - **🧠 It knows what it's looking at.** The agent pulls live scene context before answering — including coordinates, street names, active layers, and view scale. Ask *"what city is this?"* mid-flight and it knows.

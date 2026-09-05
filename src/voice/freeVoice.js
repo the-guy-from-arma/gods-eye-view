@@ -171,6 +171,9 @@ export class GevFreeVoiceController {
     this.shortcutKeyUpHandler = null;
     this.shortcutBlurHandler = null;
     this.annotationEventUnsubscribe = null;
+    this.ttsAbortController = null;
+    this.ttsAudio = null;
+    this.ttsGeneration = 0;
     this.configureUi();
   }
 
@@ -280,7 +283,7 @@ export class GevFreeVoiceController {
     this.setStatus(code === 'no-speech' ? 'idle' : 'error', detail);
   }
 
-  speak(message) {
+  speakWithBrowser(message) {
     const synthesis = this.windowRef?.speechSynthesis;
     const Utterance = this.windowRef?.SpeechSynthesisUtterance;
     if (!synthesis || !Utterance || !message) return;
@@ -292,6 +295,51 @@ export class GevFreeVoiceController {
     } catch {
       // On-screen confirmation remains available when speech synthesis is blocked.
     }
+  }
+
+  speak(message) {
+    const text = String(message || '').trim().slice(0, 180);
+    if (!text) return;
+    this.ttsGeneration += 1;
+    const generation = this.ttsGeneration;
+    this.ttsAbortController?.abort?.();
+    this.ttsAbortController = typeof AbortController === 'undefined' ? null : new AbortController();
+    if (this.ttsAudio) {
+      try { this.ttsAudio.pause(); } catch { /* already stopped */ }
+      this.ttsAudio = null;
+    }
+    this.windowRef?.speechSynthesis?.cancel?.();
+    const fetchImpl = this.windowRef?.fetch?.bind(this.windowRef);
+    const AudioClass = this.windowRef?.Audio;
+    if (!fetchImpl || !AudioClass) {
+      this.speakWithBrowser(text);
+      return;
+    }
+
+    void fetchImpl('/api/tts/speak', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: this.ttsAbortController?.signal,
+    }).then(async (response) => {
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.audioUrl) throw new Error(payload.error || 'Natural voice unavailable');
+      if (generation !== this.ttsGeneration) return;
+      const audio = new AudioClass(payload.audioUrl);
+      audio.preload = 'auto';
+      this.ttsAudio = audio;
+      audio.addEventListener?.('ended', () => {
+        if (this.ttsAudio === audio) this.ttsAudio = null;
+      }, { once: true });
+      try {
+        await audio.play();
+      } catch {
+        if (generation === this.ttsGeneration) this.speakWithBrowser(text);
+      }
+    }).catch((error) => {
+      if (error?.name !== 'AbortError' && generation === this.ttsGeneration) this.speakWithBrowser(text);
+    });
   }
 
   setStatus(status, detail) {
@@ -338,6 +386,14 @@ export class GevFreeVoiceController {
       try { recognition.abort(); } catch { /* already stopped */ }
     }
     this.windowRef?.speechSynthesis?.cancel?.();
+    this.ttsGeneration += 1;
+    this.ttsAbortController?.abort?.();
+    this.ttsAbortController = null;
+    if (this.ttsAudio) {
+      try { this.ttsAudio.pause(); } catch { /* already stopped */ }
+      try { this.ttsAudio.removeAttribute?.('src'); } catch { /* detached media */ }
+      this.ttsAudio = null;
+    }
     this.spaceKeyHeld = false;
     if (removeUi) {
       if (this.buttonHandler) this.ui.button.removeEventListener('click', this.buttonHandler);

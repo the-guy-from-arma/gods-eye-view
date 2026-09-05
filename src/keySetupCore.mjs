@@ -46,6 +46,14 @@ export const KEY_SETUP_KEYS = Object.freeze([
     tier: 'metered',
   }),
   Object.freeze({
+    id: 'ttsforfree',
+    title: 'TTS FOR FREE',
+    unlocks: 'Natural spoken confirmations for free voice commands',
+    getUrl: 'https://ttsforfree.com',
+    envVars: Object.freeze(['TTSFORFREE_API_KEY']),
+    tier: 'free',
+  }),
+  Object.freeze({
     id: 'aisstream',
     title: 'AISSTREAM',
     unlocks: 'Live ships, worldwide',

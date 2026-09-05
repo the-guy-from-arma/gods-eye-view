@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freeVoiceResultMessage, parseFreeVoiceCommand } from './freeVoice.js';
+import { GevFreeVoiceController, freeVoiceResultMessage, parseFreeVoiceCommand } from './freeVoice.js';
 
 test('free voice parses navigation and search phrases', () => {
   assert.deepEqual(parseFreeVoiceCommand('Fly to London'), {
@@ -42,4 +42,54 @@ test('free voice result copy reflects authoritative action outcomes', () => {
   const command = parseFreeVoiceCommand('show flights');
   assert.equal(freeVoiceResultMessage(command, { ok: true, action: 'set_layer_visibility', label: 'Flights' }), 'Flights on');
   assert.equal(freeVoiceResultMessage(command, { ok: false, error: 'Feed unavailable' }), 'Feed unavailable');
+});
+
+function voiceUi() {
+  return {
+    root: { dataset: {}, querySelector: () => null, remove() {} },
+    button: { setAttribute() {}, addEventListener() {}, removeEventListener() {} },
+    status: { textContent: '' },
+    detail: { textContent: '', title: '' },
+  };
+}
+
+test('free voice prefers server-side natural audio when it is configured', async () => {
+  const played = [];
+  class AudioMock {
+    constructor(url) { this.url = url; }
+    addEventListener() {}
+    async play() { played.push(this.url); }
+    pause() {}
+  }
+  const windowRef = {
+    fetch: async () => ({ ok: true, json: async () => ({ audioUrl: 'https://cdn.ttsforfree.com/result.mp3' }) }),
+    Audio: AudioMock,
+    speechSynthesis: { cancel() {}, speak() { throw new Error('browser fallback should not run'); } },
+    SpeechSynthesisUtterance: class {},
+  };
+  const controller = new GevFreeVoiceController({
+    runner: async () => ({}), ui: voiceUi(), windowRef,
+    documentRef: { addEventListener() {}, removeEventListener() {} },
+  });
+  controller.speak('Command complete');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(played, ['https://cdn.ttsforfree.com/result.mp3']);
+});
+
+test('free voice falls back to browser speech when natural voice is unavailable', async () => {
+  const spoken = [];
+  class UtteranceMock { constructor(text) { this.text = text; } }
+  const windowRef = {
+    fetch: async () => ({ ok: false, json: async () => ({ code: 'not_configured' }) }),
+    Audio: class {},
+    speechSynthesis: { cancel() {}, speak(utterance) { spoken.push(utterance.text); } },
+    SpeechSynthesisUtterance: UtteranceMock,
+  };
+  const controller = new GevFreeVoiceController({
+    runner: async () => ({}), ui: voiceUi(), windowRef,
+    documentRef: { addEventListener() {}, removeEventListener() {} },
+  });
+  controller.speak('Command complete');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(spoken, ['Command complete']);
 });
