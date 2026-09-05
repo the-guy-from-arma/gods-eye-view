@@ -78,12 +78,15 @@ test('site-wide interruption states block the globe with an owner recovery path'
   assert.doesNotMatch(account, /siteMode\.mode !== 'online' && user\?\.role !== 'owner'/);
   assert.match(account, /previousSiteMode === 'online' && siteAccessBlocked\(\) && authenticationHandled/);
   assert.match(account, /window\.location\.assign\('\/owner\.html'\)/);
+  assert.match(account, /if \(!siteAccessBlocked\(\) \|\| user\?\.role !== 'owner'\) return false/);
+  assert.match(account, /if \(routeOwnerToCommand\(\)\) return/);
   assert.match(account, /5_000/);
   assert.match(owner, /data-mode="maintenance"/);
   assert.match(owner, /data-mode="feed_disconnected"/);
   assert.match(owner, /data-mode="restricted"/);
   assert.match(ownerJs, /api\/account\/admin\/system-mode/);
   assert.match(css, /#system-mode-gate/);
+  assert.match(ownerCss, /body\.owner-loading \.command-main,[\s\S]*?visibility:hidden/);
 });
 
 test('phones receive a friendly tablet-or-PC compatibility gate before authentication', () => {

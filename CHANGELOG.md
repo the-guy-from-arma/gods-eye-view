@@ -30,6 +30,9 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 - Made site-wide Maintenance, Feed Disconnected, and Restricted modes apply to
   owner globe sessions as well as public operators, stop an already-running
   globe after propagation, and synchronize open consoles within five seconds.
+- Kept the owner-only command route available as the recovery surface during
+  every shutdown mode, with direct owner routing and no dashboard-content flash
+  before the role check succeeds.
 
 ## [0.1.1] — 2026-09-01 — Installation and live-data fixes
 

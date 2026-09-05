@@ -73,6 +73,12 @@ export function initAccounts(options = {}) {
   // hidden bypass that makes Maintenance appear ineffective in their browser.
   const siteAccessBlocked = () => siteMode.mode !== 'online';
 
+  const routeOwnerToCommand = () => {
+    if (!siteAccessBlocked() || user?.role !== 'owner') return false;
+    window.location.assign('/owner.html');
+    return true;
+  };
+
   const paintSystemMode = () => {
     const blocked = siteAccessBlocked();
     if (systemModeGate) systemModeGate.hidden = !blocked;
@@ -199,6 +205,7 @@ export function initAccounts(options = {}) {
           user = payload.user;
           setStatus(payload.message || 'Account approved.');
           paint();
+          if (routeOwnerToCommand()) return;
           await continueAfterAuthentication();
         } else {
           setMode('login');
@@ -208,6 +215,7 @@ export function initAccounts(options = {}) {
         user = payload.user;
         setStatus('Signed in.');
         paint();
+        if (routeOwnerToCommand()) return;
         await continueAfterAuthentication();
       }
     } catch (error) {
@@ -270,6 +278,9 @@ export function initAccounts(options = {}) {
       return;
     }
     paint();
+    // The globe is blocked for every account during a shutdown, but the sole
+    // configured owner is routed to the independently protected recovery page.
+    if (routeOwnerToCommand()) return;
     // If a running console receives a shutdown mode, reload once so the heavy
     // globe runtime and live-feed pollers are actually stopped behind the
     // command gate. On this reload authentication never starts main.js while
