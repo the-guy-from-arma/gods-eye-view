@@ -137,7 +137,7 @@ function showDetails(server) {
   link.href = server.sourceUrl;
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
-  link.textContent = 'OPEN BATTLEMETRICS PROFILE';
+  link.textContent = server.provider === 'steam' ? 'OPEN STEAM GAME PAGE' : 'OPEN BATTLEMETRICS PROFILE';
   card.append(header, notice, list, privacy, link);
   card.hidden = false;
 }
@@ -159,6 +159,7 @@ export function createGamingDataLayer() {
   let loading = false;
   let partial = false;
   let authMode = 'public';
+  let provider = 'battlemetrics';
   let abortController = null;
   let autoRefreshTimer = null;
   let cameraRefreshTimer = null;
@@ -379,6 +380,7 @@ export function createGamingDataLayer() {
         cached = serverPayload.cached === true;
         partial = serverPayload.partial === true;
         authMode = serverPayload.authMode || gamePayload.authMode || 'public';
+        provider = serverPayload.provider || gamePayload.provider || provider;
         error = serverPayload.warning || null;
         render();
         return true;
@@ -465,6 +467,7 @@ export function createGamingDataLayer() {
         loading,
         partial,
         authMode,
+        provider,
       };
     },
 
@@ -480,7 +483,7 @@ export function createGamingDataLayer() {
         // failures of the whole command console.
         warning: error,
         error: null,
-        source: 'BattleMetrics',
+        source: provider === 'steam' ? 'Steam' : 'BattleMetrics',
       };
     },
   };

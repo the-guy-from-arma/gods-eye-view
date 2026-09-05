@@ -78,6 +78,14 @@ export const KEY_SETUP_KEYS = Object.freeze([
     tier: 'metered',
   }),
   Object.freeze({
+    id: 'steam-web',
+    title: 'STEAM WEB API',
+    unlocks: 'Worldwide game-server activity and regional population heatmap',
+    getUrl: 'https://steamcommunity.com/dev/apikey',
+    envVars: Object.freeze(['STEAM_WEB_API_KEY']),
+    tier: 'free',
+  }),
+  Object.freeze({
     id: 'battlemetrics',
     title: 'BATTLEMETRICS',
     unlocks: 'Live Gaming Data through a BattleMetrics subscriber token',

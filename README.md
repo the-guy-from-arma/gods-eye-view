@@ -217,7 +217,7 @@ Spoken confirmations use TTSForFree exclusively. Set the server-only Railway var
 
 ### Gaming Data
 
-The independent **Gaming Data Filters** panel maps public BattleMetrics game servers as clustered markers and a player-count-weighted heatmap. It is off by default and makes no BattleMetrics requests until enabled. BattleMetrics currently requires a subscriber Personal Access Token for API use, so set the server-only `BATTLEMETRICS_API_TOKEN` in Railway. Do not prefix it with `VITE_` or expose it to client code. Locations are approximate game-server or hosting-region locations, not player locations.
+The independent **Gaming Data** panel maps aggregate game-server activity as clustered markers and a player-count-weighted heatmap. Steam is the preferred provider when `STEAM_WEB_API_KEY` is configured in Railway; it combines Valve's per-game global active-player totals with public dedicated-server population grouped only to Steam's coarse regions. BattleMetrics remains an optional fallback through `BATTLEMETRICS_API_TOKEN`. Neither key may use a `VITE_` prefix or enter client code. The map represents game-server activity—not individual users, Steam IDs, home locations, or a claim that every connected player is physically near the server.
 
 The original conversational AI voice remains available as an explicit `?voice=ai` URL opt-in. It requires a funded `OPENAI_API_KEY`; the same key also drives the optional **AI HUD summary**. AI mode adds open-ended conversation and the advanced tools below:
 

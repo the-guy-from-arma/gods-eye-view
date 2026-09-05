@@ -27,6 +27,7 @@ export function initGamingDataPanel({ dataManager, layer }) {
   const freshness = panel?.querySelector('[data-gaming-freshness]');
   const stateChip = document.getElementById('gaming-data-layer-state');
   const gameList = panel?.querySelector('[data-gaming-game-list]');
+  const attribution = panel?.querySelector('.gaming-data-attribution');
   const gameSearch = panel?.querySelector('[data-gaming-game-search]');
   const fields = [...(panel?.querySelectorAll('[data-gaming-key]') || [])];
   if (!panel || !master || !controls || !status || !layer) return null;
@@ -135,6 +136,13 @@ export function initGamingDataPanel({ dataManager, layer }) {
     }
     freshness.textContent = `LAST SUCCESS · ${relativeAge(state.lastUpdate)} · DATA AGE ${relativeAge(state.lastUpdate)}${state.cached ? ' · CACHED' : ''}${state.stale ? ' · STALE WARNING' : ''}`;
     paintStats(state.overview);
+    if (attribution) {
+      const steam = state.provider === 'steam';
+      attribution.href = steam ? 'https://store.steampowered.com/' : 'https://www.battlemetrics.com';
+      attribution.textContent = steam
+        ? 'Game activity data provided by Steam'
+        : 'Gaming server data provided by BattleMetrics';
+    }
     paintFields();
     paintGames();
   };

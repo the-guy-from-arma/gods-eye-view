@@ -142,6 +142,7 @@ export function normalizeBattleMetricsServer(resource, gamesById = new Map()) {
 }
 
 function boundedInteger(value, fallback, min, max) {
+  if (value === null || value === undefined || String(value).trim() === '') return fallback;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? Math.min(max, Math.max(min, Math.trunc(numeric))) : fallback;
 }
@@ -247,7 +248,7 @@ export function createBattleMetricsProvider(options = {}) {
       response = await fetchImpl(url, {
         headers: {
           Accept: 'application/json',
-          'User-Agent': 'ThunderLink-Gods-Eye/0.3.07',
+          'User-Agent': 'ThunderLink-Gods-Eye/0.3.08',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         signal: AbortSignal.timeout(15_000),
@@ -363,6 +364,8 @@ export function createBattleMetricsProvider(options = {}) {
   });
 
   return Object.freeze({
+    id: 'battlemetrics',
+    name: 'BattleMetrics',
     getGames,
     getServers,
     tokenConfigured: Boolean(token),

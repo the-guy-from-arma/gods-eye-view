@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.08] — 2026-09-05 — Steam regional game activity
+
+- Added a server-only Steam Web API provider for global per-game activity totals
+  and population-weighted public dedicated-server activity grouped into Steam's
+  eight coarse regions.
+- Kept the privacy boundary explicit: the provider never requests or exposes
+  individual Steam IDs, profiles, friends, ownership, histories, or player
+  locations, and server-region activity is not presented as a player's location.
+- Made Steam the preferred Gaming Data provider with BattleMetrics retained as an
+  optional fallback, five-minute caching, and a 24-hour last-good response path.
+- Added Railway-ready `STEAM_WEB_API_KEY`, optional bounded app-ID configuration,
+  dynamic provider attribution, and fixed missing numeric filters being parsed as
+  zero rather than their documented defaults.
+- Advanced ThunderLink Oblivion to public build `0.3.08` and kernel
+  `TBSGE-KERNEL-030.009`; the legal acceptance bundle remains `0.3.02`.
+
 ## [0.3.07] — 2026-09-05 — Gaming Data fail-soft activation
 
 - Fixed Gaming Data activation rolling itself back to OFF when BattleMetrics is

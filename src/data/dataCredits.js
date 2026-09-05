@@ -160,6 +160,12 @@ export const DATA_CREDITS = [
       '(licensed catalog; listening opens the provider feed page)',
   },
   {
+    key: 'steam-gaming',
+    html:
+      'Game activity and regional dedicated-server data provided by ' +
+      '<a href="https://store.steampowered.com/" target="_blank" rel="noopener">Steam</a>',
+  },
+  {
     key: 'battlemetrics',
     html:
       'Gaming server data provided by ' +

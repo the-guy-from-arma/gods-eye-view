@@ -69,6 +69,13 @@ test('BattleMetrics location accepts its documented example and rejects invalid 
   assert.equal(normalizeBattleMetricsLocation(null), null);
 });
 
+test('Gaming query preserves documented defaults when optional numeric parameters are absent', () => {
+  const query = normalizeGamingQuery(new URLSearchParams('minPlayers=50'));
+  assert.equal(query.minPlayers, 50);
+  assert.equal(query.maxPlayers, 100000);
+  assert.equal(query.limit, 600);
+});
+
 test('Gaming filters isolate games, population, status, geography and identity', () => {
   const base = normalizeBattleMetricsServer(resource(), new Map([[game.id, game]]));
   const offline = { ...base, id: '43', status: 'offline', players: 0, latitude: 50, longitude: 10 };
