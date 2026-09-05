@@ -127,6 +127,7 @@ test('owner dashboard is session-protected and returns Autopilot plus the accoun
   const payload = JSON.parse(res.body);
   assert.equal(res.statusCode, 200);
   assert.equal(payload.autopilot, false);
+  assert.equal(payload.siteMode.mode, 'online');
   assert.equal(payload.accounts[0].id, '9');
   assert.equal(payload.accounts[0].status, 'pending');
 });
@@ -185,6 +186,79 @@ test('owner can publish maintenance state while invalid layer changes are reject
   const badRes = response();
   await middleware(badReq, badRes, () => assert.fail('account path must not fall through'));
   assert.equal(badRes.statusCode, 400);
+});
+
+test('owner can put the whole public console into a red maintenance state', async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM gev_sessions/.test(sql)) return { rows: [{ id: 1, email: 'owner@example.com', email_verified_at: new Date() }] };
+      return { rows: [] };
+    },
+  };
+  const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
+  const req = request('POST', '/api/account/admin/system-mode', { mode: 'maintenance' });
+  req.headers.cookie = 'gev_session=owner-session';
+  const res = response();
+  await middleware(req, res, () => assert.fail('account path must not fall through'));
+  const payload = JSON.parse(res.body);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(payload.siteMode, {
+    mode: 'maintenance',
+    label: 'Maintenance Mode',
+    message: 'ThunderLink is undergoing scheduled maintenance. Please check back shortly.',
+  });
+  assert.equal(calls.some(({ sql, params }) => /site_operating_mode/.test(sql) && params[0] === 'maintenance'), true);
+});
+
+test('owner security lock revokes active sessions and can be removed', async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM gev_sessions/.test(sql)) return { rows: [{ id: 1, email: 'owner@example.com', email_verified_at: new Date() }] };
+      if (/UPDATE gev_users SET security_locked/.test(sql)) {
+        return { rows: [{ id: Number(params[2]), email: 'member@example.com', status: 'approved', locked: params[0], lockReason: params[1], lockedAt: params[0] ? new Date() : null }] };
+      }
+      return { rows: [] };
+    },
+  };
+  const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
+  const lockReq = request('POST', '/api/account/admin/users', { userId: '77', action: 'lock', reason: 'Suspicious activity' });
+  lockReq.headers.cookie = 'gev_session=owner-session';
+  const lockRes = response();
+  await middleware(lockReq, lockRes, () => assert.fail('account path must not fall through'));
+  assert.equal(lockRes.statusCode, 200);
+  assert.equal(JSON.parse(lockRes.body).account.locked, true);
+  assert.equal(calls.some(({ sql, params }) => /DELETE FROM gev_sessions WHERE user_id/.test(sql) && params[0] === 77), true);
+
+  const unlockReq = request('POST', '/api/account/admin/users', { userId: '77', action: 'unlock' });
+  unlockReq.headers.cookie = 'gev_session=owner-session';
+  const unlockRes = response();
+  await middleware(unlockReq, unlockRes, () => assert.fail('account path must not fall through'));
+  assert.equal(unlockRes.statusCode, 200);
+  assert.equal(JSON.parse(unlockRes.body).account.locked, false);
+});
+
+test('a security-locked operator cannot create a new session', async () => {
+  const digest = await new Promise((resolve, reject) => {
+    crypto.scrypt('valid-user-password', '00112233445566778899aabbccddeeff', 64, (error, key) => {
+      if (error) reject(error);
+      else resolve(`scrypt:00112233445566778899aabbccddeeff:${Buffer.from(key).toString('hex')}`);
+    });
+  });
+  const pool = {
+    async query(sql) {
+      if (/SELECT id, email, password_digest/.test(sql)) return { rows: [{ id: 4, email: 'locked@example.com', password_digest: digest, email_verified_at: new Date(), approval_status: 'approved', security_locked: true }] };
+      return { rows: [] };
+    },
+  };
+  const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
+  const res = response();
+  await middleware(request('POST', '/api/account/login', { email: 'locked@example.com', password: 'valid-user-password' }), res, () => assert.fail('account path must not fall through'));
+  assert.equal(res.statusCode, 423);
+  assert.match(JSON.parse(res.body).error, /locked for security review/i);
 });
 
 test('a pending account cannot sign in before owner approval', async () => {

@@ -16,6 +16,33 @@ const ACTIVITY_TYPES = new Set([
   'page_view', 'search', 'ui_action', 'filter_change', 'scanner_interest',
 ]);
 const PUBLIC_LAYER_ID_SET = new Set(PUBLIC_LAYER_IDS);
+const SITE_MODES = Object.freeze({
+  online: {
+    label: 'Systems Online',
+    message: 'Satellite link established. Public command access is available.',
+  },
+  maintenance: {
+    label: 'Maintenance Mode',
+    message: 'ThunderLink is undergoing scheduled maintenance. Please check back shortly.',
+  },
+  feed_disconnected: {
+    label: 'Feed Disconnected',
+    message: 'The satellite intelligence feed is temporarily disconnected by command authority.',
+  },
+  restricted: {
+    label: 'Restricted Mode',
+    message: 'Public access has been restricted while a security review is in progress.',
+  },
+});
+
+function normalizeSiteMode(value) {
+  return Object.hasOwn(SITE_MODES, value) ? value : 'online';
+}
+
+function publicSiteMode(mode) {
+  const normalized = normalizeSiteMode(mode);
+  return { mode: normalized, ...SITE_MODES[normalized] };
+}
 
 function json(res, status, payload, headers = {}) {
   res.statusCode = status;
@@ -148,6 +175,9 @@ export function createAccountApi(options = {}) {
       );
       ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'pending';
       ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+      ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS security_locked BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS security_lock_reason TEXT;
+      ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS security_locked_at TIMESTAMPTZ;
       UPDATE gev_users SET approval_status = 'approved', approved_at = COALESCE(approved_at, email_verified_at)
         WHERE email_verified_at IS NOT NULL AND approval_status = 'pending';
       CREATE TABLE IF NOT EXISTS gev_sessions (
@@ -173,6 +203,8 @@ export function createAccountApi(options = {}) {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
       INSERT INTO gev_settings (key, value) VALUES ('registration_autopilot', 'false')
+        ON CONFLICT (key) DO NOTHING;
+      INSERT INTO gev_settings (key, value) VALUES ('site_operating_mode', 'online')
         ON CONFLICT (key) DO NOTHING;
       CREATE TABLE IF NOT EXISTS gev_layer_availability (
         layer_id TEXT PRIMARY KEY,
@@ -212,7 +244,8 @@ export function createAccountApi(options = {}) {
     const result = await pool.query(`
       SELECT u.id, u.email, u.email_verified_at
       FROM gev_sessions s JOIN gev_users u ON u.id = s.user_id
-      WHERE s.token_digest = $1 AND s.expires_at > NOW() AND u.approval_status = 'approved'
+      WHERE s.token_digest = $1 AND s.expires_at > NOW()
+        AND u.approval_status = 'approved' AND COALESCE(u.security_locked, FALSE) = FALSE
     `, [tokenDigest(raw)]);
     const user = result.rows[0];
     if (!user) return null;
@@ -227,6 +260,11 @@ export function createAccountApi(options = {}) {
   const isAutopilotEnabled = async () => {
     const result = await pool.query("SELECT value FROM gev_settings WHERE key = 'registration_autopilot'");
     return result.rows[0]?.value === 'true';
+  };
+
+  const getSiteMode = async () => {
+    const result = await pool.query("SELECT value FROM gev_settings WHERE key = 'site_operating_mode'");
+    return publicSiteMode(result.rows[0]?.value);
   };
 
   const getLayerAvailability = async () => {
@@ -370,7 +408,10 @@ export function createAccountApi(options = {}) {
               password_digest = EXCLUDED.password_digest,
               email_verified_at = COALESCE(gev_users.email_verified_at, NOW()),
               approval_status = 'approved',
-              approved_at = COALESCE(gev_users.approved_at, NOW())
+              approved_at = COALESCE(gev_users.approved_at, NOW()),
+              security_locked = FALSE,
+              security_lock_reason = NULL,
+              security_locked_at = NULL
             RETURNING id, email
           `, [email, digest]);
           const owner = ownerResult.rows[0];
@@ -381,7 +422,7 @@ export function createAccountApi(options = {}) {
           await record(req, 'account_login', { ownerVariable: true }, user);
           return json(res, 200, { user }, { 'Set-Cookie': cookie('gev_session', rawSession, req, SESSION_DAYS * 86400) });
         }
-        const result = await pool.query('SELECT id, email, password_digest, email_verified_at, approval_status FROM gev_users WHERE email = $1', [email]);
+        const result = await pool.query('SELECT id, email, password_digest, email_verified_at, approval_status, security_locked FROM gev_users WHERE email = $1', [email]);
         const row = result.rows[0];
         if (!row || !(await passwordMatches(password, row.password_digest))) {
           return json(res, 401, { error: 'Invalid email or password' });
@@ -389,6 +430,7 @@ export function createAccountApi(options = {}) {
         if (row.approval_status === 'pending') return json(res, 403, { error: 'Your access request is awaiting owner approval.' });
         if (row.approval_status === 'rejected') return json(res, 403, { error: 'Your access request was not approved.' });
         if (row.approval_status !== 'approved') return json(res, 403, { error: 'Account access is not active.' });
+        if (row.security_locked) return json(res, 423, { error: 'Account locked for security review. Contact the owner.' });
         const rawToken = crypto.randomBytes(32).toString('base64url');
         await pool.query(`INSERT INTO gev_sessions (user_id, token_digest, expires_at)
           VALUES ($1, $2, NOW() + INTERVAL '${SESSION_DAYS} days')`, [row.id, tokenDigest(rawToken)]);
@@ -404,7 +446,8 @@ export function createAccountApi(options = {}) {
       }
 
       if (url.pathname === '/api/account/session' && req.method === 'GET') {
-        return json(res, 200, { user: await currentUser(req) });
+        const [user, siteMode] = await Promise.all([currentUser(req), getSiteMode()]);
+        return json(res, 200, { user, siteMode });
       }
 
       if (url.pathname === '/api/account/layers' && req.method === 'GET') {
@@ -416,10 +459,12 @@ export function createAccountApi(options = {}) {
       if (url.pathname === '/api/account/admin' && req.method === 'GET') {
         const user = await currentUser(req);
         if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
-        const [autopilot, accounts, layers] = await Promise.all([
+        const [autopilot, siteMode, accounts, layers] = await Promise.all([
           isAutopilotEnabled(),
+          getSiteMode(),
           pool.query(`
-            SELECT id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt"
+            SELECT id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt",
+              security_locked AS locked, security_lock_reason AS "lockReason", security_locked_at AS "lockedAt"
             FROM gev_users
             WHERE email <> $1
             ORDER BY CASE approval_status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
@@ -430,6 +475,7 @@ export function createAccountApi(options = {}) {
         ]);
         return json(res, 200, {
           autopilot,
+          siteMode,
           accounts: accounts.rows.map((account) => ({ ...account, id: String(account.id) })),
           layers,
         });
@@ -466,24 +512,56 @@ export function createAccountApi(options = {}) {
         return json(res, 200, { ok: true, autopilot: body.enabled });
       }
 
+      if (url.pathname === '/api/account/admin/system-mode' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const body = await readJson(req);
+        const mode = normalizeSiteMode(body.mode);
+        if (mode !== body.mode) return json(res, 400, { error: 'Choose a valid operating mode' });
+        await pool.query(`
+          INSERT INTO gev_settings (key, value, updated_at) VALUES ('site_operating_mode', $1, NOW())
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+        `, [mode]);
+        await record(req, 'ui_action', { action: 'site_operating_mode', mode }, user);
+        return json(res, 200, { ok: true, siteMode: publicSiteMode(mode) });
+      }
+
       if (url.pathname === '/api/account/admin/users' && req.method === 'POST') {
         const user = await currentUser(req);
         if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
         const body = await readJson(req);
         const targetId = String(body.userId || '');
-        const action = body.action === 'approve' ? 'approved' : body.action === 'reject' ? 'rejected' : '';
-        if (!/^\d+$/.test(targetId) || !action) return json(res, 400, { error: 'Choose a valid account action' });
+        const accountState = body.action === 'approve' ? 'approved' : body.action === 'reject' ? 'rejected' : '';
+        const securityAction = body.action === 'lock' || body.action === 'unlock' ? body.action : '';
+        if (!/^\d+$/.test(targetId) || (!accountState && !securityAction)) return json(res, 400, { error: 'Choose a valid account action' });
+        if (securityAction) {
+          const locked = securityAction === 'lock';
+          const reason = locked ? safeText(body.reason, 180) || 'Suspicious activity review' : null;
+          const result = await pool.query(`
+            UPDATE gev_users SET security_locked = $1, security_lock_reason = $2,
+              security_locked_at = CASE WHEN $1 THEN NOW() ELSE NULL END
+            WHERE id = $3 AND email <> $4
+            RETURNING id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt",
+              security_locked AS locked, security_lock_reason AS "lockReason", security_locked_at AS "lockedAt"
+          `, [locked, reason, targetId, ownerEmail]);
+          const account = result.rows[0];
+          if (!account) return json(res, 404, { error: 'Account not found' });
+          if (locked) await pool.query('DELETE FROM gev_sessions WHERE user_id = $1', [account.id]);
+          await record(req, 'ui_action', { action: `account_${securityAction}`, accountId: String(account.id), reason }, user);
+          return json(res, 200, { ok: true, account: { ...account, id: String(account.id) } });
+        }
         const result = await pool.query(`
           UPDATE gev_users SET approval_status = $1,
             email_verified_at = CASE WHEN $1 = 'approved' THEN NOW() ELSE NULL END,
             approved_at = CASE WHEN $1 = 'approved' THEN NOW() ELSE NULL END
           WHERE id = $2 AND email <> $3
-          RETURNING id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt"
-        `, [action, targetId, ownerEmail]);
+          RETURNING id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt",
+            security_locked AS locked, security_lock_reason AS "lockReason", security_locked_at AS "lockedAt"
+        `, [accountState, targetId, ownerEmail]);
         const account = result.rows[0];
         if (!account) return json(res, 404, { error: 'Account not found' });
-        if (action === 'rejected') await pool.query('DELETE FROM gev_sessions WHERE user_id = $1', [account.id]);
-        await record(req, 'ui_action', { action: `account_${action}`, accountId: String(account.id) }, user);
+        if (accountState === 'rejected') await pool.query('DELETE FROM gev_sessions WHERE user_id = $1', [account.id]);
+        await record(req, 'ui_action', { action: `account_${accountState}`, accountId: String(account.id) }, user);
         return json(res, 200, { ok: true, account: { ...account, id: String(account.id) } });
       }
 
@@ -533,4 +611,4 @@ export function accountApiPlugin(options = {}) {
   };
 }
 
-export const accountSecurity = { sanitizeActivityMetadata, cleanEmail, secretMatches };
+export const accountSecurity = { sanitizeActivityMetadata, cleanEmail, secretMatches, normalizeSiteMode, publicSiteMode };

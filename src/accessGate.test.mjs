@@ -6,6 +6,9 @@ const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const bootstrap = readFileSync(new URL('./bootstrap.js', import.meta.url), 'utf8');
 const account = readFileSync(new URL('./account.js', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
+const owner = readFileSync(new URL('../owner.html', import.meta.url), 'utf8');
+const ownerJs = readFileSync(new URL('./ownerDashboard.js', import.meta.url), 'utf8');
+const ownerCss = readFileSync(new URL('../owner.css', import.meta.url), 'utf8');
 
 test('the app document starts locked and loads only the access bootstrap', () => {
   assert.match(index, /<body class="auth-pending">/);
@@ -37,21 +40,31 @@ test('the access gate includes a responsible-use disclaimer with an accessible d
   assert.match(account, /disclaimerDialog\.close\(\)/);
 });
 
-test('owner access includes a Postgres approval dashboard and Autopilot controls', () => {
-  assert.match(index, /data-owner-dashboard[^>]*aria-controls="owner-dashboard-dialog"[^>]*>ACCOUNT DASHBOARD/);
-  assert.match(index, /<dialog id="owner-dashboard-dialog"[^>]*aria-labelledby="owner-dashboard-title"/);
-  assert.match(index, /data-owner-metric="pending"/);
-  assert.match(index, /data-owner-metric="approved"/);
-  assert.match(index, /data-owner-autopilot[^>]*aria-pressed="false"/);
-  assert.match(index, /data-owner-accounts/);
-  assert.match(account, /ownerDashboardDialog\.showModal\(\)/);
-  assert.match(account, /ownerDashboardDialog\.close\(\)/);
-  assert.match(account, /api\/account\/admin\/autopilot/);
-  assert.match(account, /api\/account\/admin\/users/);
-  assert.match(account, /REGISTRATION AUTOPILOT/i);
-  assert.match(index, /data-owner-layers/);
-  assert.match(index, /LAYER AVAILABILITY/);
-  assert.match(account, /api\/account\/admin\/layers/);
+test('owner access opens a dedicated full-page command center', () => {
+  assert.match(index, /data-owner-dashboard[^>]*>OPEN OWNER COMMAND/);
+  assert.match(account, /window\.location\.assign\('\/owner\.html'\)/);
+  assert.match(owner, /<title>Owner Command · ThunderLink God's Eye<\/title>/);
+  assert.match(owner, /data-owner-metric="locked"/);
+  assert.match(owner, /data-owner-autopilot[^>]*aria-pressed="false"/);
+  assert.match(owner, /data-owner-accounts/);
+  assert.match(owner, /data-owner-layers/);
+  assert.match(owner, /data-owner-activity/);
+  assert.match(ownerJs, /api\/account\/admin\/autopilot/);
+  assert.match(ownerJs, /api\/account\/admin\/users/);
+  assert.match(ownerJs, /api\/account\/admin\/layers/);
+  assert.match(ownerCss, /\.command-main/);
+});
+
+test('site-wide interruption states block the globe with an owner recovery path', () => {
+  assert.match(index, /id="system-mode-gate"[^>]*hidden/);
+  assert.match(index, /data-system-owner-access>OWNER ACCESS/);
+  assert.match(account, /siteAccessBlocked/);
+  assert.match(account, /siteMode\.mode !== 'online'/);
+  assert.match(owner, /data-mode="maintenance"/);
+  assert.match(owner, /data-mode="feed_disconnected"/);
+  assert.match(owner, /data-mode="restricted"/);
+  assert.match(ownerJs, /api\/account\/admin\/system-mode/);
+  assert.match(css, /#system-mode-gate/);
 });
 
 test('phones receive a friendly tablet-or-PC compatibility gate before authentication', () => {

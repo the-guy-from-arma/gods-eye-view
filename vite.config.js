@@ -7956,6 +7956,12 @@ export default defineConfig(({ mode }) => {
       // The Cesium engine bundle is inherently large; raise the warning ceiling
       // so the build log isn't dominated by an expected chunk-size notice.
       chunkSizeWarningLimit: 1500,
+      rollupOptions: {
+        input: {
+          app: path.resolve(__dirname, 'index.html'),
+          owner: path.resolve(__dirname, 'owner.html'),
+        },
+      },
     },
   };
 });

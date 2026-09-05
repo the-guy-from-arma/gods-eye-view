@@ -31,8 +31,8 @@
 }
 
 /* ThunderLink accounts and public-safety preview */
-body.auth-pending > :not(#account-dialog):not(#platform-disclaimer-dialog):not(#phone-compatibility-gate):not(script) { visibility: hidden !important; }
-body.auth-pending #account-dialog, body.auth-pending #platform-disclaimer-dialog, body.auth-pending #phone-compatibility-gate { visibility: visible; }
+body.auth-pending > :not(#account-dialog):not(#platform-disclaimer-dialog):not(#phone-compatibility-gate):not(#system-mode-gate):not(script) { visibility: hidden !important; }
+body.auth-pending #account-dialog, body.auth-pending #platform-disclaimer-dialog, body.auth-pending #phone-compatibility-gate, body.auth-pending #system-mode-gate { visibility: visible; }
 body.auth-pending #account-chip { display: none; }
 body.auth-pending .account-close { visibility: hidden; pointer-events: none; }
 body.auth-pending { background: #02060a; }
@@ -67,6 +67,42 @@ body.phone-unsupported { overflow: auto; background: #02080d; }
 #phone-compatibility-gate p { width: min(100%, 430px); color: #91adb4; font: 400 14px/1.65 Inter, sans-serif; }
 #phone-compatibility-gate strong { width: min(100%, 430px); padding: 14px 16px; border: 1px solid rgba(82, 229, 255, .35); background: rgba(11, 78, 94, .22); color: #baf6ff; font: 600 11px/1.45 'JetBrains Mono', monospace; letter-spacing: .07em; }
 #phone-compatibility-gate small { color: #62838b; font: 400 11px/1.5 'JetBrains Mono', monospace; }
+#system-mode-gate[hidden] { display: none; }
+#system-mode-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 4900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 17px;
+  padding: 36px;
+  overflow: auto;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 66, 66, .025) 3px 4px),
+    radial-gradient(circle at 50% 42%, rgba(205, 22, 22, .14), transparent 33%),
+    #030405;
+  color: #ffe8e8;
+  text-align: center;
+}
+#system-mode-gate::after { position: fixed; inset: 18px; border: 1px solid rgba(255, 61, 61, .24); pointer-events: none; content: ''; }
+.system-mode-signal { position: relative; display: grid; place-items: center; width: 148px; height: 148px; margin-bottom: 8px; }
+.system-mode-signal span { position: absolute; inset: 0; border: 1px solid rgba(255, 63, 63, .46); border-radius: 50%; animation: system-signal-pulse 2.6s ease-out infinite; }
+.system-mode-signal span:nth-child(2) { inset: 20px; animation-delay: .45s; }
+.system-mode-signal span:nth-child(3) { inset: 40px; animation-delay: .9s; }
+.system-mode-signal i { color: #ff4c4c; font-size: 42px; text-shadow: 0 0 25px rgba(255, 27, 27, .8); }
+@keyframes system-signal-pulse { 0%, 100% { opacity: .22; transform: scale(.97); } 45% { opacity: .9; transform: scale(1.035); } }
+.system-mode-kicker { color: #ff6868; font: 700 10px/1 var(--font-mono); letter-spacing: .24em; }
+#system-mode-gate h1 { font: 500 clamp(35px, 5vw, 66px)/1 var(--font-sans); letter-spacing: -.02em; text-transform: uppercase; text-shadow: 0 0 36px rgba(255, 42, 42, .25); }
+#system-mode-gate > p { max-width: 620px; color: #aa7d7d; font: 400 14px/1.7 var(--font-mono); }
+.system-mode-code { display: flex; align-items: center; width: min(540px, 90vw); gap: 12px; color: #ff5555; font: 600 9px/1 var(--font-mono); letter-spacing: .18em; }
+.system-mode-code i { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 57, 57, .6)); }
+.system-mode-code i:last-child { transform: scaleX(-1); }
+#system-mode-gate button { min-height: 42px; margin-top: 12px; padding: 0 22px; border: 1px solid rgba(255, 76, 76, .55); background: rgba(94, 9, 9, .3); color: #ffb2b2; font: 700 9px/1 var(--font-mono); letter-spacing: .15em; cursor: pointer; }
+#system-mode-gate button:hover, #system-mode-gate button:focus-visible { border-color: #ff5d5d; background: rgba(135, 15, 15, .42); color: #fff; }
+#system-mode-gate small { color: #6d4d4d; font: 400 8px/1.5 var(--font-mono); letter-spacing: .08em; }
+@media (prefers-reduced-motion: reduce) { .system-mode-signal span { animation: none; } }
 #account-signed-in[hidden], #account-signed-out[hidden] { display: none !important; }
 
 #account-chip {

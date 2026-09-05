@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Owner Command · ThunderLink God's Eye</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <link rel="stylesheet" href="/owner.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" rel="stylesheet" />
+</head>
+<body class="owner-loading">
+  <div class="owner-grid" aria-hidden="true"></div>
+  <aside class="command-rail">
+    <a class="command-brand" href="/" aria-label="Return to God's Eye">
+      <img src="/logo.svg" alt="" />
+      <span><strong>THUNDERLINK</strong><small>OWNER COMMAND</small></span>
+    </a>
+    <nav aria-label="Dashboard sections">
+      <a href="#overview" class="active"><span class="material-symbols-outlined">space_dashboard</span>Overview</a>
+      <a href="#system-control"><span class="material-symbols-outlined">satellite_alt</span>System control</a>
+      <a href="#accounts"><span class="material-symbols-outlined">shield_person</span>Account security</a>
+      <a href="#layers"><span class="material-symbols-outlined">layers</span>Data layers</a>
+      <a href="#activity"><span class="material-symbols-outlined">history</span>Activity</a>
+    </nav>
+    <div class="command-rail-footer">
+      <span><i></i>OWNER SESSION</span>
+      <strong data-owner-email>VERIFYING…</strong>
+      <a href="/">RETURN TO GOD'S EYE</a>
+    </div>
+  </aside>
+
+  <main class="command-main">
+    <header class="command-topbar">
+      <div>
+        <span>THUNDERLINK · OPERATIONS AUTHORITY</span>
+        <h1>Command Center</h1>
+      </div>
+      <div class="command-top-actions">
+        <span class="command-clock" data-owner-clock>--:--:-- UTC</span>
+        <button type="button" data-owner-refresh><span class="material-symbols-outlined">refresh</span>SYNC</button>
+      </div>
+    </header>
+
+    <div class="command-content">
+      <section id="overview" class="system-hero" data-site-mode="online">
+        <div class="system-hero-copy">
+          <span class="section-kicker">GLOBAL OPERATING STATE</span>
+          <div class="system-title-line"><i></i><h2 data-site-mode-label>Systems Online</h2></div>
+          <p data-site-mode-message>Satellite link established. Public command access is available.</p>
+          <small>Changes reach open public consoles within 15 seconds. Owner access always remains available for recovery.</small>
+        </div>
+        <div class="orbital-status" aria-hidden="true">
+          <span></span><span></span><span></span>
+          <div><img src="/logo.svg" alt="" /></div>
+        </div>
+      </section>
+
+      <section class="metric-grid" aria-label="Account totals">
+        <article><span>PENDING</span><strong data-owner-metric="pending">0</strong><small>AWAITING REVIEW</small></article>
+        <article><span>APPROVED</span><strong data-owner-metric="approved">0</strong><small>ACTIVE OPERATORS</small></article>
+        <article class="metric-alert"><span>LOCKED</span><strong data-owner-metric="locked">0</strong><small>SECURITY HOLDS</small></article>
+        <article><span>TOTAL</span><strong data-owner-metric="total">0</strong><small>ACCOUNT RECORDS</small></article>
+      </section>
+
+      <section id="system-control" class="command-panel operating-panel">
+        <header><div><span class="section-kicker">PUBLIC CONSOLE</span><h2>System operating mode</h2></div><span class="panel-readout" data-system-readout>ONLINE</span></header>
+        <p class="panel-intro">Select exactly what visitors see. Any red state blocks all non-owner access and replaces the globe with a command-network status screen.</p>
+        <div class="mode-grid" data-mode-controls>
+          <button type="button" data-mode="online"><span class="material-symbols-outlined">sensors</span><strong>SYSTEMS ONLINE</strong><small>Normal public access</small></button>
+          <button type="button" data-mode="maintenance"><span class="material-symbols-outlined">construction</span><strong>MAINTENANCE MODE</strong><small>Scheduled service screen</small></button>
+          <button type="button" data-mode="feed_disconnected"><span class="material-symbols-outlined">signal_disconnected</span><strong>FEED DISCONNECTED</strong><small>Satellite link offline</small></button>
+          <button type="button" data-mode="restricted"><span class="material-symbols-outlined">gpp_bad</span><strong>RESTRICTED MODE</strong><small>Security lockdown</small></button>
+        </div>
+        <div class="system-confirm" data-system-confirm hidden>
+          <div><strong data-system-confirm-title>CONFIRM MODE CHANGE</strong><p data-system-confirm-copy></p></div>
+          <button type="button" data-system-cancel>CANCEL</button>
+          <button type="button" data-system-apply>APPLY SITE-WIDE</button>
+        </div>
+      </section>
+
+      <section class="command-panel policy-panel">
+        <header><div><span class="section-kicker">REGISTRATION POLICY</span><h2>Account Autopilot</h2></div><button type="button" class="toggle-control" data-owner-autopilot aria-pressed="false"><span data-owner-autopilot-state>OFF</span><i></i></button></header>
+        <p data-owner-autopilot-description>Manual approval is active. New operators remain pending until you approve them.</p>
+        <div class="security-note"><span class="material-symbols-outlined">warning</span><p>Autopilot approves anyone who can reach this app. Keep it off when controlled access matters.</p></div>
+      </section>
+
+      <section id="accounts" class="command-panel accounts-panel">
+        <header><div><span class="section-kicker">ACCESS REGISTRY</span><h2>Operator security</h2></div><span class="panel-readout" data-owner-account-count>0 ACCOUNTS</span></header>
+        <p class="panel-intro">Approval grants access. Security lock immediately revokes every session and prevents future sign-in until you unlock the account.</p>
+        <div class="account-toolbar">
+          <input type="search" data-account-search placeholder="Search operator email…" aria-label="Search operator accounts" />
+          <select data-account-filter aria-label="Filter operator accounts">
+            <option value="all">ALL ACCOUNTS</option><option value="pending">PENDING</option><option value="approved">APPROVED</option><option value="locked">LOCKED</option><option value="rejected">DENIED</option>
+          </select>
+        </div>
+        <div class="owner-accounts" data-owner-accounts><p class="empty-state">Synchronizing account registry…</p></div>
+      </section>
+
+      <section id="layers" class="command-panel layers-panel">
+        <header><div><span class="section-kicker">DATA GOVERNANCE</span><h2>Public layer availability</h2></div><span class="panel-readout" data-owner-layer-count>0 LAYERS</span></header>
+        <p class="panel-intro">Coming Soon and Maintenance remain visible but disabled. Disabled removes a layer from the public list entirely.</p>
+        <div class="owner-layers" data-owner-layers><p class="empty-state">Synchronizing layer registry…</p></div>
+      </section>
+
+      <section id="activity" class="command-panel activity-panel">
+        <header><div><span class="section-kicker">AUDIT TRAIL</span><h2>Recent system activity</h2></div><span class="panel-readout">LATEST 100</span></header>
+        <div class="owner-activity" data-owner-activity><p class="empty-state">Synchronizing activity records…</p></div>
+      </section>
+    </div>
+  </main>
+
+  <div class="owner-toast" data-owner-status role="status" aria-live="polite"></div>
+  <section class="owner-denied" data-owner-denied hidden>
+    <span class="material-symbols-outlined">lock</span><h1>Owner access required</h1><p>This command page is available only to the configured ThunderLink owner.</p><a href="/">RETURN TO SIGN IN</a>
+  </section>
+  <script type="module" src="/src/ownerDashboard.js"></script>
+</body>
+</html>
