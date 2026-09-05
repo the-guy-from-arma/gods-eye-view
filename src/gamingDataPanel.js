@@ -127,7 +127,7 @@ export function initGamingDataPanel({ dataManager, layer }) {
       status.textContent = 'Loading cached and live BattleMetrics server data…';
     } else if (state.error && !state.serverCount) {
       stateChip.textContent = 'UNAVAILABLE';
-      status.textContent = state.error;
+      status.textContent = `LAYER ACTIVE · ${state.error}`;
     } else {
       stateChip.textContent = state.stale ? 'STALE' : (state.partial ? 'PARTIAL' : 'LIVE');
       const cacheLabel = state.stale ? 'STALE CACHE' : (state.cached ? 'CACHE' : 'FRESH');

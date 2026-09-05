@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.07] — 2026-09-05 — Gaming Data fail-soft activation
+
+- Fixed Gaming Data activation rolling itself back to OFF when BattleMetrics is
+  unconfigured, rejects a token, or is temporarily unavailable.
+- Isolated BattleMetrics provider failures inside the Gaming Data panel as an
+  `UNAVAILABLE` degraded state, preventing the optional source from changing the
+  console-wide boot indicator to `LOAD FAILED`.
+- Kept automatic/manual recovery armed so a later valid Railway subscriber token
+  or restored provider response can populate the already-active layer.
+- Advanced ThunderLink Oblivion to public build `0.3.07` and kernel
+  `TBSGE-KERNEL-030.008`; the legal acceptance bundle remains `0.3.02`.
+
 ## [0.3.06] — 2026-09-05 — Gaming Data left-rail panel
 
 - Moved Gaming Data into the adaptive left-side accordion as its own collapsible

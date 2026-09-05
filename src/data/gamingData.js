@@ -387,7 +387,12 @@ export function createGamingDataLayer() {
         error = caught?.message || 'BattleMetrics is temporarily unavailable';
         stale = servers.length > 0;
         render();
-        return servers.length > 0;
+        // Gaming Data is an optional, isolated surface. A missing/rejected
+        // provider token must not roll its UI lifecycle back to OFF or poison
+        // the console-wide loading state. Keep the layer enabled so its own
+        // panel can explain the provider failure and recover on a later manual
+        // or automatic refresh. Existing last-good rows remain visible.
+        return true;
       } finally {
         if (abortController === request) {
           abortController = null;
@@ -469,8 +474,12 @@ export function createGamingDataLayer() {
         lastUpdate: lastUpdate ? Date.parse(lastUpdate) : null,
         loading,
         stale,
-        degraded: stale || partial,
-        error,
+        degraded: stale || partial || Boolean(error),
+        // Provider failures are surfaced by getUIState() inside the dedicated
+        // Gaming Data panel. They are warnings to the global loader, not fatal
+        // failures of the whole command console.
+        warning: error,
+        error: null,
         source: 'BattleMetrics',
       };
     },

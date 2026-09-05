@@ -9,6 +9,7 @@ import {
   normalizeGamingDataFilters,
   resetGamingDataFilters,
 } from './gamingDataModel.js';
+import { createGamingDataLayer } from './gamingData.js';
 import {
   createBattleMetricsProvider,
   normalizeBattleMetricsLocation,
@@ -214,6 +215,39 @@ test('public provider omits Authorization and unauthorized errors are sanitized'
 
   const denied = createBattleMetricsProvider({ fetchImpl: async () => jsonResponse({}, { status: 401 }), token: 'secret' });
   await assert.rejects(denied.getGames(), /rejected the configured token/);
+});
+
+test('provider failure stays isolated and does not roll the optional Gaming Data layer back off', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  const originalCustomEvent = globalThis.CustomEvent;
+  const originalDocument = globalThis.document;
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 503,
+    json: async () => ({ error: 'Gaming Data requires a BattleMetrics subscriber token configured in Railway.' }),
+  });
+  globalThis.window = { dispatchEvent() {} };
+  globalThis.document = { getElementById: () => null };
+  globalThis.CustomEvent = class CustomEvent {
+    constructor(type, options = {}) { this.type = type; this.detail = options.detail; }
+  };
+  try {
+    const layer = createGamingDataLayer();
+    layer.enable();
+    assert.equal(await layer.update(), true);
+    assert.equal(layer.getUIState().enabled, true);
+    assert.match(layer.getUIState().error, /subscriber token/i);
+    assert.equal(layer.getStats().error, null);
+    assert.match(layer.getStats().warning, /subscriber token/i);
+    assert.equal(layer.getStats().degraded, true);
+    layer.disable();
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.window = originalWindow;
+    globalThis.CustomEvent = originalCustomEvent;
+    globalThis.document = originalDocument;
+  }
 });
 
 test('Gaming Data panel is isolated, responsive, private-by-default, and default-off', () => {
