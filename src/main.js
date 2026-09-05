@@ -39,6 +39,7 @@ import { initFirstRunExperience } from './firstRunExperience.js';
 import { initKeySetup } from './keySetup.js';
 import { loadPhotorealisticTileset } from './mapStartup.js';
 import { initPublicSafetyPreview } from './publicSafetyPreview.js';
+import { applyInterfaceAvailability } from './interfaceAvailability.js';
 
 initLogoGaze();
 const publicSafetyPreview = initPublicSafetyPreview();
@@ -140,6 +141,13 @@ async function init() {
     // expandable bottom-left credit lightbox (showOnScreen=false), so they never
     // clutter the on-globe line. See docs/pre-ship-audit-2026-07-01.md H11.
     registerDataCredits(viewer);
+    const creditsFooterButton = document.getElementById('credits-footer-button');
+    creditsFooterButton?.addEventListener('click', () => {
+      // Cesium owns the canonical credit lightbox and keeps its dynamic
+      // provider list current. Reuse that surface for ThunderLink's explicit
+      // Credits button instead of maintaining a second, divergent list.
+      document.querySelector('#cesium-credits .cesium-credit-expand-link')?.click();
+    });
 
     // Hide Cesium's default globe — Google Photorealistic 3D Tiles provide their own
     // globe at all LODs (street level → orbital). The default globe's 2D imagery
@@ -245,6 +253,7 @@ async function init() {
     const applyAvailability = async (layers) => {
       latestLayerAvailability = Array.isArray(layers) ? layers : [];
       await dataManager.applyLayerAvailability(latestLayerAvailability);
+      applyInterfaceAvailability(latestLayerAvailability);
       const sceneState = latestLayerAvailability.find((layer) => (layer.id || layer.layerId) === 'scenes');
       sceneDirector?.setAvailability?.(sceneState?.status || 'coming_soon');
       window.dispatchEvent(new CustomEvent('gev:layer-availability-changed', {

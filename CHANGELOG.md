@@ -16,6 +16,18 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   project documentation as ThunderLink God's Eye while preserving the original
   MIT license, upstream attribution, and stable internal protocol identifiers.
 
+## [0.3.0] — 2026-09-05 — ThunderLink Oblivion command system
+
+### Added
+
+- Added owner-governed Enabled, Coming Soon, Maintenance, and Hidden states for
+  the public Display, CCTV, and Context interface modules.
+- Rebuilt Owner Command with an animated telemetry field, relay-mesh and
+  security-spectrum modules, richer tactical framing, and grouped governance
+  controls.
+- Added the ThunderLink Oblivion OS, version, and `TBSGE-KERNEL-030.001`
+  identity readout while retaining the required map-provider attribution.
+
 ## [0.1.1] — 2026-09-01 — Installation and live-data fixes
 
 ### Changed

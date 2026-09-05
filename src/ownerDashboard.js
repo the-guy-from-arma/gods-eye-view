@@ -100,7 +100,16 @@ function renderAccounts() {
 function renderLayers() {
   const live = dashboard.layers.filter((layer) => layer.status === 'live').length;
   document.querySelector('[data-owner-layer-count]').textContent = `${live} LIVE · ${dashboard.layers.length} TOTAL`;
-  const rows = dashboard.layers.map((layer) => {
+  const rows = [];
+  let activeGroup = '';
+  for (const layer of dashboard.layers) {
+    const group = layer.group || 'Data & Tools';
+    if (group !== activeGroup) {
+      const heading = node('div', 'owner-layer-group');
+      heading.append(node('span', '', group), node('i'));
+      rows.push(heading);
+      activeGroup = group;
+    }
     const row = node('label', 'owner-layer-row');
     row.dataset.status = layer.status;
     const identity = node('div');
@@ -115,8 +124,8 @@ function renderLayers() {
       select.append(option);
     }
     row.append(identity, select);
-    return row;
-  });
+    rows.push(row);
+  }
   layersHost.replaceChildren(...rows);
 }
 
@@ -261,6 +270,87 @@ function updateClock() {
 }
 updateClock();
 setInterval(updateClock, 1000);
+
+function initTelemetryCanvas() {
+  const canvas = document.getElementById('owner-telemetry-canvas');
+  const context = canvas?.getContext('2d');
+  if (!context) return;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let width = 0;
+  let height = 0;
+  let frame = 0;
+  let raf = 0;
+  let points = [];
+
+  const resize = () => {
+    const ratio = Math.min(devicePixelRatio || 1, 1.5);
+    width = innerWidth;
+    height = innerHeight;
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    points = Array.from({ length: Math.max(24, Math.floor(width / 42)) }, (_, index) => ({
+      x: (index * 83.17) % width,
+      y: (index * 137.39) % height,
+      phase: index * 0.71,
+    }));
+  };
+
+  const draw = () => {
+    context.clearRect(0, 0, width, height);
+    context.save();
+    context.strokeStyle = 'rgba(58, 218, 243, .055)';
+    context.lineWidth = 1;
+    for (let x = 238; x < width; x += 96) {
+      context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke();
+    }
+    for (let y = 0; y < height; y += 96) {
+      context.beginPath(); context.moveTo(238, y); context.lineTo(width, y); context.stroke();
+    }
+
+    const cx = width * 0.77;
+    const cy = Math.min(390, height * 0.34);
+    const radius = Math.min(width, height) * 0.22;
+    context.strokeStyle = 'rgba(70, 225, 249, .075)';
+    for (let ring = 1; ring <= 3; ring += 1) {
+      context.beginPath();
+      context.ellipse(cx, cy, radius * ring * 0.58, radius * ring * 0.22, -0.32, 0, Math.PI * 2);
+      context.stroke();
+    }
+    context.setLineDash([3, 11]);
+    context.beginPath(); context.arc(cx, cy, radius, 0, Math.PI * 2); context.stroke();
+    context.setLineDash([]);
+
+    for (const point of points) {
+      const pulse = 0.25 + (Math.sin(frame * 0.018 + point.phase) + 1) * 0.18;
+      context.fillStyle = `rgba(73, 230, 250, ${pulse})`;
+      context.fillRect(point.x, point.y, 1.2, 1.2);
+    }
+    const sweepY = (frame * 0.55) % Math.max(height, 1);
+    const sweep = context.createLinearGradient(0, sweepY - 18, 0, sweepY + 18);
+    sweep.addColorStop(0, 'rgba(46, 222, 249, 0)');
+    sweep.addColorStop(0.5, 'rgba(46, 222, 249, .045)');
+    sweep.addColorStop(1, 'rgba(46, 222, 249, 0)');
+    context.fillStyle = sweep;
+    context.fillRect(238, sweepY - 18, width - 238, 36);
+    context.restore();
+    frame += 1;
+    if (!reducedMotion && !document.hidden) raf = requestAnimationFrame(draw);
+  };
+
+  const syncAnimation = () => {
+    cancelAnimationFrame(raf);
+    if (!document.hidden) draw();
+  };
+  resize();
+  draw();
+  addEventListener('resize', resize, { passive: true });
+  document.addEventListener('visibilitychange', syncAnimation);
+}
+
+initTelemetryCanvas();
 
 api('/api/account/session').then(async ({ user }) => {
   if (user?.role !== 'owner') {

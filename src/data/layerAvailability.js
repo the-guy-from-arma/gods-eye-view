@@ -8,6 +8,9 @@ export const LAYER_AVAILABILITY_STATUSES = Object.freeze([
 const VALID_STATUSES = new Set(LAYER_AVAILABILITY_STATUSES);
 
 export const PUBLIC_LAYER_CATALOG = Object.freeze([
+  ['interface-display', 'Display Controls', 'Interface Modules'],
+  ['interface-cctv', 'CCTV Controls', 'Interface Modules'],
+  ['interface-context', 'Context Controls', 'Interface Modules'],
   ['ais-live-vessels', 'Live AIS Vessels'],
   ['bikeshare', 'Bikeshare'],
   ['cctv', 'CCTV'],
@@ -29,7 +32,7 @@ export const PUBLIC_LAYER_CATALOG = Object.freeze([
   ['scenes', 'Scenes'],
   ['telegeography-submarine-cables', 'Submarine Cables'],
   ['traffic', 'Street Traffic'],
-].map(([id, name]) => Object.freeze({ id, name })));
+].map(([id, name, group = 'Data & Tools']) => Object.freeze({ id, name, group })));
 
 export const PUBLIC_LAYER_IDS = Object.freeze(PUBLIC_LAYER_CATALOG.map(({ id }) => id));
 
@@ -42,9 +45,10 @@ export function mergeLayerAvailability(rows = []) {
     String(row?.layerId || row?.layer_id || ''),
     normalizeLayerAvailabilityStatus(row?.status),
   ]));
-  return PUBLIC_LAYER_CATALOG.map(({ id, name }) => ({
+  return PUBLIC_LAYER_CATALOG.map(({ id, name, group }) => ({
     id,
     name,
+    group,
     status: statusById.get(id) || 'live',
   }));
 }

@@ -13,7 +13,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" rel="stylesheet" />
 </head>
 <body class="owner-loading">
+  <canvas id="owner-telemetry-canvas" aria-hidden="true"></canvas>
   <div class="owner-grid" aria-hidden="true"></div>
+  <div class="owner-hud-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <aside class="command-rail">
     <a class="command-brand" href="/" aria-label="Return to God's Eye">
       <img src="/logo.svg" alt="" />
@@ -27,6 +29,11 @@
       <a href="#activity"><span class="material-symbols-outlined">history</span>Activity</a>
     </nav>
     <div class="command-rail-footer">
+      <div class="rail-os-readout">
+        <small>OS</small><strong>THUNDERLINK OBLIVION</strong>
+        <small>VERSION</small><strong>0.3.0</strong>
+        <small>KERNEL</small><strong>TBSGE-KERNEL-030.001</strong>
+      </div>
       <span><i></i>OWNER SESSION</span>
       <strong data-owner-email>VERIFYING…</strong>
       <a href="/">RETURN TO GOD'S EYE</a>
@@ -34,6 +41,13 @@
   </aside>
 
   <main class="command-main">
+    <div class="system-telemetry-bar" aria-label="System telemetry">
+      <span><i></i>OBLIVION CORE · NOMINAL</span>
+      <span>POSTGRES · LINKED</span>
+      <span>POLICY SYNC · 15S</span>
+      <span>ENCRYPTED COMMAND CHANNEL</span>
+      <span>TBSGE-KERNEL-030.001</span>
+    </div>
     <header class="command-topbar">
       <div>
         <span>THUNDERLINK · OPERATIONS AUTHORITY</span>
@@ -47,6 +61,7 @@
 
     <div class="command-content">
       <section id="overview" class="system-hero" data-site-mode="online">
+        <div class="hero-coordinate-rail" aria-hidden="true">LAT 38.9072° N · LON 77.0369° W · ORBITAL CONTROL PLANE 03</div>
         <div class="system-hero-copy">
           <span class="section-kicker">GLOBAL OPERATING STATE</span>
           <div class="system-title-line"><i></i><h2 data-site-mode-label>Systems Online</h2></div>
@@ -56,7 +71,29 @@
         <div class="orbital-status" aria-hidden="true">
           <span></span><span></span><span></span>
           <div><img src="/logo.svg" alt="" /></div>
+          <b class="orbit-node orbit-node-a"></b><b class="orbit-node orbit-node-b"></b>
         </div>
+        <div class="hero-signal-bank" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><small>UPLINK SPECTRUM</small></div>
+      </section>
+
+      <section class="telemetry-matrix" aria-label="Command network telemetry">
+        <article>
+          <header><span>GLOBAL RELAY MESH</span><strong>STABLE</strong></header>
+          <div class="relay-map" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><b></b><b></b><b></b></div>
+          <footer><span>EDGE NODES · 08</span><span>LATENCY · 24 MS</span></footer>
+        </article>
+        <article>
+          <header><span>SECURITY ENVELOPE</span><strong>SEALED</strong></header>
+          <div class="signal-spectrum" aria-hidden="true">
+            <i style="--h:34%"></i><i style="--h:62%"></i><i style="--h:45%"></i><i style="--h:84%"></i><i style="--h:57%"></i><i style="--h:92%"></i><i style="--h:68%"></i><i style="--h:39%"></i><i style="--h:76%"></i><i style="--h:51%"></i><i style="--h:88%"></i><i style="--h:64%"></i>
+          </div>
+          <footer><span>SESSION GUARD · ACTIVE</span><span>THREAT LEVEL · LOW</span></footer>
+        </article>
+        <article class="identity-module">
+          <header><span>OPERATING SYSTEM</span><strong>ONLINE</strong></header>
+          <div><small>OS</small><b>THUNDERLINK OBLIVION</b><small>VERSION</small><b>0.3.0</b><small>KERNEL</small><b>TBSGE-KERNEL-030.001</b></div>
+          <footer><span>BUILD CHANNEL · PRODUCTION</span></footer>
+        </article>
       </section>
 
       <section class="metric-grid" aria-label="Account totals">
@@ -102,7 +139,7 @@
 
       <section id="layers" class="command-panel layers-panel">
         <header><div><span class="section-kicker">DATA GOVERNANCE</span><h2>Public layer availability</h2></div><span class="panel-readout" data-owner-layer-count>0 LAYERS</span></header>
-        <p class="panel-intro">Controls include data layers, Law Enforcement Radio, and Scenes. Coming Soon and Disabled / Maintenance remain visible but inactive. Hidden removes the feature from the public interface entirely.</p>
+        <p class="panel-intro">Controls include data layers, Law Enforcement Radio, Scenes, and the Display, CCTV, and Context interface modules. Coming Soon and Disabled / Maintenance remain visible but inactive. Hidden removes the feature from the public interface entirely.</p>
         <div class="owner-layers" data-owner-layers><p class="empty-state">Synchronizing layer registry…</p></div>
       </section>
 
