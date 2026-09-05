@@ -76,9 +76,10 @@ test('free voice prefers server-side natural audio when it is configured', async
   assert.deepEqual(played, ['https://cdn.ttsforfree.com/result.mp3']);
 });
 
-test('free voice falls back to browser speech when natural voice is unavailable', async () => {
+test('free voice never falls back to computer speech when AI voice is unavailable', async () => {
   const spoken = [];
   class UtteranceMock { constructor(text) { this.text = text; } }
+  const ui = voiceUi();
   const windowRef = {
     fetch: async () => ({ ok: false, json: async () => ({ code: 'not_configured' }) }),
     Audio: class {},
@@ -86,10 +87,12 @@ test('free voice falls back to browser speech when natural voice is unavailable'
     SpeechSynthesisUtterance: UtteranceMock,
   };
   const controller = new GevFreeVoiceController({
-    runner: async () => ({}), ui: voiceUi(), windowRef,
+    runner: async () => ({}), ui, windowRef,
     documentRef: { addEventListener() {}, removeEventListener() {} },
   });
   controller.speak('Command complete');
   await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(spoken, ['Command complete']);
+  assert.deepEqual(spoken, []);
+  assert.equal(ui.status.textContent, 'ERROR');
+  assert.equal(ui.detail.textContent, 'Natural voice unavailable');
 });

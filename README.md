@@ -6,7 +6,7 @@
 
 ThunderLink-branded fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) by Bilawal Sidhu. The original MIT license and third-party attribution are preserved.
 
-Photorealistic 3D globe. Live aircraft, ships, satellites, earthquakes, global disaster events, traffic, and public cameras. Free browser voice commands by default, with an optional realtime AI agent.
+Photorealistic 3D globe. Live aircraft, ships, satellites, earthquakes, global disaster events, traffic, and public cameras. Browser-recognized voice commands with server-side AI speech, plus an optional realtime AI agent.
 
 *No place left behind.*
 
@@ -211,9 +211,9 @@ The cockpit even carries its own briefing strip: nearby live signals, regional h
 
 ## 🎙️ Talk to It
 
-> Voice commands are **free by default** in Chrome and Edge through the browser Speech Recognition API. Click the mic and speak one command such as *"fly to London,"* *"show breaking news,"* or *"use night vision."* No OpenAI key or paid request is used.
+> Command recognition runs in Chrome and Edge through the browser Speech Recognition API. Click the mic and speak one command such as *"fly to London,"* *"show breaking news,"* or *"use night vision."* No OpenAI key or paid request is used for command recognition.
 
-For more natural spoken confirmations, set the server-only Railway variable `TTSFORFREE_API_KEY`. God’s Eye sends only its short command-result phrase to TTSForFree, caches repeated results, and falls back to the browser voice automatically. `TTSFORFREE_VOICE_ID` optionally selects another provider voice. The provider’s free API plan is limited to non-commercial use; review its current terms before using it commercially.
+Spoken confirmations use TTSForFree exclusively. Set the server-only Railway variable `TTSFORFREE_API_KEY`; `TTSFORFREE_VOICE_ID` selects the provider voice. God’s Eye sends only its short command-result phrase to TTSForFree and caches repeated results. If the AI provider or quota is unavailable, the app stays silent and shows an error—it never falls back to the computer’s browser voice. Review the provider’s current plan and usage terms before commercial use.
 
 The original conversational AI voice remains available as an explicit `?voice=ai` URL opt-in. It requires a funded `OPENAI_API_KEY`; the same key also drives the optional **AI HUD summary**. AI mode adds open-ended conversation and the advanced tools below:
 

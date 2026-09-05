@@ -154,7 +154,7 @@ function isEditableTarget(target) {
   return Boolean(target?.closest?.('input, textarea, select, [contenteditable], [role="textbox"]'));
 }
 
-/** Keyless one-command-at-a-time voice controller backed by the Web Speech API. */
+/** Browser-recognized commands with TTSForFree as the only spoken-output path. */
 export class GevFreeVoiceController {
   constructor({ runner, ui, windowRef = window, documentRef = document }) {
     this.runner = runner;
@@ -181,17 +181,17 @@ export class GevFreeVoiceController {
     const kicker = this.ui.root.querySelector('.gev-voice-kicker');
     if (kicker) kicker.textContent = 'VOICE COMMANDS';
     if (this.ui.tierButton) {
-      this.ui.tierButton.textContent = 'FREE';
+      this.ui.tierButton.textContent = 'AI';
       this.ui.tierButton.disabled = true;
-      this.ui.tierButton.title = 'Free browser voice — no API charges';
+      this.ui.tierButton.title = 'TTSForFree AI voice — computer voice fallback disabled';
     }
     if (this.ui.costValue) {
-      this.ui.costValue.textContent = '$0';
-      this.ui.costValue.title = 'No paid voice API';
+      this.ui.costValue.textContent = 'TTS';
+      this.ui.costValue.title = 'Uses the configured TTSForFree quota';
     }
-    if (this.ui.helpDetail) this.ui.helpDetail.textContent = 'Click mic and speak one command · hold Space to talk';
-    this.ui.button.setAttribute('aria-label', 'Free voice command — click or hold Space, then speak');
-    this.setStatus('idle', 'FREE VOICE READY');
+    if (this.ui.helpDetail) this.ui.helpDetail.textContent = 'Click mic and speak one command · AI voice output only';
+    this.ui.button.setAttribute('aria-label', 'AI voice command — click or hold Space, then speak');
+    this.setStatus('idle', 'AI VOICE READY');
   }
 
   isActive() {
@@ -212,7 +212,6 @@ export class GevFreeVoiceController {
     }
     this.pushToTalk = Boolean(pushToTalk);
     this.commandHandled = false;
-    this.windowRef?.speechSynthesis?.cancel?.();
     const recognition = new Recognition();
     this.recognition = recognition;
     recognition.lang = 'en-US';
@@ -283,20 +282,6 @@ export class GevFreeVoiceController {
     this.setStatus(code === 'no-speech' ? 'idle' : 'error', detail);
   }
 
-  speakWithBrowser(message) {
-    const synthesis = this.windowRef?.speechSynthesis;
-    const Utterance = this.windowRef?.SpeechSynthesisUtterance;
-    if (!synthesis || !Utterance || !message) return;
-    try {
-      synthesis.cancel();
-      const utterance = new Utterance(String(message).slice(0, 180));
-      utterance.rate = 1.05;
-      synthesis.speak(utterance);
-    } catch {
-      // On-screen confirmation remains available when speech synthesis is blocked.
-    }
-  }
-
   speak(message) {
     const text = String(message || '').trim().slice(0, 180);
     if (!text) return;
@@ -308,11 +293,10 @@ export class GevFreeVoiceController {
       try { this.ttsAudio.pause(); } catch { /* already stopped */ }
       this.ttsAudio = null;
     }
-    this.windowRef?.speechSynthesis?.cancel?.();
     const fetchImpl = this.windowRef?.fetch?.bind(this.windowRef);
     const AudioClass = this.windowRef?.Audio;
     if (!fetchImpl || !AudioClass) {
-      this.speakWithBrowser(text);
+      this.setStatus('error', 'AI voice playback is unavailable in this browser');
       return;
     }
 
@@ -335,10 +319,14 @@ export class GevFreeVoiceController {
       try {
         await audio.play();
       } catch {
-        if (generation === this.ttsGeneration) this.speakWithBrowser(text);
+        if (generation === this.ttsGeneration) {
+          this.setStatus('error', 'AI voice playback was blocked — tap the mic and try again');
+        }
       }
     }).catch((error) => {
-      if (error?.name !== 'AbortError' && generation === this.ttsGeneration) this.speakWithBrowser(text);
+      if (error?.name !== 'AbortError' && generation === this.ttsGeneration) {
+        this.setStatus('error', error?.message || 'AI voice is temporarily unavailable');
+      }
     });
   }
 
@@ -346,7 +334,7 @@ export class GevFreeVoiceController {
     this.status = status;
     this.ui.root.dataset.status = status;
     this.ui.status.textContent = FREE_STATUS[status] || FREE_STATUS.idle;
-    this.ui.detail.textContent = detail || (status === 'idle' ? 'FREE VOICE READY' : 'VOICE ACTIVE');
+    this.ui.detail.textContent = detail || (status === 'idle' ? 'AI VOICE READY' : 'VOICE ACTIVE');
     this.ui.detail.title = this.ui.detail.textContent;
     if (this.ui.errorDetail) this.ui.errorDetail.textContent = status === 'error' ? this.ui.detail.textContent : '';
     if (this.ui.buttonLabel) this.ui.buttonLabel.textContent = this.isActive() ? 'STOP' : 'SPEAK';
@@ -385,7 +373,6 @@ export class GevFreeVoiceController {
       recognition.onend = null;
       try { recognition.abort(); } catch { /* already stopped */ }
     }
-    this.windowRef?.speechSynthesis?.cancel?.();
     this.ttsGeneration += 1;
     this.ttsAbortController?.abort?.();
     this.ttsAbortController = null;
@@ -404,7 +391,7 @@ export class GevFreeVoiceController {
       this.annotationEventUnsubscribe = null;
       this.ui.root.remove();
     } else if (!preserveStatus) {
-      this.setStatus('idle', 'FREE VOICE READY');
+      this.setStatus('idle', 'AI VOICE READY');
     }
   }
 
