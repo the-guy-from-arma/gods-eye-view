@@ -12,7 +12,7 @@ export const INTELLIGENCE_MODULES = Object.freeze([
   ['conflicts', 'Conflict Monitor', 'Operations', 'registered', 'Source-linked conflict reporting with explicit verification state.'],
   ['frontlines', 'Frontline Monitor', 'Operations', 'verified', 'Third-party frontline geometry treated as unverified reporting.'],
   ['air-quality', 'Air Quality', 'Environment', 'registered', 'Open air-quality observations and station health.'],
-  ['severe-weather', 'Severe Weather', 'Environment', 'registered', 'NWS, EONET, and GDACS alerts.'],
+  ['severe-weather', 'Severe Weather', 'Environment', 'registered', 'Live radar, warning polygons, and storm events on the operations globe.'],
   ['space-weather', 'Space Weather', 'Environment', 'registered', 'NOAA geomagnetic, solar flare, and alert telemetry.'],
   ['sentinel-imagery', 'Sentinel Imagery', 'Environment', 'verified', 'Public STAC scene discovery for an authorized area of interest.'],
   ['nuclear-infrastructure', 'Nuclear Infrastructure', 'Infrastructure', 'registered', 'Public facility records with source dates and nearby event context.'],

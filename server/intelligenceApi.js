@@ -89,7 +89,7 @@ async function fetchJson(url, options = {}) {
     method: options.method || 'GET',
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'ThunderLink-Oblivion/0.3.11 (+public-intelligence-console)',
+      'User-Agent': 'ThunderLink-Oblivion/0.3.12 (+public-intelligence-console)',
       ...(options.headers || {}),
     },
     body: options.body,
@@ -384,7 +384,7 @@ export function createIntelligenceApi(options = {}) {
       }
 
       if (url.pathname === '/api/intelligence/overview' && req.method === 'GET') {
-        const requested = ['severe-weather', 'space-weather', 'cyber-threats', 'internet-outages', 'market-watch'];
+        const requested = ['space-weather', 'cyber-threats', 'internet-outages', 'market-watch'];
         const results = await Promise.allSettled(requested.map((id) => feedSnapshot(id, env)));
         const feeds = Object.fromEntries(results.map((result, i) => [requested[i], result.status === 'fulfilled' ? result.value : { error: 'unavailable' }]));
         await audit(req, user, 'overview', 'intelligence_overview');

@@ -60,7 +60,7 @@ test('owner access opens a dedicated full-page command center', () => {
   assert.match(ownerJs, /paintOperationalMetrics/);
   assert.match(ownerJs, /10_000/);
   assert.match(owner, /THUNDERLINK OBLIVION/);
-  assert.match(owner, /TBSGE-KERNEL-030\.012/);
+  assert.match(owner, /TBSGE-KERNEL-030\.013/);
   assert.match(ownerJs, /api\/account\/admin\/autopilot/);
   assert.match(ownerJs, /api\/account\/admin\/users/);
   assert.match(ownerJs, /api\/account\/admin\/layers/);
@@ -71,8 +71,8 @@ test('owner access opens a dedicated full-page command center', () => {
 test('public console exposes ThunderLink OS identity without removing map attribution', () => {
   assert.match(index, /id="thunderlink-system-identity"/);
   assert.match(index, /OS <strong>THUNDERLINK OBLIVION<\/strong>/);
-  assert.match(index, /VERSION <strong>0\.3\.11<\/strong>/);
-  assert.match(index, /KERNEL <strong>TBSGE-KERNEL-030\.012<\/strong>/);
+  assert.match(index, /VERSION <strong>0\.3\.12<\/strong>/);
+  assert.match(index, /KERNEL <strong>TBSGE-KERNEL-030\.013<\/strong>/);
   assert.match(index, /id="credits-footer-button"[^>]*>CREDITS &amp; OPEN SOURCES<\/button>/);
   assert.match(css, /#thunderlink-system-identity/);
   assert.match(css, /#cesium-credits/);

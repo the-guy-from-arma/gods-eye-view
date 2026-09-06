@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.12] — 2026-09-06 — Geospatial weather operations
+
+- Moved severe-weather presentation out of the Intelligence Console list view
+  and into two independent, owner-governed globe data filters.
+- Added a translucent NOAA/NWS MRMS base-reflectivity radar overlay with a
+  five-minute refresh, bounded proxy cache, and one-hour last-good fallback.
+- Added active NWS Polygon/MultiPolygon warning areas, severity coloring,
+  total-versus-mapped telemetry, two-minute refreshes, and stale-state honesty.
+- Kept tropical cyclones and severe natural events in the existing NASA EONET
+  and GDACS Live Global Events layer, so radar, official warning areas, and
+  event markers can be combined without turning weather into a text feed.
+- Advanced ThunderLink Oblivion to public build `0.3.12` and kernel
+  `TBSGE-KERNEL-030.013`; legal acceptance remains `0.3.02`.
+
 ## [0.3.11] — 2026-09-06 — ThunderLink Intelligence Console
 
 - Added a separate authenticated intelligence console without displacing the

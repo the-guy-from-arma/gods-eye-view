@@ -47,6 +47,7 @@ import {
 import { filterTrailing24h, parseFirmsCsv } from './src/data/firmsCsv.js';
 import { accountApiPlugin } from './server/accountApi.js';
 import { intelligenceApiPlugin } from './server/intelligenceApi.js';
+import { weatherLayersApiPlugin } from './server/weatherLayersApi.js';
 import { broadcastifyApiPlugin } from './server/broadcastifyApi.js';
 import { locationSearchApiPlugin } from './server/locationSearchApi.js';
 import { newsEventsApiPlugin } from './server/newsEventsApi.js';
@@ -7926,6 +7927,7 @@ export default defineConfig(({ mode }) => {
       googlePlacesContextProxy(),
       accountApiPlugin({ env }),
       intelligenceApiPlugin({ env }),
+      weatherLayersApiPlugin({ env }),
       keySetupEndpoint(),
     ],
     server: {

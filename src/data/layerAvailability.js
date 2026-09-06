@@ -23,6 +23,8 @@ const MAP_LAYER_CATALOG = [
   ['gaming-data', 'Gaming Data', 'Gaming Data'],
   ['law-enforcement-transmissions', 'Law Enforcement Transmissions'],
   ['live-events', 'Live Global Events'],
+  ['weather-radar', 'Live Weather Radar', 'Weather'],
+  ['weather-alerts', 'Active Weather Warnings', 'Weather'],
   ['local-dams', 'Dams'],
   ['local-datacenters', 'Datacenters'],
   ['local-firms', 'FIRMS Active Fires'],

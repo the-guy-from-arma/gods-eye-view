@@ -81,6 +81,12 @@ export const DATA_CREDITS = [
       '(European Commission / United Nations cooperation framework)',
   },
   {
+    key: 'noaa-weather',
+    html:
+      'Live weather radar and active warning polygons: ' +
+      '<a href="https://www.weather.gov/" target="_blank" rel="noopener">NOAA / National Weather Service</a>',
+  },
+  {
     key: 'overpass',
     html:
       'Road geometry (traffic): ' +

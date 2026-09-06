@@ -1,5 +1,5 @@
 const QUERY_MODULES = new Set(['dns','whois','certificates','cve','github','shodan','ip-intel','bgp','mac','breaches','username','infostealer','wallet-intel','phone']);
-const FEED_MODULES = new Set(['severe-weather','space-weather','cyber-threats','malware-live','internet-outages','market-watch','air-quality']);
+const FEED_MODULES = new Set(['space-weather','cyber-threats','malware-live','internet-outages','market-watch','air-quality']);
 const SCAN_TYPES = new Map([['security-headers','headers'],['ssl','ssl'],['tech-detect','tech'],['subdomains','subdomains'],['port-scan','quick'],['vulnerability-scan','vuln'],['ip-sweep','quick']]);
 const PLACEHOLDERS = { dns:'example.com', whois:'example.com', certificates:'example.com', cve:'CVE-2024-0001', github:'username', shodan:'8.8.8.8', 'ip-intel':'8.8.8.8', bgp:'AS13335 or IP address', mac:'00:00:5E:00:53:AF', breaches:'your signed-in email', username:'public username', infostealer:'email, username, or domain', 'wallet-intel':'public BTC or ETH address', phone:'+15551234567' };
 
@@ -130,7 +130,9 @@ async function selectModule(moduleId) {
     return;
   }
   notice.hidden = false;
-  notice.textContent = `${module.name} is managed through the connected God’s Eye operations map or a provider-specific workspace. Its access state and auditing are active here; source ingestion will only run when the authorized provider is configured.`;
+  notice.textContent = module.id === 'severe-weather'
+    ? 'Weather is rendered geospatially. Open the God’s Eye operations map and enable Live Weather Radar, Active Weather Warnings, and Live Global Events in Data Layers.'
+    : `${module.name} is managed through the connected God’s Eye operations map or a provider-specific workspace. Its access state and auditing are active here; source ingestion will only run when the authorized provider is configured.`;
 }
 
 queryForm.addEventListener('submit', async (event) => {
