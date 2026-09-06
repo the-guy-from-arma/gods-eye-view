@@ -181,6 +181,9 @@ export function createAccountApi(options = {}) {
       ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS security_locked_at TIMESTAMPTZ;
       ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS legal_accepted_version TEXT;
       ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS legal_accepted_at TIMESTAMPTZ;
+      ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS identity_verification_status TEXT NOT NULL DEFAULT 'unverified';
+      ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS identity_verified_at TIMESTAMPTZ;
+      ALTER TABLE gev_users ADD COLUMN IF NOT EXISTS intelligence_access TEXT NOT NULL DEFAULT 'registered';
       UPDATE gev_users SET approval_status = 'approved', approved_at = COALESCE(approved_at, email_verified_at)
         WHERE email_verified_at IS NOT NULL AND approval_status = 'pending';
       CREATE TABLE IF NOT EXISTS gev_sessions (
@@ -250,18 +253,23 @@ export function createAccountApi(options = {}) {
     if (!raw) return null;
     const result = await pool.query(`
       SELECT u.id, u.email, u.email_verified_at,
-        u.legal_accepted_version, u.legal_accepted_at
+        u.legal_accepted_version, u.legal_accepted_at,
+        u.identity_verification_status, u.identity_verified_at, u.intelligence_access
       FROM gev_sessions s JOIN gev_users u ON u.id = s.user_id
       WHERE s.token_digest = $1 AND s.expires_at > NOW()
         AND u.approval_status = 'approved' AND COALESCE(u.security_locked, FALSE) = FALSE
     `, [tokenDigest(raw)]);
     const user = result.rows[0];
     if (!user) return null;
+    const owner = ownerEmail && user.email === ownerEmail;
     return {
       id: String(user.id),
       email: user.email,
       verified: Boolean(user.email_verified_at),
-      role: ownerEmail && user.email === ownerEmail ? 'owner' : 'user',
+      role: owner ? 'owner' : 'user',
+      identityVerificationStatus: owner ? 'verified' : user.identity_verification_status,
+      identityVerifiedAt: owner ? (user.identity_verified_at || user.email_verified_at) : (user.identity_verified_at || null),
+      intelligenceAccess: owner ? 'owner' : (user.intelligence_access || 'registered'),
       legalAccepted: legalAcceptanceIsCurrent(user.legal_accepted_version),
       legalAcceptedAt: user.legal_accepted_at || null,
     };
@@ -508,7 +516,9 @@ export function createAccountApi(options = {}) {
           pool.query(`
             SELECT id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt",
               security_locked AS locked, security_lock_reason AS "lockReason", security_locked_at AS "lockedAt",
-              legal_accepted_version AS "legalAcceptedVersion", legal_accepted_at AS "legalAcceptedAt"
+              legal_accepted_version AS "legalAcceptedVersion", legal_accepted_at AS "legalAcceptedAt",
+              identity_verification_status AS "identityVerificationStatus",
+              identity_verified_at AS "identityVerifiedAt", intelligence_access AS "intelligenceAccess"
             FROM gev_users
             WHERE email <> $1
             ORDER BY CASE approval_status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
@@ -609,7 +619,41 @@ export function createAccountApi(options = {}) {
         const targetId = String(body.userId || '');
         const accountState = body.action === 'approve' ? 'approved' : body.action === 'reject' ? 'rejected' : '';
         const securityAction = body.action === 'lock' || body.action === 'unlock' ? body.action : '';
-        if (!/^\d+$/.test(targetId) || (!accountState && !securityAction)) return json(res, 400, { error: 'Choose a valid account action' });
+        const intelligenceAction = ['verify_identity', 'revoke_identity', 'grant_analyst', 'revoke_analyst'].includes(body.action) ? body.action : '';
+        if (!/^\d+$/.test(targetId) || (!accountState && !securityAction && !intelligenceAction)) return json(res, 400, { error: 'Choose a valid account action' });
+        if (intelligenceAction) {
+          if (intelligenceAction === 'grant_analyst') {
+            const eligible = await pool.query("SELECT 1 FROM gev_users WHERE id = $1 AND email <> $2 AND identity_verification_status = 'verified'", [targetId, ownerEmail]);
+            if (!eligible.rows[0]) return json(res, 409, { error: 'Verify this operator’s identity before granting analyst access' });
+          }
+          const result = await pool.query(`
+            UPDATE gev_users SET
+              identity_verification_status = CASE
+                WHEN $1 = 'verify_identity' THEN 'verified'
+                WHEN $1 = 'revoke_identity' THEN 'unverified'
+                ELSE identity_verification_status END,
+              identity_verified_at = CASE
+                WHEN $1 = 'verify_identity' THEN NOW()
+                WHEN $1 = 'revoke_identity' THEN NULL
+                ELSE identity_verified_at END,
+              intelligence_access = CASE
+                WHEN $1 = 'verify_identity' AND intelligence_access = 'registered' THEN 'verified'
+                WHEN $1 = 'revoke_identity' THEN 'registered'
+                WHEN $1 = 'grant_analyst' THEN 'analyst'
+                WHEN $1 = 'revoke_analyst' AND identity_verification_status = 'verified' THEN 'verified'
+                WHEN $1 = 'revoke_analyst' THEN 'registered'
+                ELSE intelligence_access END
+            WHERE id = $2 AND email <> $3
+            RETURNING id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt",
+              security_locked AS locked, security_lock_reason AS "lockReason", security_locked_at AS "lockedAt",
+              identity_verification_status AS "identityVerificationStatus", identity_verified_at AS "identityVerifiedAt",
+              intelligence_access AS "intelligenceAccess"
+          `, [intelligenceAction, targetId, ownerEmail]);
+          const account = result.rows[0];
+          if (!account) return json(res, 404, { error: 'Account not found' });
+          await record(req, 'ui_action', { action: `account_${intelligenceAction}`, accountId: String(account.id) }, user);
+          return json(res, 200, { ok: true, account: { ...account, id: String(account.id) } });
+        }
         if (securityAction) {
           const locked = securityAction === 'lock';
           const reason = locked ? safeText(body.reason, 180) || 'Suspicious activity review' : null;

@@ -54,6 +54,8 @@ function paintMetrics(accounts) {
   const values = {
     pending: accounts.filter((account) => account.status === 'pending').length,
     approved: accounts.filter((account) => account.status === 'approved' && !account.locked).length,
+    verified: accounts.filter((account) => account.identityVerificationStatus === 'verified').length,
+    analysts: accounts.filter((account) => account.intelligenceAccess === 'analyst').length,
     locked: accounts.filter((account) => account.locked).length,
     total: accounts.length,
   };
@@ -128,6 +130,8 @@ function renderAccounts() {
       account.legalAcceptedVersion === dashboard.telemetry?.legalVersion
         ? `LEGAL ${account.legalAcceptedVersion} · ACCEPTED ${formatDate(account.legalAcceptedAt)}`
         : `LEGAL RENEWAL REQUIRED · CURRENT ${dashboard.telemetry?.legalVersion || 'UNKNOWN'}`));
+    identity.append(node('small', account.identityVerificationStatus === 'verified' ? 'legal-current' : '',
+      `IDENTITY ${String(account.identityVerificationStatus || 'unverified').toUpperCase()} · INTEL ${String(account.intelligenceAccess || 'registered').toUpperCase()}`));
     if (account.locked) identity.append(node('small', '', `SECURITY LOCK · ${account.lockReason || 'Suspicious activity review'} · ${formatDate(account.lockedAt)}`));
     const actions = node('div', 'owner-account-actions');
     if (account.status !== 'approved') actions.append(actionButton(account, 'approve', 'APPROVE'));
@@ -135,6 +139,14 @@ function renderAccounts() {
     actions.append(account.locked
       ? actionButton(account, 'unlock', 'REMOVE SECURITY LOCK')
       : actionButton(account, 'lock', 'SECURITY LOCK'));
+    actions.append(account.identityVerificationStatus === 'verified'
+      ? actionButton(account, 'revoke_identity', 'REVOKE IDENTITY')
+      : actionButton(account, 'verify_identity', 'VERIFY IDENTITY'));
+    if (account.identityVerificationStatus === 'verified') {
+      actions.append(account.intelligenceAccess === 'analyst'
+        ? actionButton(account, 'revoke_analyst', 'REMOVE ANALYST')
+        : actionButton(account, 'grant_analyst', 'GRANT ANALYST'));
+    }
     row.append(identity, actions);
     return row;
   });
@@ -288,7 +300,16 @@ accountsHost.addEventListener('click', async (event) => {
       body: JSON.stringify({ userId: button.dataset.userId, action, reason: action === 'lock' ? 'Suspicious activity review' : undefined }),
     });
     await loadDashboard(true);
-    const message = { approve: 'ACCOUNT APPROVED', reject: 'ACCOUNT DENIED AND SESSIONS REVOKED', lock: 'SECURITY LOCK ACTIVE · ALL SESSIONS REVOKED', unlock: 'SECURITY LOCK REMOVED' }[action];
+    const message = {
+      approve: 'ACCOUNT APPROVED',
+      reject: 'ACCOUNT DENIED AND SESSIONS REVOKED',
+      lock: 'SECURITY LOCK ACTIVE · ALL SESSIONS REVOKED',
+      unlock: 'SECURITY LOCK REMOVED',
+      verify_identity: 'IDENTITY VERIFICATION RECORDED',
+      revoke_identity: 'IDENTITY AND ELEVATED ACCESS REVOKED',
+      grant_analyst: 'ANALYST ACCESS GRANTED',
+      revoke_analyst: 'ANALYST ACCESS REMOVED',
+    }[action] || 'ACCOUNT UPDATED';
     showStatus(message);
   } catch (error) {
     showStatus(error.message, true);

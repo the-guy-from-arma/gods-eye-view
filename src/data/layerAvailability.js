@@ -1,3 +1,5 @@
+import { INTELLIGENCE_MODULES } from './intelligenceModules.js';
+
 export const LAYER_AVAILABILITY_STATUSES = Object.freeze([
   'live',
   'coming_soon',
@@ -7,7 +9,7 @@ export const LAYER_AVAILABILITY_STATUSES = Object.freeze([
 
 const VALID_STATUSES = new Set(LAYER_AVAILABILITY_STATUSES);
 
-export const PUBLIC_LAYER_CATALOG = Object.freeze([
+const MAP_LAYER_CATALOG = [
   ['interface-display', 'Display Controls', 'Interface Modules'],
   ['interface-cctv', 'CCTV Controls', 'Interface Modules'],
   ['interface-context', 'Context Controls', 'Interface Modules'],
@@ -33,6 +35,17 @@ export const PUBLIC_LAYER_CATALOG = Object.freeze([
   ['scenes', 'Scenes'],
   ['telegeography-submarine-cables', 'Submarine Cables'],
   ['traffic', 'Street Traffic'],
+];
+
+const INTELLIGENCE_LAYER_CATALOG = INTELLIGENCE_MODULES.map(([id, name, group]) => [
+  `intel-${id}`,
+  name,
+  `Intelligence Console · ${group}`,
+]);
+
+export const PUBLIC_LAYER_CATALOG = Object.freeze([
+  ...MAP_LAYER_CATALOG,
+  ...INTELLIGENCE_LAYER_CATALOG,
 ].map(([id, name, group = 'Data & Tools']) => Object.freeze({ id, name, group })));
 
 export const PUBLIC_LAYER_IDS = Object.freeze(PUBLIC_LAYER_CATALOG.map(({ id }) => id));

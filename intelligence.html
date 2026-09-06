@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intelligence Console · ThunderLink God's Eye</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <link rel="stylesheet" href="/intelligence.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="intel-grid" aria-hidden="true"></div>
+  <header class="intel-topbar">
+    <a class="intel-brand" href="/"><img src="/logo.svg" alt="" /><span><strong>THUNDERLINK</strong><small>INTELLIGENCE CONSOLE</small></span></a>
+    <div class="intel-system"><span><i></i>SECURE SESSION</span><span data-intel-clock>--:--:-- UTC</span><span>VERSION <strong>0.3.11</strong></span><span>TBSGE-KERNEL-030.012</span></div>
+    <nav><a href="/">OPERATIONS MAP</a><a href="/owner.html" data-owner-link hidden>OWNER COMMAND</a><button type="button" data-intel-logout>SIGN OUT</button></nav>
+  </header>
+
+  <div class="intel-shell" hidden data-intel-shell>
+    <aside class="intel-rail">
+      <div class="operator-card"><small>OPERATOR</small><strong data-intel-email>AUTHENTICATING…</strong><span data-intel-access>REGISTERED</span></div>
+      <label class="module-search">MODULE SEARCH<input type="search" data-module-search placeholder="Filter capabilities…" /></label>
+      <nav data-module-nav aria-label="Intelligence modules"></nav>
+    </aside>
+
+    <main class="intel-main">
+      <section class="intel-hero">
+        <div><span class="eyebrow">THUNDERLINK · SOURCE-GROUNDED INTELLIGENCE</span><h1 data-module-title>Global Overview</h1><p data-module-description>Cross-source operational summary and provider health.</p></div>
+        <div class="hero-readouts"><span><small>ACCESS</small><b data-hero-access>REGISTERED</b></span><span><small>MODULES</small><b data-module-count>0</b></span><span><small>LAST SYNC</small><b data-last-sync>WAITING</b></span></div>
+      </section>
+
+      <section class="policy-banner"><strong>LAWFUL USE ONLY</strong><span>Public data does not grant permission to target, track, harass, intrude, or scan. Active tests require separate ownership verification and are fully audited.</span></section>
+
+      <section class="workspace" data-workspace>
+        <header><div><span class="eyebrow">ACTIVE WORKSPACE</span><h2 data-workspace-title>Operational overview</h2></div><span class="workspace-state" data-workspace-state>READY</span></header>
+        <form class="query-form" data-query-form hidden>
+          <label data-query-label>QUERY<input data-query-input autocomplete="off" maxlength="300" /></label>
+          <button type="submit">RUN PASSIVE QUERY</button>
+        </form>
+        <div class="module-notice" data-module-notice hidden></div>
+        <div class="overview-grid" data-overview-grid></div>
+        <pre class="result-view" data-result-view hidden></pre>
+      </section>
+
+      <section class="asset-panel" data-asset-panel hidden>
+        <header><div><span class="eyebrow">AUTHORIZED TESTING</span><h2>Verified asset registry</h2></div><span>DNS OWNERSHIP PROOF</span></header>
+        <p>Register a domain you control, publish the generated TXT challenge, then verify it before any scanner request is accepted.</p>
+        <form data-target-form><input name="target" placeholder="example.com" required /><button type="submit">REGISTER ASSET</button></form>
+        <div data-targets></div>
+      </section>
+    </main>
+
+    <aside class="intel-context">
+      <section><span class="eyebrow">PROVIDER STATUS</span><div data-provider-status><p>Waiting for overview sync…</p></div></section>
+      <section><span class="eyebrow">ACCESS ENVELOPE</span><dl><div><dt>ACCOUNT</dt><dd data-context-account>CHECKING</dd></div><div><dt>IDENTITY</dt><dd data-context-identity>CHECKING</dd></div><div><dt>INTEL</dt><dd data-context-access>CHECKING</dd></div><div><dt>AUDIT</dt><dd>POSTGRES · ACTIVE</dd></div></dl></section>
+      <section><span class="eyebrow">SOURCE STANDARD</span><p>Results identify their provider and time. Simulated incidents, spoofed request headers, and insecure TLS bypasses are excluded.</p></section>
+    </aside>
+  </div>
+
+  <section class="intel-gate" data-intel-gate>
+    <img src="/logo.svg" alt="" /><span>THUNDERLINK · CONTROLLED ACCESS</span><h1>Intelligence Console</h1><p data-gate-message>Verifying your operator session…</p><a href="/">RETURN TO SIGN IN</a>
+  </section>
+  <div class="intel-toast" data-intel-toast role="status" aria-live="polite"></div>
+  <script type="module" src="/src/intelligenceConsole.js"></script>
+</body>
+</html>

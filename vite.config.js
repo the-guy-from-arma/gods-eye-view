@@ -46,6 +46,7 @@ import {
 } from './src/data/tomtomTiles.js';
 import { filterTrailing24h, parseFirmsCsv } from './src/data/firmsCsv.js';
 import { accountApiPlugin } from './server/accountApi.js';
+import { intelligenceApiPlugin } from './server/intelligenceApi.js';
 import { broadcastifyApiPlugin } from './server/broadcastifyApi.js';
 import { locationSearchApiPlugin } from './server/locationSearchApi.js';
 import { newsEventsApiPlugin } from './server/newsEventsApi.js';
@@ -7924,6 +7925,7 @@ export default defineConfig(({ mode }) => {
       locationSearchApiPlugin({ env }),
       googlePlacesContextProxy(),
       accountApiPlugin({ env }),
+      intelligenceApiPlugin({ env }),
       keySetupEndpoint(),
     ],
     server: {
@@ -7962,6 +7964,7 @@ export default defineConfig(({ mode }) => {
         input: {
           app: path.resolve(__dirname, 'index.html'),
           owner: path.resolve(__dirname, 'owner.html'),
+          intelligence: path.resolve(__dirname, 'intelligence.html'),
           terms: path.resolve(__dirname, 'legal/terms.html'),
           privacy: path.resolve(__dirname, 'legal/privacy.html'),
           eula: path.resolve(__dirname, 'legal/eula.html'),

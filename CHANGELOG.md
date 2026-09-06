@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.11] — 2026-09-06 — ThunderLink Intelligence Console
+
+- Added a separate authenticated intelligence console without displacing the
+  Cesium operations map, with a searchable capability rail, live provider
+  health, passive source queries, and explicit degraded/not-configured states.
+- Added Railway PostgreSQL identity-verification and intelligence-access fields,
+  owner controls for verified and analyst roles, and inherited per-module
+  live/coming-soon/maintenance/hidden governance.
+- Added source-bounded defensive lookups for DNS, RDAP, certificate
+  transparency, CVEs, GitHub, IP/ASN context, MAC vendors, Shodan InternetDB,
+  personal breach checks, public chains, and configured phone metadata.
+- Added live overview feeds for NOAA space weather, CISA KEV, Georgia Tech
+  IODA, URLhaus, market context, and optional OpenAQ/Cloudflare Radar sources.
+- Added DNS TXT ownership challenges and a gated scanner bridge. Active checks
+  require analyst access, a verified asset, and an explicitly configured HTTPS
+  backend; spoofed headers, TLS bypasses, and simulated incidents were excluded.
+- Imported the Osiris capability model under its MIT terms while reimplementing
+  the production boundaries for God’s Eye. Advanced ThunderLink Oblivion to
+  public build `0.3.11` and kernel `TBSGE-KERNEL-030.012`; legal acceptance
+  remains `0.3.02`.
+
 ## [0.3.10] — 2026-09-05 — Steam request hardening
 
 - Added a provider-wide three-request concurrency ceiling so simultaneous game

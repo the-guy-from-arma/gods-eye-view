@@ -155,6 +155,25 @@ Douglas-Peucker simplification, 6-decimal rounding).
 
 ---
 
+### ThunderLink Intelligence Console runtime sources
+
+The separate authenticated console can query or summarize Google Public DNS,
+RDAP, crt.sh certificate transparency, MITRE CVE, GitHub's public API, Shodan
+InternetDB, ipwho.is, RIPEstat, MACLookup, XposedOrNot, Blockstream Esplora,
+Blockscout, NOAA SWPC, CISA Known Exploited Vulnerabilities, Georgia Tech IODA,
+abuse.ch URLhaus, Yahoo Finance public chart data, and optionally OpenAQ and
+Cloudflare Radar. Results are fetched at runtime, bounded and cached by the
+server, and keep a source field in the returned record. Each upstream remains
+subject to its own terms, attribution requirements, availability, and rate
+limits. No copy of an upstream database is relicensed by this repository.
+
+The capability taxonomy and selected interface concepts were adapted from the
+MIT-licensed Osiris project at commit
+`d2c08c876b2a2228954ac42b2d15d00772e5df84`; its complete notice is retained in
+`THIRD_PARTY_NOTICES.md`. ThunderLink does not import Osiris request-header
+spoofing, disabled TLS verification, fabricated cyber events, simulated
+commercial-provider responses, or opaque hard-coded risk scores.
+
 ## In-app attribution
 
 The required Google Maps / Cesium credit renders on the on-globe credit line (`#cesium-credits`, bottom-left) and must stay visible — including in clean-view and recording modes (the whole line, logo + "Google Maps" + the "Data attribution" link, stays on screen; only the GEV panels/HUD fade). The layer-specific credits (adsb.lol, TeleGeography, OSM datacenters/dams/roads, NASA FIRMS, CelesTrak, USGS, City of Austin, GBFS, Radio Browser, Broadcastify, OpenSky, AISStream) are registered into the expandable **"Data attribution"** popover on that credit line via `viewer.creditDisplay.addStaticCredit(new Cesium.Credit(html, /* showOnScreen */ false))` — see `src/data/dataCredits.js`. When you add a new data source, add its license and attribution to this file **and** append an entry to `DATA_CREDITS` in `src/data/dataCredits.js` so it surfaces in the app.

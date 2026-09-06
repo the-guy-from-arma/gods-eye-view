@@ -10,6 +10,20 @@ Photorealistic 3D globe. Live aircraft, ships, satellites, earthquakes, global d
 
 *No place left behind.*
 
+ThunderLink has three coordinated workspaces: the authenticated Cesium
+operations map (`/`), the source-grounded Intelligence Console
+(`/intelligence.html`), and the owner-only Command Center (`/owner.html`). The
+console adds passive domain/network research, defensive cyber feeds, market and
+environment summaries, exposure self-checks, public-chain context, and a gated
+bridge for organization-owned security testing. Railway PostgreSQL stores the
+account access tier, owner policy, verified-asset challenges, and bounded audit
+events; provider secrets remain server-side.
+
+The Intelligence Console adapts the MIT-licensed Osiris capability model while
+excluding spoofed network identity, disabled TLS validation, simulated provider
+responses, and fabricated “live” incidents. See [third-party notices](THIRD_PARTY_NOTICES.md)
+and [data sources](DATA_SOURCES.md).
+
 ![Orbital HUD, a tracked live globe, FLIR terrain — then OPEN SOURCED](docs/media/hero-open-source-reveal.gif)
 
 <a href="https://www.youtube.com/@bilawalsidhu">

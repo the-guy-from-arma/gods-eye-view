@@ -49,6 +49,7 @@ export function initAccounts(options = {}) {
   const activityPanel = dialog?.querySelector('[data-account-activity-panel]');
   const eventsHost = dialog?.querySelector('[data-account-events]');
   const ownerDashboardButton = dialog?.querySelector('[data-owner-dashboard]');
+  const intelligenceConsoleButton = dialog?.querySelector('[data-intelligence-console]');
   const legalRenewal = dialog?.querySelector('[data-account-legal-renewal]');
   const legalRenewalCheck = dialog?.querySelector('[data-account-legal-renewal-check]');
   const legalAcceptButton = dialog?.querySelector('[data-account-legal-accept]');
@@ -133,6 +134,7 @@ export function initAccounts(options = {}) {
     if (legalRenewal) legalRenewal.hidden = !legalAcceptanceRequired;
     activityButton.hidden = user.role !== 'owner' || legalAcceptanceRequired;
     ownerDashboardButton.hidden = user.role !== 'owner' || legalAcceptanceRequired;
+    if (intelligenceConsoleButton) intelligenceConsoleButton.hidden = legalAcceptanceRequired;
     if (user.role !== 'owner') {
       activityPanel.hidden = true;
     }
@@ -283,6 +285,9 @@ export function initAccounts(options = {}) {
   dialog.querySelector('[data-account-refresh]')?.addEventListener('click', loadEvents);
   ownerDashboardButton?.addEventListener('click', () => {
     if (user?.role === 'owner') window.location.assign('/owner.html');
+  });
+  intelligenceConsoleButton?.addEventListener('click', () => {
+    if (user && !legalAcceptanceRequired) window.location.assign('/intelligence.html');
   });
   systemOwnerAccess?.addEventListener('click', () => {
     if (user?.role === 'owner') {

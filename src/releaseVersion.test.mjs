@@ -6,6 +6,7 @@ const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.me
 const packageLock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'));
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const owner = readFileSync(new URL('../owner.html', import.meta.url), 'utf8');
+const intelligence = readFileSync(new URL('../intelligence.html', import.meta.url), 'utf8');
 const policy = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
 
 test('public build and kernel identifiers stay synchronized with package SemVer', () => {
@@ -15,7 +16,7 @@ test('public build and kernel identifiers stay synchronized with package SemVer'
 
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[''].version, packageJson.version);
-  for (const markup of [index, owner]) {
+  for (const markup of [index, owner, intelligence]) {
     assert.match(markup, new RegExp(`VERSION(?:</small><strong>| <strong>)${displayVersion.replaceAll('.', '\\.')}`));
     assert.match(markup, new RegExp(kernelVersion.replaceAll('.', '\\.')));
   }
