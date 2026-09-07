@@ -9,6 +9,7 @@ import {
 import { PUBLIC_LAYER_CATALOG } from './data/layerAvailability.js';
 
 const html = readFileSync(new URL('../intelligence.html', import.meta.url), 'utf8');
+const visibilityCss = readFileSync(new URL('../intelligence-visibility.css', import.meta.url), 'utf8');
 const client = readFileSync(new URL('./intelligenceConsole.js', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../server/intelligenceApi.js', import.meta.url), 'utf8');
 
@@ -37,4 +38,10 @@ test('console is authenticated, source-grounded, and separates passive from acti
   assert.match(api, /Verify ownership of this target before scanning/);
   assert.match(api, /Scanner backend must use HTTPS/);
   assert.doesNotMatch(api, /rejectUnauthorized\s*:\s*false|X-Forwarded-For.*random|X-Real-IP.*random/);
+});
+
+test('authenticated console shell cannot remain covered by the hidden access gate', () => {
+  assert.match(html, /href="\/intelligence-visibility\.css"/);
+  assert.match(visibilityCss, /\.intel-shell\[hidden\][\s\S]*\.intel-gate\[hidden\][\s\S]*display:\s*none\s*!important/);
+  assert.match(client, /gate\.hidden = true; shell\.hidden = false/);
 });

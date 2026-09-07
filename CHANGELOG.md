@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.14] — 2026-09-07 — Intelligence gate visibility hotfix
+
+- Restored the authenticated Intelligence Console for every permitted account,
+  including the owner, by explicitly honoring the shell and access gate's
+  `hidden` state above their grid display rules.
+- Added a regression contract proving successful authentication removes the
+  access gate and reveals the console shell.
+- Advanced ThunderLink Oblivion to public build `0.3.14` and kernel
+  `TBSGE-KERNEL-030.015`; legal acceptance remains `0.3.02`.
+
 ## [0.3.13] — 2026-09-06 — Weather plugin startup hotfix
 
 - Fixed the weather API plugin setup hook so it registers middleware without
