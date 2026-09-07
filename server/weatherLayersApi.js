@@ -79,7 +79,7 @@ export function createWeatherLayersApi(options = {}) {
   async function refreshRadar() {
     const response = await fetch(NOAA_RADAR_EXPORT, {
       signal: AbortSignal.timeout(25_000),
-      headers: { Accept: 'image/png', 'User-Agent': 'ThunderLinkGodsEye/0.3.12 (+https://github.com/the-guy-from-arma/gods-eye-view)' },
+      headers: { Accept: 'image/png', 'User-Agent': 'ThunderLinkGodsEye/0.3.13 (+https://github.com/the-guy-from-arma/gods-eye-view)' },
     });
     if (!response.ok) throw new Error(`NOAA radar HTTP ${response.status}`);
     const body = await readCapped(response, MAX_RADAR_BYTES);
@@ -94,7 +94,7 @@ export function createWeatherLayersApi(options = {}) {
       signal: AbortSignal.timeout(25_000),
       headers: {
         Accept: 'application/geo+json',
-        'User-Agent': env.NWS_USER_AGENT || 'ThunderLinkGodsEye/0.3.12 (https://github.com/the-guy-from-arma/gods-eye-view)',
+        'User-Agent': env.NWS_USER_AGENT || 'ThunderLinkGodsEye/0.3.13 (https://github.com/the-guy-from-arma/gods-eye-view)',
       },
     });
     if (!response.ok) throw new Error(`NWS alerts HTTP ${response.status}`);
@@ -169,7 +169,9 @@ export function createWeatherLayersApi(options = {}) {
 }
 
 export function weatherLayersApiPlugin(options = {}) {
-  const install = (server) => server.middlewares.use(createWeatherLayersApi(options));
+  const install = (server) => {
+    server.middlewares.use(createWeatherLayersApi(options));
+  };
   return { name: 'thunderlink-weather-layers-api', configureServer: install, configurePreviewServer: install };
 }
 

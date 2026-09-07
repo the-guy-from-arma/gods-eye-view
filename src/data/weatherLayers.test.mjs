@@ -5,7 +5,7 @@ import { createWeatherRadarLayer } from './weatherRadar.js';
 import { createWeatherAlertsLayer } from './weatherAlerts.js';
 import { LAYER_STATE_REGISTRY } from './layerState.js';
 import { PUBLIC_LAYER_CATALOG } from './layerAvailability.js';
-import { weatherLayersInternals } from '../../server/weatherLayersApi.js';
+import { weatherLayersApiPlugin, weatherLayersInternals } from '../../server/weatherLayersApi.js';
 
 const main = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
 const consoleClient = readFileSync(new URL('../intelligenceConsole.js', import.meta.url), 'utf8');
@@ -42,4 +42,12 @@ test('radar proxy is pinned to NOAA and severe weather no longer renders as a co
   assert.equal(url.searchParams.get('transparent'), 'true');
   assert.doesNotMatch(consoleClient.split('\n')[1], /severe-weather/);
   assert.match(consoleClient, /enable Live Weather Radar, Active Weather Warnings/);
+});
+
+test('weather plugin setup never returns the middleware app as a Vite post hook', () => {
+  const middlewareApp = () => {};
+  const server = { middlewares: { use() { return middlewareApp; } } };
+  const plugin = weatherLayersApiPlugin({ env: {} });
+  assert.equal(plugin.configureServer(server), undefined);
+  assert.equal(plugin.configurePreviewServer(server), undefined);
 });

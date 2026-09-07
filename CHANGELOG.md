@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.13] — 2026-09-06 — Weather plugin startup hotfix
+
+- Fixed the weather API plugin setup hook so it registers middleware without
+  returning Vite's middleware application as an invalid post-start callback.
+- Added a regression test covering both development and preview server hooks.
+- Advanced ThunderLink Oblivion to public build `0.3.13` and kernel
+  `TBSGE-KERNEL-030.014`; legal acceptance remains `0.3.02`.
+
 ## [0.3.12] — 2026-09-06 — Geospatial weather operations
 
 - Moved severe-weather presentation out of the Intelligence Console list view
