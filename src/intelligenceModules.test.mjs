@@ -42,6 +42,24 @@ test('console is authenticated, source-grounded, and separates passive from acti
 
 test('authenticated console shell cannot remain covered by the hidden access gate', () => {
   assert.match(html, /href="\/intelligence-visibility\.css"/);
-  assert.match(visibilityCss, /\.intel-shell\[hidden\][\s\S]*\.intel-gate\[hidden\][\s\S]*display:\s*none\s*!important/);
+  assert.match(visibilityCss, /\[hidden\][\s\S]*display:\s*none\s*!important/);
   assert.match(client, /gate\.hidden = true; shell\.hidden = false/);
+});
+
+test('overview channels are interactive and live feeds use structured operational views', () => {
+  assert.match(html, /data-feed-view/);
+  assert.match(html, /data-feed-refresh/);
+  assert.match(client, /card\.dataset\.moduleId = id/);
+  assert.match(client, /overviewGrid\.addEventListener\('click'/);
+  assert.match(client, /buildFeedPresentation/);
+  assert.match(client, /renderFeed\(module, payload\)/);
+  assert.match(visibilityCss, /\.overview-card:hover/);
+  assert.match(visibilityCss, /\.feed-metrics/);
+  assert.match(visibilityCss, /\.feed-records/);
+});
+
+test('space-weather overview survives a partial NOAA provider outage', () => {
+  assert.match(api, /feedId === 'space-weather'[\s\S]*Promise\.allSettled/);
+  assert.match(api, /providerStatus: status/);
+  assert.match(api, /degraded: Object\.values\(status\)\.some/);
 });

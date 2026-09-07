@@ -16,7 +16,7 @@
   <div class="intel-grid" aria-hidden="true"></div>
   <header class="intel-topbar">
     <a class="intel-brand" href="/"><img src="/logo.svg" alt="" /><span><strong>THUNDERLINK</strong><small>INTELLIGENCE CONSOLE</small></span></a>
-    <div class="intel-system"><span><i></i>SECURE SESSION</span><span data-intel-clock>--:--:-- UTC</span><span>VERSION <strong>0.3.14</strong></span><span>TBSGE-KERNEL-030.015</span></div>
+    <div class="intel-system"><span><i></i>SECURE SESSION</span><span data-intel-clock>--:--:-- UTC</span><span>VERSION <strong>0.3.15</strong></span><span>TBSGE-KERNEL-030.016</span></div>
     <nav><a href="/">OPERATIONS MAP</a><a href="/owner.html" data-owner-link hidden>OWNER COMMAND</a><button type="button" data-intel-logout>SIGN OUT</button></nav>
   </header>
 
@@ -43,6 +43,16 @@
         </form>
         <div class="module-notice" data-module-notice hidden></div>
         <div class="overview-grid" data-overview-grid></div>
+        <section class="feed-view" data-feed-view hidden aria-live="polite">
+          <header class="feed-toolbar">
+            <button type="button" data-feed-back>← NETWORK OVERVIEW</button>
+            <div><small>LIVE PROVIDER</small><strong data-feed-source>CONNECTING…</strong></div>
+            <span data-feed-time>AWAITING SYNC</span>
+            <button type="button" data-feed-refresh>REFRESH CHANNEL</button>
+          </header>
+          <div class="feed-metrics" data-feed-metrics></div>
+          <div class="feed-records" data-feed-records></div>
+        </section>
         <pre class="result-view" data-result-view hidden></pre>
       </section>
 

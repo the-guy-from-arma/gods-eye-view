@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.15] — 2026-09-07 — Interactive intelligence channels
+
+- Rebuilt the four Global Overview panels as keyboard-accessible live channel
+  controls, with matching interactive provider-health shortcuts.
+- Replaced raw feed JSON with a God’s Eye-styled operational workspace containing
+  real provider metrics, timestamped records, status tags, refresh/back controls,
+  and source drill-down links for space weather, CISA cyber threats, IODA internet
+  outages, and market telemetry.
+- Made NOAA space weather fail soft when only one upstream product is unavailable,
+  exposing partial provider health instead of discarding usable observations.
+- Added a deterministic headless-browser interaction check covering owner access,
+  overview-card activation, structured feed rendering, and source drill-down UI.
+- Advanced ThunderLink Oblivion to public build `0.3.15` and kernel
+  `TBSGE-KERNEL-030.016`; legal acceptance remains `0.3.02`.
+
 ## [0.3.14] — 2026-09-07 — Intelligence gate visibility hotfix
 
 - Restored the authenticated Intelligence Console for every permitted account,

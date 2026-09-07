@@ -89,7 +89,7 @@ async function fetchJson(url, options = {}) {
     method: options.method || 'GET',
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'ThunderLink-Oblivion/0.3.14 (+public-intelligence-console)',
+      'User-Agent': 'ThunderLink-Oblivion/0.3.15 (+public-intelligence-console)',
       ...(options.headers || {}),
     },
     body: options.body,
@@ -257,12 +257,28 @@ async function feedSnapshot(feedId, env) {
     };
   }
   if (feedId === 'space-weather') {
-    const [kp, alerts, flares] = await Promise.all([
+    const [kpResult, alertsResult, flaresResult] = await Promise.allSettled([
       fetchJson('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json', { ttlMs: 60_000 }),
       fetchJson('https://services.swpc.noaa.gov/json/alerts.json', { ttlMs: 60_000 }),
       fetchJson('https://services.swpc.noaa.gov/json/goes/primary/xray-flares-latest.json', { ttlMs: 60_000 }),
     ]);
-    return { feedId, kp: kp.slice(-24), alerts: alerts.slice(0, 20), flares: flares.slice(0, 20), source: 'NOAA SWPC' };
+    const status = {
+      kp: kpResult.status === 'fulfilled' ? 'live' : 'unavailable',
+      alerts: alertsResult.status === 'fulfilled' ? 'live' : 'unavailable',
+      flares: flaresResult.status === 'fulfilled' ? 'live' : 'unavailable',
+    };
+    if (Object.values(status).every((value) => value === 'unavailable')) {
+      throw Object.assign(new Error('NOAA SWPC feeds are temporarily unavailable'), { status: 502 });
+    }
+    return {
+      feedId,
+      kp: kpResult.status === 'fulfilled' ? kpResult.value.slice(-24) : [],
+      alerts: alertsResult.status === 'fulfilled' ? alertsResult.value.slice(0, 20) : [],
+      flares: flaresResult.status === 'fulfilled' ? flaresResult.value.slice(0, 20) : [],
+      providerStatus: status,
+      degraded: Object.values(status).some((value) => value !== 'live'),
+      source: 'NOAA SWPC',
+    };
   }
   if (feedId === 'cyber-threats') {
     const data = await fetchJson('https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json', { ttlMs: 30 * 60_000 });

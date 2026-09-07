@@ -11,6 +11,9 @@ const queryForm = q('[data-query-form]');
 const queryInput = q('[data-query-input]');
 const resultView = q('[data-result-view]');
 const overviewGrid = q('[data-overview-grid]');
+const feedView = q('[data-feed-view]');
+const feedMetrics = q('[data-feed-metrics]');
+const feedRecords = q('[data-feed-records]');
 const notice = q('[data-module-notice]');
 const assetPanel = q('[data-asset-panel]');
 let catalog = [];
@@ -56,8 +59,8 @@ function renderNav(filter = '') {
 function providerSummary(feeds = {}) {
   const host = q('[data-provider-status]');
   const rows = Object.entries(feeds).map(([id, data]) => {
-    const row = document.createElement('div'); row.className = 'provider-row';
-    row.append(text('span', id.replaceAll('-',' ').toUpperCase()), text('b', data?.error ? 'DEGRADED' : data?.configured === false ? 'NOT CONFIGURED' : 'CONNECTED'));
+    const row = document.createElement('button'); row.type = 'button'; row.className = 'provider-row'; row.dataset.moduleId = id;
+    row.append(text('span', id.replaceAll('-',' ').toUpperCase()), text('b', data?.error ? 'DEGRADED' : data?.degraded ? 'PARTIAL' : data?.configured === false ? 'NOT CONFIGURED' : 'CONNECTED'));
     return row;
   });
   host.replaceChildren(...(rows.length ? rows : [text('p','No provider health returned.') ]));
@@ -69,12 +72,188 @@ function countRecord(value) {
   return Object.values(value).reduce((best, item) => Math.max(best, Array.isArray(item) ? item.length : 0), 0);
 }
 
+function safeText(value, fallback = '—', max = 360) {
+  if (value === null || value === undefined || value === '') return fallback;
+  return String(value).replace(/\s+/g, ' ').trim().slice(0, max) || fallback;
+}
+
+function numberText(value, digits = 1) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  return number.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+function dateText(value) {
+  if (!value) return 'TIME NOT REPORTED';
+  const number = Number(value);
+  const date = new Date(Number.isFinite(number) && number > 10_000_000_000 ? number : Number.isFinite(number) && number > 1_000_000_000 ? number * 1000 : value);
+  return Number.isNaN(date.getTime()) ? safeText(value, 'TIME NOT REPORTED', 80) : date.toLocaleString();
+}
+
+function firstValue(record, keys, fallback = '') {
+  for (const key of keys) {
+    const value = record?.[key];
+    if (value !== null && value !== undefined && value !== '') return value;
+  }
+  return fallback;
+}
+
+function metricNode(label, value, detail = '') {
+  const node = document.createElement('article');
+  node.className = 'feed-metric';
+  node.append(text('small', label), text('strong', safeText(value)));
+  if (detail) node.append(text('span', detail));
+  return node;
+}
+
+function recordNode({ eyebrow = 'OBSERVATION', title = 'Untitled record', detail = '', meta = [], tags = [], href = '' }) {
+  const node = document.createElement('article');
+  node.className = 'feed-record';
+  const head = document.createElement('header');
+  const titleBlock = document.createElement('div');
+  titleBlock.append(text('small', safeText(eyebrow, 'OBSERVATION', 100)), text('strong', safeText(title, 'Untitled record', 220)));
+  head.append(titleBlock);
+  if (href) {
+    const link = document.createElement('a');
+    link.href = href; link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'SOURCE ↗';
+    head.append(link);
+  }
+  node.append(head);
+  if (detail) node.append(text('p', safeText(detail, '', 620)));
+  const footer = document.createElement('footer');
+  for (const item of meta.filter(Boolean).slice(0, 4)) footer.append(text('span', safeText(item, '', 120)));
+  for (const tag of tags.filter(Boolean).slice(0, 3)) footer.append(text('b', safeText(tag, '', 80)));
+  if (footer.childNodes.length) node.append(footer);
+  return node;
+}
+
+function genericRecords(payload) {
+  const collection = Object.values(payload || {}).find((value) => Array.isArray(value)) || [];
+  return collection.slice(0, 50).map((record, index) => {
+    if (!record || typeof record !== 'object') return recordNode({ title: safeText(record, `Record ${index + 1}`) });
+    const scalar = Object.entries(record).filter(([, value]) => ['string','number','boolean'].includes(typeof value));
+    return recordNode({
+      eyebrow: safeText(firstValue(record, ['type','category','status'], `RECORD ${index + 1}`)),
+      title: safeText(firstValue(record, ['name','title','event','id'], `Record ${index + 1}`)),
+      detail: scalar.slice(0, 4).map(([key, value]) => `${key.replaceAll('_',' ')}: ${safeText(value, '', 120)}`).join(' · '),
+    });
+  });
+}
+
+function buildFeedPresentation(module, payload) {
+  const metrics = [];
+  let records = [];
+  if (module.id === 'space-weather') {
+    const kp = Array.isArray(payload.kp) ? payload.kp : [];
+    const alerts = Array.isArray(payload.alerts) ? payload.alerts : [];
+    const flares = Array.isArray(payload.flares) ? payload.flares : [];
+    const latest = kp.at(-1) || {};
+    metrics.push(
+      metricNode('PLANETARY Kp', numberText(firstValue(latest, ['kp_index','estimated_kp','kp','Kp']), 2), 'LATEST GEOMAGNETIC INDEX'),
+      metricNode('ACTIVE BULLETINS', alerts.length, 'NOAA SWPC'),
+      metricNode('RECENT FLARES', flares.length, 'LATEST REPORTED WINDOW'),
+    );
+    records = [
+      ...alerts.slice(0, 20).map((item) => recordNode({
+        eyebrow: 'SWPC BULLETIN',
+        title: firstValue(item, ['product_id','message','summary'], 'Space-weather alert'),
+        detail: firstValue(item, ['message','description','summary']),
+        meta: [dateText(firstValue(item, ['issue_datetime','issue_time','time_tag']))],
+        href: 'https://www.swpc.noaa.gov/products/alerts-watches-and-warnings',
+      })),
+      ...flares.slice(0, 20).map((item) => recordNode({
+        eyebrow: 'SOLAR FLARE',
+        title: `CLASS ${safeText(firstValue(item, ['max_class','class_type','current_class']), 'UNRATED')}`,
+        detail: firstValue(item, ['satellite','observatory'], 'GOES primary X-ray observation'),
+        meta: [dateText(firstValue(item, ['max_time','begin_time','time_tag']))],
+        href: 'https://www.swpc.noaa.gov/products/goes-x-ray-flux',
+      })),
+    ];
+  } else if (module.id === 'cyber-threats') {
+    const vulnerabilities = Array.isArray(payload.vulnerabilities) ? payload.vulnerabilities : [];
+    const ransomware = vulnerabilities.filter((item) => String(item.knownRansomwareCampaignUse || '').toLowerCase() === 'known').length;
+    metrics.push(
+      metricNode('KNOWN EXPLOITED', vulnerabilities.length, 'LATEST CATALOG WINDOW'),
+      metricNode('RANSOMWARE LINKED', ransomware, 'CISA CONFIRMED KNOWN USE'),
+      metricNode('CATALOG', payload.catalogVersion || 'CURRENT', 'CISA KEV RELEASE'),
+    );
+    records = vulnerabilities.map((item) => {
+      const cve = safeText(item.cveID, 'CVE NOT REPORTED', 40);
+      return recordNode({
+        eyebrow: cve,
+        title: `${safeText(item.vendorProject, 'UNKNOWN VENDOR', 80)} · ${safeText(item.product, 'UNKNOWN PRODUCT', 100)}`,
+        detail: firstValue(item, ['shortDescription','vulnerabilityName']),
+        meta: [`ADDED ${safeText(item.dateAdded)}`, `ACTION DUE ${safeText(item.dueDate)}`],
+        tags: [item.knownRansomwareCampaignUse === 'Known' ? 'KNOWN RANSOMWARE USE' : '', item.requiredAction ? 'REMEDIATION REQUIRED' : ''],
+        href: /^CVE-\d{4}-\d+$/i.test(cve) ? `https://nvd.nist.gov/vuln/detail/${encodeURIComponent(cve)}` : 'https://www.cisa.gov/known-exploited-vulnerabilities-catalog',
+      });
+    });
+  } else if (module.id === 'internet-outages') {
+    const events = Array.isArray(payload.events) ? payload.events : [];
+    const countries = new Set(events.map((item) => safeText(firstValue(item, ['entityCode','countryCode'], item.entity?.code), '', 20)).filter(Boolean));
+    const ongoing = events.filter((item) => !firstValue(item, ['end','endTime','end_time'])).length;
+    metrics.push(
+      metricNode('OUTAGE EVENTS', events.length, 'LAST 24 HOURS'),
+      metricNode('ONGOING', ongoing, 'NO END TIME REPORTED'),
+      metricNode('JURISDICTIONS', countries.size || '—', 'DISTINCT COUNTRY CODES'),
+    );
+    records = events.slice(0, 50).map((item, index) => recordNode({
+      eyebrow: safeText(firstValue(item, ['entityCode','countryCode','datasource'], item.entity?.code || `EVENT ${index + 1}`)),
+      title: safeText(firstValue(item, ['entityName','name'], item.entity?.name || 'Network disruption event')),
+      detail: `Observed disruption signal${firstValue(item, ['score','severity','level']) !== '' ? ` · magnitude ${safeText(firstValue(item, ['score','severity','level']))}` : ''}.`,
+      meta: [dateText(firstValue(item, ['start','startTime','start_time','timestamp'])), firstValue(item, ['datasource','source'])],
+      href: 'https://ioda.inetintel.cc.gatech.edu/',
+    }));
+  } else if (module.id === 'market-watch') {
+    const quotes = Array.isArray(payload.quotes) ? payload.quotes : [];
+    const snapshots = quotes.map((quote) => {
+      const meta = quote.meta || {};
+      const rawPrice = firstValue(meta, ['regularMarketPrice'], quote.indicators?.quote?.[0]?.close?.at(-1) ?? null);
+      const rawPrevious = firstValue(meta, ['chartPreviousClose','previousClose'], null);
+      const price = rawPrice === null ? null : Number(rawPrice);
+      const previous = rawPrevious === null ? null : Number(rawPrevious);
+      const change = Number.isFinite(price) && Number.isFinite(previous) && previous !== 0 ? ((price - previous) / previous) * 100 : null;
+      return { quote, meta, price, change };
+    });
+    metrics.push(
+      metricNode('INSTRUMENTS', snapshots.length, 'LIVE REFERENCE BOARD'),
+      metricNode('ADVANCING', snapshots.filter(({ change }) => change > 0).length, 'VERSUS PREVIOUS CLOSE'),
+      metricNode('DECLINING', snapshots.filter(({ change }) => change < 0).length, 'VERSUS PREVIOUS CLOSE'),
+    );
+    records = snapshots.map(({ meta, price, change }) => recordNode({
+      eyebrow: safeText(meta.symbol, 'MARKET'),
+      title: safeText(meta.longName || meta.shortName || meta.symbol, 'Market instrument'),
+      detail: `${numberText(price, 4)} ${safeText(meta.currency, '', 12)}${change === null ? '' : ` · ${change >= 0 ? '+' : ''}${numberText(change, 2)}%`}`,
+      meta: [safeText(meta.exchangeName || meta.fullExchangeName), dateText(meta.regularMarketTime)],
+      tags: [change === null ? 'REFERENCE' : change >= 0 ? 'ADVANCING' : 'DECLINING'],
+      href: meta.symbol ? `https://finance.yahoo.com/quote/${encodeURIComponent(meta.symbol)}` : 'https://finance.yahoo.com/',
+    }));
+  } else {
+    records = genericRecords(payload);
+    metrics.push(metricNode('RECORDS', countRecord(payload), 'CURRENT PROVIDER RESPONSE'));
+  }
+  return { metrics, records };
+}
+
+function renderFeed(module, payload) {
+  const presentation = buildFeedPresentation(module, payload);
+  q('[data-feed-source]').textContent = safeText(payload.source || payload.message, 'PROVIDER NOT REPORTED', 160).toUpperCase();
+  q('[data-feed-time]').textContent = `SYNC ${new Date().toLocaleTimeString()}`;
+  feedMetrics.replaceChildren(...presentation.metrics);
+  feedRecords.replaceChildren(...(presentation.records.length
+    ? presentation.records
+    : [text('div', payload.configured === false ? safeText(payload.message, 'Provider not configured.') : 'No current records were returned by this provider.', 'feed-empty')]));
+  feedView.hidden = false;
+}
+
 function renderOverview(payload) {
   const cards = Object.entries(payload.feeds || {}).map(([id, data]) => {
-    const card = document.createElement('article'); card.className = 'overview-card';
-    const header = document.createElement('header'); header.append(text('span', id.replaceAll('-',' ').toUpperCase()), text('span', data.error ? 'DEGRADED' : 'LIVE'));
+    const card = document.createElement('button'); card.type = 'button'; card.className = 'overview-card'; card.dataset.moduleId = id;
+    card.setAttribute('aria-label', `Open ${id.replaceAll('-',' ')} intelligence feed`);
+    const header = document.createElement('span'); header.className = 'overview-card-head'; header.append(text('span', id.replaceAll('-',' ').toUpperCase()), text('span', data.error ? 'DEGRADED' : data.degraded ? 'PARTIAL' : 'LIVE'));
     const source = data.source || data.message || (data.error ? 'Provider unavailable' : 'Connected source');
-    card.append(header, text('b', String(countRecord(data))), text('p', source));
+    card.append(header, text('b', String(countRecord(data))), text('p', source), text('span', 'OPEN CHANNEL →', 'overview-card-open'));
     return card;
   });
   overviewGrid.replaceChildren(...cards);
@@ -83,7 +262,7 @@ function renderOverview(payload) {
 }
 
 function resetWorkspace() {
-  queryForm.hidden = true; resultView.hidden = true; overviewGrid.hidden = true; notice.hidden = true; assetPanel.hidden = true;
+  queryForm.hidden = true; resultView.hidden = true; overviewGrid.hidden = true; feedView.hidden = true; notice.hidden = true; assetPanel.hidden = true;
   resultView.textContent = ''; notice.textContent = '';
 }
 
@@ -124,9 +303,11 @@ async function selectModule(moduleId) {
     queryInput.focus(); return;
   }
   if (FEED_MODULES.has(module.id)) {
-    resultView.hidden = false; resultView.textContent = 'Synchronizing provider…';
-    try { const payload = await api(`/api/intelligence/feed/${encodeURIComponent(module.id)}`); resultView.textContent = pretty(payload); q('[data-workspace-state]').textContent = payload.configured === false ? 'NOT CONFIGURED' : 'LIVE'; }
-    catch (error) { resultView.textContent = error.message; q('[data-workspace-state]').textContent = 'DEGRADED'; }
+    feedView.hidden = false;
+    feedMetrics.replaceChildren(metricNode('CHANNEL', 'SYNCHRONIZING', 'REQUESTING CURRENT PROVIDER STATE'));
+    feedRecords.replaceChildren();
+    try { const payload = await api(`/api/intelligence/feed/${encodeURIComponent(module.id)}`); renderFeed(module, payload); q('[data-workspace-state]').textContent = payload.configured === false ? 'NOT CONFIGURED' : 'LIVE'; }
+    catch (error) { feedMetrics.replaceChildren(metricNode('CHANNEL', 'DEGRADED', error.message)); feedRecords.replaceChildren(); q('[data-workspace-state]').textContent = 'DEGRADED'; }
     return;
   }
   notice.hidden = false;
@@ -160,6 +341,10 @@ q('[data-targets]').addEventListener('click', async (event) => {
 });
 
 nav.addEventListener('click',(event)=>{ const button=event.target.closest('[data-module-id]'); if(button) void selectModule(button.dataset.moduleId); });
+overviewGrid.addEventListener('click',(event)=>{ const button=event.target.closest('[data-module-id]'); if(button) void selectModule(button.dataset.moduleId); });
+q('[data-provider-status]').addEventListener('click',(event)=>{ const button=event.target.closest('[data-module-id]'); if(button) void selectModule(button.dataset.moduleId); });
+q('[data-feed-back]').addEventListener('click',()=>void selectModule('overview'));
+q('[data-feed-refresh]').addEventListener('click',()=>{ if(activeModule && FEED_MODULES.has(activeModule.id)) void selectModule(activeModule.id); });
 q('[data-module-search]').addEventListener('input',(event)=>renderNav(event.currentTarget.value));
 q('[data-intel-logout]').addEventListener('click',async()=>{ try{await api('/api/account/logout',{method:'POST',body:'{}'});}finally{location.assign('/');} });
 

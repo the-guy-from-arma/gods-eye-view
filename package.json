@@ -1,7 +1,7 @@
 {
   "name": "thunderlink-gods-eye",
   "private": true,
-  "version": "0.3.14",
+  "version": "0.3.15",
   "description": "ThunderLink God's Eye — a real-time intelligence console for planet Earth with a photorealistic 3D globe and live open-source data.",
   "type": "module",
   "license": "MIT",
@@ -41,6 +41,7 @@
     "preview": "vite preview",
     "test": "node scripts/run-unit-tests.mjs",
     "test:track": "node scripts/track-regression.mjs",
+    "qa:intelligence-dashboard": "node scripts/qa-intelligence-dashboard.mjs",
     "qa:map-source-tray": "node scripts/qa-map-source-tray.mjs"
   },
   "dependencies": {
