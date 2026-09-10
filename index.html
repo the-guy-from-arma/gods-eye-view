@@ -37,8 +37,8 @@
   <div id="cesiumContainer"></div>
   <aside id="thunderlink-system-identity" aria-label="ThunderLink software identity">
     <span>OS <strong>THUNDERLINK OBLIVION</strong></span>
-    <span>VERSION <strong>0.3.22</strong></span>
-    <span>KERNEL <strong>TBSGE-KERNEL-030.023</strong></span>
+    <span>VERSION <strong>0.3.23</strong></span>
+    <span>KERNEL <strong>TBSGE-KERNEL-030.024</strong></span>
     <button id="credits-footer-button" type="button">CREDITS &amp; OPEN SOURCES</button>
   </aside>
   <footer id="platform-legal-footer" aria-label="Legal and privacy policies">
@@ -720,7 +720,11 @@
         <button id="cctv-viewer-close" class="scene-btn" type="button" aria-label="Close camera viewer">CLOSE</button>
       </header>
       <div class="cctv-viewer-toolbar">
-        <button id="cctv-viewer-mode" class="scene-btn" type="button">MULTI VIEW</button>
+        <div class="cctv-viewer-view-controls">
+          <button id="cctv-viewer-mode" class="scene-btn" type="button">MULTI VIEW</button>
+          <button id="cctv-viewer-fit" class="scene-btn active" type="button">FIT</button>
+          <button id="cctv-viewer-native" class="scene-btn" type="button">1:1 PIXELS</button>
+        </div>
         <span id="cctv-viewer-status">LIVE SNAPSHOT</span>
       </div>
       <figure id="cctv-viewer-single" class="cctv-viewer-single">

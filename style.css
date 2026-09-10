@@ -7025,6 +7025,17 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   gap: 12px;
 }
 
+.cctv-viewer-view-controls {
+  display: flex;
+  gap: 7px;
+}
+
+.cctv-viewer-view-controls .scene-btn.active {
+  border-color: #35dff5;
+  color: #9ff3ff;
+  background: rgba(0, 150, 178, 0.2);
+}
+
 .cctv-viewer-shell > header span,
 .cctv-viewer-toolbar span {
   color: #55deef;
@@ -7044,15 +7055,29 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   display: grid;
   place-items: center;
   min-height: min(68vh, 680px);
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid rgba(56, 216, 238, 0.3);
   background: #02070a;
 }
 
 .cctv-viewer-single img {
-  width: 100%;
-  height: min(68vh, 680px);
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: min(68vh, 680px);
   object-fit: contain;
+  image-rendering: auto;
+}
+
+.cctv-viewer-single.native-pixels {
+  display: block;
+}
+
+.cctv-viewer-single.native-pixels img {
+  max-width: none;
+  max-height: none;
+  margin: 0 auto;
+  display: block;
 }
 
 .cctv-viewer-single figcaption,

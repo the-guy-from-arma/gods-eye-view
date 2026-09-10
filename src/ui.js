@@ -2177,6 +2177,7 @@ export class StyleManager {
     this._cctvRouteTimer = null;
     this._cctvRouteIndex = -1;
     this._cctvViewerMode = 'single';
+    this._cctvViewerScale = 'fit';
     // Auto-expand guard: last active camera id seen while the layer was
     // enabled; routine state notifications with the same id never re-expand.
     this._lastSeenCctvActiveId = null;
@@ -2368,6 +2369,8 @@ export class StyleManager {
     this._cctvViewerDialog = document.getElementById('cctv-viewer-dialog');
     this._cctvViewerClose = document.getElementById('cctv-viewer-close');
     this._cctvViewerModeBtn = document.getElementById('cctv-viewer-mode');
+    this._cctvViewerFitBtn = document.getElementById('cctv-viewer-fit');
+    this._cctvViewerNativeBtn = document.getElementById('cctv-viewer-native');
     this._cctvViewerSingle = document.getElementById('cctv-viewer-single');
     this._cctvViewerFrame = document.getElementById('cctv-viewer-frame');
     this._cctvViewerCaption = document.getElementById('cctv-viewer-caption');
@@ -6194,6 +6197,11 @@ export class StyleManager {
       this._cctvViewerMode = this._cctvViewerMode === 'multi' ? 'single' : 'multi';
       this._refreshCctvViewer();
     });
+    this._cctvViewerFitBtn?.addEventListener('click', () => this._setCctvViewerScale('fit'));
+    this._cctvViewerNativeBtn?.addEventListener('click', () => this._setCctvViewerScale('native'));
+    this._cctvViewerFrame?.addEventListener('load', () => {
+      if (this._cctvViewerDialog?.open) this._refreshCctvViewer();
+    });
     this._cctvViewerClose?.addEventListener('click', () => this._cctvViewerDialog?.close());
 
     this._cctvNearestBtn?.addEventListener('click', async () => {
@@ -6408,6 +6416,15 @@ export class StyleManager {
     }
   }
 
+  /** Uses either containment or true source-pixel sizing in the large viewer. */
+  _setCctvViewerScale(mode) {
+    this._cctvViewerScale = mode === 'native' ? 'native' : 'fit';
+    this._cctvViewerSingle?.classList.toggle('native-pixels', this._cctvViewerScale === 'native');
+    this._cctvViewerFitBtn?.classList.toggle('active', this._cctvViewerScale === 'fit');
+    this._cctvViewerNativeBtn?.classList.toggle('active', this._cctvViewerScale === 'native');
+    this._refreshCctvViewer();
+  }
+
   /** Synchronizes the enlarged feed and multi-camera mosaic. */
   _refreshCctvViewer() {
     if (!this._cctvViewerDialog) return;
@@ -6416,10 +6433,15 @@ export class StyleManager {
     if (this._cctvViewerSingle) this._cctvViewerSingle.hidden = multi;
     if (this._cctvViewerGrid) this._cctvViewerGrid.hidden = !multi;
     if (this._cctvViewerModeBtn) this._cctvViewerModeBtn.textContent = multi ? 'SINGLE VIEW' : 'MULTI VIEW';
+    if (this._cctvViewerFitBtn) this._cctvViewerFitBtn.disabled = multi;
+    if (this._cctvViewerNativeBtn) this._cctvViewerNativeBtn.disabled = multi;
     if (this._cctvViewerStatus) {
+      const width = this._cctvViewerFrame?.naturalWidth || 0;
+      const height = this._cctvViewerFrame?.naturalHeight || 0;
+      const resolution = width && height ? ` · SOURCE ${width}×${height}` : '';
       this._cctvViewerStatus.textContent = multi
         ? `${this._cctvWatchCameras.size} SELECTED FEEDS`
-        : (active?.sourceStatus ? `${String(active.sourceStatus).toUpperCase()} SNAPSHOT` : 'LIVE SNAPSHOT');
+        : `${active?.sourceStatus ? `${String(active.sourceStatus).toUpperCase()} SNAPSHOT` : 'LIVE SNAPSHOT'}${resolution} · ${this._cctvViewerScale === 'native' ? '1:1' : 'FIT'}`;
     }
     if (!multi) {
       if (this._cctvViewerFrame) {

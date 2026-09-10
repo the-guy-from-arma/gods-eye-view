@@ -1359,11 +1359,15 @@ test('CCTV panel exposes enlarged single/multi viewing and a bounded camera watc
   assert.match(INDEX_SOURCE, /id="cctv-enlarge-btn"/);
   assert.match(INDEX_SOURCE, /id="cctv-viewer-dialog"/);
   assert.match(INDEX_SOURCE, /id="cctv-viewer-grid"/);
+  assert.match(INDEX_SOURCE, /id="cctv-viewer-fit"/);
+  assert.match(INDEX_SOURCE, /id="cctv-viewer-native"/);
   assert.match(INDEX_SOURCE, /id="cctv-watch-add-btn"/);
   assert.match(INDEX_SOURCE, /id="cctv-watch-track-btn"/);
   assert.match(UI_SOURCE, /_cctvWatchCameras\.size >= 12/);
   assert.match(UI_SOURCE, /_advanceCctvWatchRoute/);
   assert.match(UI_SOURCE, /_activateCctvWatchCamera/);
+  assert.match(UI_SOURCE, /_setCctvViewerScale/);
   assert.match(STYLE_SOURCE, /\.cctv-viewer-dialog/);
   assert.match(STYLE_SOURCE, /\.cctv-viewer-grid/);
+  assert.match(STYLE_SOURCE, /\.cctv-viewer-single\.native-pixels/);
 });

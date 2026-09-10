@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.23] — 2026-09-10 — Native-resolution CCTV viewing
+
+- Stopped the enlarged CCTV viewer from stretching low-resolution provider
+  snapshots beyond their native pixel dimensions. FIT now scales down only,
+  while 1:1 PIXELS exposes the original frame in a scrollable inspection view.
+- Added the provider frame's decoded source resolution and current scale mode
+  to the large-view status line, making source limitations explicit instead of
+  presenting browser interpolation as additional visual detail.
+- Advanced ThunderLink Oblivion to public build `0.3.23` and kernel
+  `TBSGE-KERNEL-030.024`; legal acceptance remains `0.3.02`.
+
 ## [0.3.22] — 2026-09-10 — Live CCTV projection and watch routes
 
 - Changed the Cesium CCTV monitor material to a callback-backed texture. The
