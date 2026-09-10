@@ -46,6 +46,7 @@ import cctvLayer, {
   calibrationPatchMovesAnchor,
   cctvGeometryDrainPacing,
   createGeometryProgressNotifier,
+  decodedProjectionTextureSource,
   normalizeCoverageMode,
   frameSignatureFromPixels,
   focusCctvRecord,
@@ -60,6 +61,7 @@ import cctvLayer, {
   refreshCoverageStyles,
   setCctvCardPresentationOptions,
   setActiveCamera,
+  settleProjectionImageRequest,
 } from './cctv.js';
 import {
   CCTV_ACTIVATION_RESULT,
@@ -1282,4 +1284,52 @@ test('frameSignatureFromPixels: empty or junk input yields null (always redraw)'
   assert.equal(frameSignatureFromPixels(null), null);
   assert.equal(frameSignatureFromPixels(undefined), null);
   assert.equal(frameSignatureFromPixels({}), null);
+});
+
+test('projection image lifecycle commits the decoded image object used by the Cesium texture', () => {
+  const previous = { id: 'previous-frame' };
+  const candidate = { id: 'decoded-frame' };
+  const runtime = {
+    pendingImage: candidate,
+    image: previous,
+    imageLoading: true,
+    imageReady: true,
+    imageStamp: 10,
+    drawnImageStamp: 10,
+  };
+
+  assert.equal(settleProjectionImageRequest(runtime, candidate, true, 42), true);
+  assert.equal(runtime.image, candidate);
+  assert.equal(runtime.imageLoading, false);
+  assert.equal(decodedProjectionTextureSource(runtime), null, 'not exposed before canvas/signature processing');
+
+  runtime.drawnImageStamp = 42;
+  assert.equal(
+    decodedProjectionTextureSource(runtime),
+    candidate,
+    'the exact decoded image becomes the monitor-plane texture source',
+  );
+});
+
+test('projection image lifecycle ignores stale requests and preserves the last good frame on failure', () => {
+  const previous = { id: 'good-frame' };
+  const current = { id: 'current-request' };
+  const stale = { id: 'stale-request' };
+  const runtime = {
+    pendingImage: current,
+    image: previous,
+    imageLoading: true,
+    imageReady: true,
+    imageStamp: 7,
+    drawnImageStamp: 7,
+  };
+
+  assert.equal(settleProjectionImageRequest(runtime, stale, true, 99), false);
+  assert.equal(runtime.pendingImage, current);
+  assert.equal(runtime.image, previous);
+  assert.equal(settleProjectionImageRequest(runtime, current, false, 100), false);
+  assert.equal(runtime.pendingImage, null);
+  assert.equal(runtime.image, previous);
+  assert.equal(runtime.imageReady, true);
+  assert.equal(decodedProjectionTextureSource(runtime), previous);
 });

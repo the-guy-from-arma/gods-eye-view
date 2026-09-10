@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.21] — 2026-09-10 — CCTV monitor-plane frame recovery
+
+- Fixed CCTV frames appearing normally in the sidebar while the corresponding
+  Cesium monitor plane remained black. Snapshot projections now bind the exact
+  newly decoded image object directly to the plane material instead of routing
+  it through an additional pair of full-size canvas copies.
+- Hardened projection refreshes so stale image completions cannot replace a
+  newer request, a failed refresh preserves the last good frame, and an async
+  decode explicitly requests the Cesium texture-upload render.
+- Added regression coverage for decoded-frame promotion, stale-request
+  rejection, last-good-frame retention, and the monitor texture-source gate.
+- Advanced ThunderLink Oblivion to public build `0.3.21` and kernel
+  `TBSGE-KERNEL-030.022`; legal acceptance remains `0.3.02`.
+
 ## [0.3.20] — 2026-09-10 — Central U.S. 511 expansion and state controls
 
 - Added current public 511/DOT camera catalogs for Colorado, New Mexico,

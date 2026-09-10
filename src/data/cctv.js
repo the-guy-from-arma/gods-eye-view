@@ -19,8 +19,9 @@
  *   far end of the frustum ("monitor at the end of the cone"), oriented
  *   perpendicular to the view axis (static — never billboarded). Video feeds
  *   bind the HTMLVideoElement directly (Cesium updates video textures
- *   per-frame); image feeds alternate two offscreen canvases so the texture
- *   re-uploads on every repaint tick (<=1Hz). One live plane at a time. On
+ *   per-frame); image feeds bind each newly decoded image object directly,
+ *   while placeholder/status frames use alternating offscreen canvases
+ *   (<=1Hz). One live plane at a time. On
  *   activation a single scene.pickFromRay obstruction probe (§9.1 — the ONLY
  *   raycast in the subsystem) clamps the plane's range short of the first
  *   tile hit so the end cap never clips into buildings.
@@ -98,7 +99,11 @@ import {
   getFocusTarget,
   onFocusTargetAppear,
 } from './focusDeemphasis.js';
-import { holdContinuousRender, releaseContinuousRender } from '../renderGovernor.js';
+import {
+  governorRequestRender,
+  holdContinuousRender,
+  releaseContinuousRender,
+} from '../renderGovernor.js';
 
 // ---------------------------------------------------------------------------
 // API endpoints
@@ -1491,8 +1496,11 @@ function paintNextProjectionBuffer(runtime) {
  * projection tick.
  *
  * Video feeds are skipped entirely — their HTMLVideoElement uniform is
- * updated per-frame by Cesium natively (H5). Image/webcam-frame feeds swap
- * the double-buffer canvas reference, throttled to PROJECTION_TEXTURE_SWAP_MS.
+ * updated per-frame by Cesium natively (H5). Image feeds bind the freshly
+ * decoded HTMLImageElement directly. That is the same browser-decoded source
+ * used by the working sidebar preview and avoids an unreliable extra
+ * image→canvas→canvas→WebGL copy. Placeholders still use the double-buffered
+ * canvas path so status-text repaints receive a new object identity.
  *
  * @param {Object} record - Camera record with an initialized projection runtime.
  */
@@ -1512,11 +1520,56 @@ function refreshProjectionTextures(record) {
   // 2026-07-04: intermittent white flashes on the monitor plane).
   if (runtime.canvasStamp === runtime.lastSwappedCanvasStamp) return;
 
-  const buffer = paintNextProjectionBuffer(runtime);
-  if (!buffer) return;
+  const decodedFrame = decodedProjectionTextureSource(runtime);
+  const textureSource = decodedFrame
+    ? decodedFrame
+    : paintNextProjectionBuffer(runtime);
+  if (!textureSource) return;
   runtime.lastTextureSwapAt = now;
   runtime.lastSwappedCanvasStamp = runtime.canvasStamp;
-  runtime.planeMaterial.image = buffer;
+  runtime.planeMaterial.image = textureSource;
+  // The decode completes outside Cesium's scene lifecycle. Explicitly ask
+  // for the upload frame as well as holding the active projection loop; this
+  // closes the requestRenderMode race when a selection is changed quickly.
+  governorRequestRender('cctv-projection-texture');
+}
+
+/**
+ * Returns a decoded projection frame only after it has been painted and
+ * signature-checked by drawProjectionFrame. Keeping this gate pure makes the
+ * Cesium texture-source contract testable without a browser or WebGL context.
+ *
+ * @param {Object} runtime
+ * @returns {HTMLImageElement|Object|null}
+ */
+export function decodedProjectionTextureSource(runtime) {
+  if (!runtime?.imageReady || !runtime.image) return null;
+  return runtime.drawnImageStamp === runtime.imageStamp ? runtime.image : null;
+}
+
+/**
+ * Settles one projection image request without allowing an older request to
+ * overwrite a newer one. Failed refreshes preserve the last decoded frame.
+ * Exported as a narrow test seam for the async image lifecycle.
+ *
+ * @param {Object} runtime
+ * @param {HTMLImageElement|Object} candidate
+ * @param {boolean} ok
+ * @param {number} [settledAt=Date.now()]
+ * @returns {boolean} True when this was the current request and was accepted.
+ */
+export function settleProjectionImageRequest(runtime, candidate, ok, settledAt = Date.now()) {
+  if (!runtime || runtime.pendingImage !== candidate) return false;
+  runtime.pendingImage = null;
+  runtime.imageLoading = false;
+  if (!ok) {
+    runtime.imageReady = !!runtime.image;
+    return false;
+  }
+  runtime.image = candidate;
+  runtime.imageReady = true;
+  runtime.imageStamp = settledAt;
+  return true;
 }
 
 /**
@@ -1746,6 +1799,7 @@ function createProjectionRuntime(record) {
     lastImageRefreshAt: 0,
     imageReady: false,
     imageLoading: false,
+    pendingImage: null,
     imageStamp: 0,
     drawnImageStamp: -1,
     // Signature of the pixels currently ON the canvas, plus the reused 64x36
@@ -1776,20 +1830,6 @@ function createProjectionRuntime(record) {
       video.play().catch(() => {});
     });
     runtime.video = video;
-  } else {
-    const img = new Image();
-    img.decoding = 'async';
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      runtime.imageLoading = false;
-      runtime.imageReady = true;
-      runtime.imageStamp = Date.now();
-    };
-    img.onerror = () => {
-      runtime.imageLoading = false;
-      runtime.imageReady = false;
-    };
-    runtime.image = img;
   }
 
   // Monitor plane = the frustum's far cap: video feeds bind the video element
@@ -1832,6 +1872,13 @@ function ensureProjectionRuntime(record) {
  */
 function destroyProjectionRuntime(runtime) {
   if (!runtime) return;
+  runtime.disposed = true;
+  if (runtime.pendingImage) {
+    runtime.pendingImage.onload = null;
+    runtime.pendingImage.onerror = null;
+    runtime.pendingImage = null;
+    runtime.imageLoading = false;
+  }
   if (runtime.video) {
     runtime.video.pause();
     runtime.video.removeAttribute('src');
@@ -1855,7 +1902,7 @@ function destroyProjectionRuntime(runtime) {
  */
 function refreshProjectionImage(record, force = false) {
   const runtime = record?.projection;
-  if (!runtime || runtime.mode !== 'image' || !runtime.image) return;
+  if (!runtime || runtime.mode !== 'image' || runtime.disposed) return;
   // Hidden-state gate (perf wave 2): no new frame fetch/decode for a canvas
   // nobody can see. The refresh interval re-fills naturally on return.
   if (typeof document !== 'undefined' && document.hidden && !force) return;
@@ -1873,9 +1920,23 @@ function refreshProjectionImage(record, force = false) {
 
   const frameUrl = frameUrlFor(record.camera, refreshMs);
   const sep = frameUrl.includes('?') ? '&' : '?';
+  const candidate = new Image();
+  candidate.decoding = 'async';
   runtime.imageLoading = true;
-  runtime.imageReady = false;
-  runtime.image.src = `${frameUrl}${sep}projTs=${Math.floor(now / refreshMs)}`;
+  runtime.pendingImage = candidate;
+  candidate.onload = () => {
+    candidate.onload = null;
+    candidate.onerror = null;
+    if (settleProjectionImageRequest(runtime, candidate, true)) {
+      governorRequestRender('cctv-projection-image-ready');
+    }
+  };
+  candidate.onerror = () => {
+    candidate.onload = null;
+    candidate.onerror = null;
+    settleProjectionImageRequest(runtime, candidate, false);
+  };
+  candidate.src = `${frameUrl}${sep}projTs=${Math.floor(now / refreshMs)}`;
 }
 
 /**
