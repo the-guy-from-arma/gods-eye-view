@@ -5,7 +5,10 @@ import assert from 'node:assert/strict';
 import {
   fetchTerrainChunkWithRetry,
   resolveTerrainHeightRequest,
+  TERRAIN_TRANSPORT_BACKOFF_MS,
+  terrainFailureIsTransient,
   terrainPointKey,
+  terrainTransportCooldownMs,
 } from './terrainHeightsProxy.js';
 
 function result(id, ellipsoid) {
@@ -114,4 +117,13 @@ test('stale per-point entries serve through a failed refresh only when every poi
   });
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.results.map((item) => item.id), ['stale-b', 'stale-a']);
+});
+
+test('terrain circuit-breaker policy backs off only transient failures', () => {
+  assert.deepEqual(TERRAIN_TRANSPORT_BACKOFF_MS, [30_000, 60_000, 120_000, 300_000]);
+  assert.equal(terrainTransportCooldownMs(1), 30_000);
+  assert.equal(terrainTransportCooldownMs(9), 300_000);
+  assert.equal(terrainFailureIsTransient(Object.assign(new Error('timeout'), { name: 'TimeoutError' })), true);
+  assert.equal(terrainFailureIsTransient(Object.assign(new Error('bad request'), { status: 400, retryable: false })), false);
+  assert.equal(terrainFailureIsTransient(Object.assign(new Error('provider down'), { status: 503, retryable: true })), true);
 });

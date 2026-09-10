@@ -1064,6 +1064,21 @@ function _deriveOpenSkyAuthError({ detail, authMode, authReason }) {
   if (reason === 'oauth_invalid_credentials') {
     return 'OpenSky OAuth rejected credentials';
   }
+  if (reason.includes('credentials_rejected')) {
+    return 'OpenSky OAuth rejected credentials';
+  }
+  if (reason.includes('transport_timeout')) {
+    return 'OpenSky network timed out; fallback unavailable';
+  }
+  if (reason.includes('transport_error') || reason.includes('provider_error')) {
+    return 'OpenSky temporarily unreachable';
+  }
+  if (reason.includes('rate_limited')) {
+    return 'OpenSky OAuth temporarily rate limited';
+  }
+  if (reason.includes('not_configured')) {
+    return 'OpenSky OAuth client not configured';
+  }
   if (reason === 'basic_invalid_credentials') {
     return 'OpenSky username/password rejected';
   }

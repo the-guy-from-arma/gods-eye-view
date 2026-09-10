@@ -11,6 +11,28 @@ export const TERRAIN_RETRY_BUDGET_MS = 10_000;
 /** One initial attempt plus three bounded retries. */
 export const TERRAIN_MAX_ATTEMPTS = 4;
 
+/** Backoff rungs stop an unavailable best-effort provider from log/request storms. */
+export const TERRAIN_TRANSPORT_BACKOFF_MS = Object.freeze([
+  30_000,
+  60_000,
+  120_000,
+  300_000,
+]);
+
+export function terrainTransportCooldownMs(consecutiveFailures) {
+  const count = Math.max(1, Math.floor(Number(consecutiveFailures) || 1));
+  return TERRAIN_TRANSPORT_BACKOFF_MS[
+    Math.min(count - 1, TERRAIN_TRANSPORT_BACKOFF_MS.length - 1)
+  ];
+}
+
+/** Only provider/network failures should open the terrain circuit breaker. */
+export function terrainFailureIsTransient(error) {
+  if (error?.retryable === false) return false;
+  const status = Number(error?.status);
+  return !Number.isFinite(status) || status === 429 || status >= 500;
+}
+
 /** @param {number} ms */
 function defaultSleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -111,6 +133,7 @@ export async function fetchTerrainChunkWithRetry(points, {
       const res = await fetchImpl(url, signal ? { signal } : {});
       if (!res.ok) {
         const error = new Error(`HTTP ${res.status}`);
+        error.status = res.status;
         error.retryable = res.status === 429 || res.status >= 500;
         error.retryAfter = res.headers?.get?.('retry-after') ?? null;
         throw error;

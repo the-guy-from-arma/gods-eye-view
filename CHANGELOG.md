@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.29] — 2026-09-10 — OpenSky and terrain provider resilience
+
+- Corrected OpenSky authentication to follow its current OAuth-only contract;
+  legacy Basic mode now degrades to OAuth/anonymous operation instead of
+  sending username/password credentials the provider no longer accepts.
+- Added a coalesced, bounded OAuth retry with explicit credential-rejected,
+  rate-limit, provider, and transport-timeout states so Railway connection
+  failures are no longer mislabeled as broken API keys.
+- Added automatic token invalidation, refresh, and one-time request replay when
+  OpenSky returns the documented expired-token `401` response.
+- Kept live aircraft usable through anonymous OpenSky and regional adsb.lol
+  fallback while the OAuth host is temporarily unreachable.
+- Reduced Re:Earth point-height request sizes and added bounded terrain-provider
+  circuit breaking, stale-cache headers, and quiet cooldown handling so a
+  best-effort terrain outage cannot repeatedly stall or flood the deployment.
+- Added bounded timeout overrides for Railway without placing credentials in Git.
+- Advanced ThunderLink Oblivion to public build `0.3.29` and kernel
+  `TBSGE-KERNEL-030.030`; legal acceptance remains `0.3.02`.
+
 ## [0.3.28] — 2026-09-10 — Once-per-account release briefing
 
 - Added a post-login What’s New experience covering every release from 0.3.10
