@@ -37,8 +37,8 @@
   <div id="cesiumContainer"></div>
   <aside id="thunderlink-system-identity" aria-label="ThunderLink software identity">
     <span>OS <strong>THUNDERLINK OBLIVION</strong></span>
-    <span>VERSION <strong>0.3.27</strong></span>
-    <span>KERNEL <strong>TBSGE-KERNEL-030.028</strong></span>
+    <span>VERSION <strong>0.3.28</strong></span>
+    <span>KERNEL <strong>TBSGE-KERNEL-030.029</strong></span>
     <button id="credits-footer-button" type="button">CREDITS &amp; OPEN SOURCES</button>
   </aside>
   <footer id="platform-legal-footer" aria-label="Legal and privacy policies">
@@ -1173,6 +1173,7 @@
       </section>
       <button type="button" data-owner-dashboard hidden>OPEN OWNER COMMAND</button>
       <button type="button" data-intelligence-console>OPEN INTELLIGENCE CONSOLE</button>
+      <button type="button" data-whats-new-open>WHAT’S NEW &amp; COMING SOON</button>
       <button type="button" data-account-activity hidden>VIEW ACTIVITY LOG</button>
       <button type="button" data-account-logout>SIGN OUT</button>
       <div class="account-activity" data-account-activity-panel hidden>
@@ -1212,6 +1213,33 @@
     <footer class="platform-disclaimer-footer">
       <span>PUBLIC DATA DOES NOT MEAN HARMLESS DATA.</span>
       <button type="button" data-disclaimer-close>I UNDERSTAND</button>
+    </footer>
+  </dialog>
+
+  <dialog id="whats-new-dialog" aria-labelledby="whats-new-title" aria-describedby="whats-new-intro">
+    <div class="whats-new-grid" aria-hidden="true"></div>
+    <header class="whats-new-header">
+      <div><span>THUNDERLINK · RELEASE INTELLIGENCE</span><small data-whats-new-range>0.3.10 — 0.3.28</small></div>
+      <button type="button" data-whats-new-close aria-label="Close What’s New"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
+    </header>
+    <div class="whats-new-hero">
+      <div class="whats-new-orbit" aria-hidden="true"><img src="/logo.svg" alt="" /><i></i><i></i></div>
+      <div><span>MISSION UPDATE // 019 RELEASES</span><h2 id="whats-new-title" data-whats-new-title>God’s Eye evolved</h2><p id="whats-new-intro" data-whats-new-intro></p></div>
+    </div>
+    <nav class="whats-new-tabs" role="tablist" aria-label="Release briefing sections">
+      <button type="button" role="tab" aria-selected="true" data-whats-new-tab="added">NEW FEATURES ADDED</button>
+      <button type="button" role="tab" aria-selected="false" data-whats-new-tab="soon">COMING SOON</button>
+    </nav>
+    <section class="whats-new-panel" role="tabpanel" data-whats-new-panel="added">
+      <div class="whats-new-release-list" data-whats-new-releases></div>
+    </section>
+    <section class="whats-new-panel" role="tabpanel" data-whats-new-panel="soon" hidden>
+      <div class="whats-new-soon-list" data-whats-new-coming-soon></div>
+      <p class="whats-new-honesty">Coming Soon items are plans, not live-data claims. Availability depends on provider access, testing, licensing, and owner activation.</p>
+    </section>
+    <footer class="whats-new-footer">
+      <span><i></i>THIS BRIEFING APPEARS ONCE PER ANNOUNCEMENT</span>
+      <button type="button" data-whats-new-close>ENTER COMMAND CONSOLE</button>
     </footer>
   </dialog>
 

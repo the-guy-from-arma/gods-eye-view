@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.28] — 2026-09-10 — Once-per-account release briefing
+
+- Added a post-login What’s New experience covering every release from 0.3.10
+  through 0.3.28, organized into clickable New Features Added and Coming Soon
+  views with honest availability language.
+- Added a permanent account-panel entry so operators can reopen the briefing
+  without forcing the automatic presentation to repeat.
+- Added Railway Postgres acknowledgement records keyed by user and announcement,
+  plus a local fallback, so dismissing the briefing prevents repeated login
+  interruptions across sessions and devices.
+- Added an owner System Control switch that enables or disables the login
+  briefing site-wide, including live shutdown of an open briefing through the
+  existing five-second account-state synchronization.
+- Advanced ThunderLink Oblivion to public build `0.3.28` and kernel
+  `TBSGE-KERNEL-030.029`; legal acceptance remains `0.3.02`.
+
 ## [0.3.27] — 2026-09-10 — Dormant protected-frame archive
 
 - Added an optional detector-only Railway privacy worker that localizes plate

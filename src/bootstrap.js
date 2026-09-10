@@ -1,5 +1,6 @@
 import { initAccounts } from './account.js';
 import { detectPhoneLikeDevice } from './deviceCompatibility.js';
+import { initWhatsNew } from './whatsNew.js';
 
 const loadingScreen = document.getElementById('loading-screen');
 const loaderStatus = loadingScreen?.querySelector('.loader-status');
@@ -24,7 +25,7 @@ function failBoot(message) {
 
 window.__thunderlinkBoot = { phase: setBootPhase, fail: failBoot };
 
-async function startGodsEye() {
+async function startGodsEye(user) {
   if (started) return;
   started = true;
   document.body.classList.remove('auth-pending');
@@ -39,6 +40,7 @@ async function startGodsEye() {
   setBootPhase('runtime', 'LOADING COMMAND RUNTIME');
   try {
     await import('./main.js');
+    void initWhatsNew({ user });
   } catch (error) {
     started = false;
     failBoot(error?.message || 'COMMAND CONSOLE FAILED TO START');

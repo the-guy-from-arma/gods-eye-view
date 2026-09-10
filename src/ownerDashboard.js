@@ -20,7 +20,7 @@ const vehicleHost = document.querySelector('[data-vehicle-observations]');
 const vehicleState = document.querySelector('[data-vehicle-state]');
 const vehicleCamera = document.querySelector('[data-vehicle-camera]');
 const vehicleSearch = document.querySelector('[data-vehicle-search]');
-let dashboard = { accounts: [], layers: [], autopilot: false, siteMode: { mode: 'online' }, telemetry: {} };
+let dashboard = { accounts: [], layers: [], autopilot: false, siteMode: { mode: 'online' }, whatsNew: { enabled: false }, telemetry: {} };
 let vehicleAnalytics = { configured: false, enabled: false, observations: [], totals: {}, sources: [] };
 let vehicleSearchTimer;
 let pendingMode = null;
@@ -347,6 +347,16 @@ function paintSiteMode(siteMode) {
   confirmBar.hidden = true;
 }
 
+function paintWhatsNew(whatsNew = {}) {
+  dashboard.whatsNew = { ...dashboard.whatsNew, ...whatsNew };
+  const control = document.querySelector('[data-whats-new-enabled]');
+  control.setAttribute('aria-pressed', String(Boolean(dashboard.whatsNew.enabled)));
+  document.querySelector('[data-whats-new-enabled-label]').textContent = dashboard.whatsNew.enabled ? 'ON' : 'OFF';
+  document.querySelector('[data-whats-new-readout]').textContent = dashboard.whatsNew.enabled
+    ? `LIVE · ${dashboard.whatsNew.range || 'CURRENT'}`
+    : 'DISABLED SITE-WIDE';
+}
+
 async function loadDashboard(quiet = false) {
   if (!quiet) showStatus('SYNCHRONIZING WITH RAILWAY POSTGRES');
   const [admin, activity] = await Promise.all([
@@ -359,6 +369,7 @@ async function loadDashboard(quiet = false) {
   renderActivity(activity.events);
   paintAutopilot(Boolean(admin.autopilot));
   paintSiteMode(admin.siteMode);
+  paintWhatsNew(admin.whatsNew);
   paintOperationalMetrics(admin.telemetry);
   await loadVehicleAnalytics();
   if (!quiet) showStatus(`SYNC COMPLETE · ${admin.accounts.length} ACCOUNTS`);
@@ -393,6 +404,23 @@ document.querySelector('[data-system-apply]').addEventListener('click', async ()
     showStatus(error.message, true);
   } finally {
     button.disabled = false;
+  }
+});
+
+document.querySelector('[data-whats-new-enabled]').addEventListener('click', async (event) => {
+  const control = event.currentTarget;
+  const enabled = control.getAttribute('aria-pressed') !== 'true';
+  control.disabled = true;
+  try {
+    const payload = await api('/api/account/admin/whats-new', {
+      method: 'POST', body: JSON.stringify({ enabled }),
+    });
+    paintWhatsNew(payload.whatsNew);
+    showStatus(`WHAT’S NEW LOGIN BRIEFING ${payload.whatsNew.enabled ? 'ENABLED' : 'DISABLED'} SITE-WIDE`);
+  } catch (error) {
+    showStatus(error.message, true);
+  } finally {
+    control.disabled = false;
   }
 });
 

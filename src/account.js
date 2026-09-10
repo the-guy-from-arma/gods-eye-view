@@ -67,6 +67,7 @@ export function initAccounts(options = {}) {
   let authenticationHandled = false;
   let legalAcceptanceRequired = false;
   let ownerAccessRequested = false;
+  let whatsNewEnabled = false;
 
   if (!chip || !dialog || !form || !status) return null;
 
@@ -321,9 +322,14 @@ export function initAccounts(options = {}) {
     const payload = await api('/api/account/session');
     const previousUser = user;
     const previousSiteMode = siteMode.mode;
+    const previousWhatsNewEnabled = whatsNewEnabled;
     user = payload.user;
     legalAcceptanceRequired = Boolean(payload.legalAcceptanceRequired);
     siteMode = payload.siteMode || siteMode;
+    whatsNewEnabled = Boolean(payload.whatsNewEnabled);
+    if (!initial && previousWhatsNewEnabled !== whatsNewEnabled) {
+      window.dispatchEvent(new CustomEvent('gev:whats-new-availability', { detail: { enabled: whatsNewEnabled } }));
+    }
     if (!initial && previousUser && !user) {
       location.reload();
       return;

@@ -173,6 +173,59 @@ test('owner dashboard is session-protected and returns Autopilot plus the accoun
   assert.equal(payload.telemetry.searches24h, 9);
   assert.equal(payload.telemetry.failedLogins24h, 2);
   assert.equal(payload.telemetry.legalVersion, '0.3.02');
+  assert.equal(payload.whatsNew.enabled, false);
+});
+
+test('What’s New acknowledgement is scoped to the authenticated account and current announcement', async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM gev_sessions s JOIN gev_users/.test(sql)) return { rows: [{
+        id: 5, email: 'member@example.com', email_verified_at: new Date(),
+        legal_accepted_version: '0.3.02', legal_accepted_at: new Date(),
+      }] };
+      if (/key = 'whats_new_enabled'/.test(sql)) return { rows: [{ value: 'true' }] };
+      if (/SELECT acknowledged_at/.test(sql)) return { rows: [] };
+      return { rows: [] };
+    },
+  };
+  const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
+  const getReq = request('GET', '/api/account/whats-new');
+  getReq.headers.cookie = 'gev_session=member-session';
+  const getRes = response();
+  await middleware(getReq, getRes, () => assert.fail('account path must not fall through'));
+  const briefing = JSON.parse(getRes.body);
+  assert.equal(briefing.enabled, true);
+  assert.equal(briefing.acknowledged, false);
+  assert.equal(briefing.announcementId, 'thunderlink-whats-new-0.3.28');
+
+  const postReq = request('POST', '/api/account/whats-new/acknowledge', { announcementId: briefing.announcementId });
+  postReq.headers.cookie = 'gev_session=member-session';
+  const postRes = response();
+  await middleware(postReq, postRes, () => assert.fail('account path must not fall through'));
+  assert.equal(postRes.statusCode, 200);
+  assert.equal(calls.some(({ sql, params }) => /INSERT INTO gev_announcement_acknowledgements/.test(sql)
+    && String(params[0]) === '5' && params[1] === briefing.announcementId), true);
+});
+
+test('owner can disable the login release briefing site-wide', async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM gev_sessions s JOIN gev_users/.test(sql)) return { rows: [{ id: 1, email: 'owner@example.com', email_verified_at: new Date() }] };
+      return { rows: [] };
+    },
+  };
+  const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
+  const req = request('POST', '/api/account/admin/whats-new', { enabled: false });
+  req.headers.cookie = 'gev_session=owner-session';
+  const res = response();
+  await middleware(req, res, () => assert.fail('account path must not fall through'));
+  assert.equal(res.statusCode, 200);
+  assert.equal(JSON.parse(res.body).whatsNew.enabled, false);
+  assert.equal(calls.some(({ sql, params }) => /whats_new_enabled/.test(sql) && params[0] === 'false'), true);
 });
 
 test('owner can enable Autopilot and manually approve or reject accounts', async () => {

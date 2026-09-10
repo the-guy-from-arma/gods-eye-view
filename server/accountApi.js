@@ -7,6 +7,7 @@ import {
   normalizeLayerAvailabilityStatus,
 } from '../src/data/layerAvailability.js';
 import { CURRENT_LEGAL_VERSION, legalAcceptanceIsCurrent } from '../src/legalPolicy.js';
+import { RELEASE_ANNOUNCEMENT } from '../src/releaseAnnouncement.js';
 import { opaqueCameraTitle, redactFrameWithWorker } from './protectedFrameArchive.js';
 import { analyzeVehicleFrame } from './vehicleAnalytics.js';
 
@@ -230,6 +231,8 @@ export function createAccountApi(options = {}) {
         ON CONFLICT (key) DO NOTHING;
       INSERT INTO gev_settings (key, value) VALUES ('protected_frame_archive_enabled', 'false')
         ON CONFLICT (key) DO NOTHING;
+      INSERT INTO gev_settings (key, value) VALUES ('whats_new_enabled', 'true')
+        ON CONFLICT (key) DO NOTHING;
       CREATE TABLE IF NOT EXISTS gev_layer_availability (
         layer_id TEXT PRIMARY KEY,
         status TEXT NOT NULL DEFAULT 'live'
@@ -307,6 +310,12 @@ export function createAccountApi(options = {}) {
       );
       CREATE INDEX IF NOT EXISTS gev_protected_vehicle_frames_created_idx
         ON gev_protected_vehicle_frames(created_at DESC);
+      CREATE TABLE IF NOT EXISTS gev_announcement_acknowledgements (
+        user_id BIGINT NOT NULL REFERENCES gev_users(id) ON DELETE CASCADE,
+        announcement_id TEXT NOT NULL,
+        acknowledged_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (user_id, announcement_id)
+      );
       DELETE FROM gev_vehicle_observations WHERE captured_at < NOW() - INTERVAL '90 days';
       DELETE FROM gev_vehicle_frame_scans WHERE captured_at < NOW() - INTERVAL '90 days';
       DELETE FROM gev_protected_vehicle_frames WHERE created_at < NOW() - INTERVAL '7 days';
@@ -352,6 +361,11 @@ export function createAccountApi(options = {}) {
   const getSiteMode = async () => {
     const result = await pool.query("SELECT value FROM gev_settings WHERE key = 'site_operating_mode'");
     return publicSiteMode(result.rows[0]?.value);
+  };
+
+  const getWhatsNewEnabled = async () => {
+    const result = await pool.query("SELECT value FROM gev_settings WHERE key = 'whats_new_enabled'");
+    return result.rows[0]?.value !== 'false';
   };
 
   const getLayerAvailability = async () => {
@@ -549,13 +563,45 @@ export function createAccountApi(options = {}) {
       }
 
       if (url.pathname === '/api/account/session' && req.method === 'GET') {
-        const [user, siteMode] = await Promise.all([currentUser(req), getSiteMode()]);
+        const [user, siteMode, whatsNewEnabled] = await Promise.all([currentUser(req), getSiteMode(), getWhatsNewEnabled()]);
         return json(res, 200, {
           user,
           siteMode,
+          whatsNewEnabled,
           legalVersion: CURRENT_LEGAL_VERSION,
           legalAcceptanceRequired: Boolean(user && !user.legalAccepted),
         });
+      }
+
+      if (url.pathname === '/api/account/whats-new' && req.method === 'GET') {
+        const user = await currentUser(req);
+        if (!user) return json(res, 401, { error: 'Sign in required' });
+        const [enabled, acknowledgement] = await Promise.all([
+          getWhatsNewEnabled(),
+          pool.query(`SELECT acknowledged_at AS "acknowledgedAt"
+            FROM gev_announcement_acknowledgements WHERE user_id = $1 AND announcement_id = $2`,
+          [user.id, RELEASE_ANNOUNCEMENT.id]),
+        ]);
+        return json(res, 200, {
+          announcementId: RELEASE_ANNOUNCEMENT.id,
+          enabled,
+          acknowledged: Boolean(acknowledgement.rows[0]),
+          acknowledgedAt: acknowledgement.rows[0]?.acknowledgedAt || null,
+        });
+      }
+
+      if (url.pathname === '/api/account/whats-new/acknowledge' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (!user) return json(res, 401, { error: 'Sign in required' });
+        const body = await readJson(req);
+        if (body.announcementId !== RELEASE_ANNOUNCEMENT.id) {
+          return json(res, 400, { error: 'Announcement version is not current' });
+        }
+        await pool.query(`INSERT INTO gev_announcement_acknowledgements (user_id, announcement_id, acknowledged_at)
+          VALUES ($1, $2, NOW()) ON CONFLICT (user_id, announcement_id)
+          DO UPDATE SET acknowledged_at = EXCLUDED.acknowledged_at`, [user.id, RELEASE_ANNOUNCEMENT.id]);
+        await record(req, 'ui_action', { action: 'whats_new_acknowledged', announcement: RELEASE_ANNOUNCEMENT.id }, user);
+        return json(res, 200, { ok: true, announcementId: RELEASE_ANNOUNCEMENT.id });
       }
 
       if (url.pathname === '/api/account/accept-legal' && req.method === 'POST') {
@@ -579,9 +625,10 @@ export function createAccountApi(options = {}) {
       if (url.pathname === '/api/account/admin' && req.method === 'GET') {
         const user = await currentUser(req);
         if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
-        const [autopilot, siteMode, accounts, layers, sessionMetrics, activityMetrics] = await Promise.all([
+        const [autopilot, siteMode, whatsNewEnabled, accounts, layers, sessionMetrics, activityMetrics] = await Promise.all([
           isAutopilotEnabled(),
           getSiteMode(),
+          getWhatsNewEnabled(),
           pool.query(`
             SELECT id, email, approval_status AS status, created_at AS "createdAt", approved_at AS "approvedAt",
               security_locked AS locked, security_lock_reason AS "lockReason", security_locked_at AS "lockedAt",
@@ -618,6 +665,11 @@ export function createAccountApi(options = {}) {
         return json(res, 200, {
           autopilot,
           siteMode,
+          whatsNew: {
+            enabled: whatsNewEnabled,
+            announcementId: RELEASE_ANNOUNCEMENT.id,
+            range: RELEASE_ANNOUNCEMENT.range,
+          },
           accounts: accounts.rows.map((account) => ({ ...account, id: String(account.id) })),
           layers,
           telemetry: {
@@ -863,6 +915,20 @@ export function createAccountApi(options = {}) {
         `, [mode]);
         await record(req, 'ui_action', { action: 'site_operating_mode', mode }, user);
         return json(res, 200, { ok: true, siteMode: publicSiteMode(mode) });
+      }
+
+      if (url.pathname === '/api/account/admin/whats-new' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const body = await readJson(req);
+        if (typeof body.enabled !== 'boolean') return json(res, 400, { error: 'Enabled state must be true or false' });
+        await pool.query(`INSERT INTO gev_settings (key, value, updated_at) VALUES ('whats_new_enabled', $1, NOW())
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [String(body.enabled)]);
+        await record(req, 'ui_action', { action: 'whats_new_availability', enabled: body.enabled }, user);
+        return json(res, 200, {
+          ok: true,
+          whatsNew: { enabled: body.enabled, announcementId: RELEASE_ANNOUNCEMENT.id, range: RELEASE_ANNOUNCEMENT.range },
+        });
       }
 
       if (url.pathname === '/api/account/admin/users' && req.method === 'POST') {
