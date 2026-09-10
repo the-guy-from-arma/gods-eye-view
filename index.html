@@ -37,8 +37,8 @@
   <div id="cesiumContainer"></div>
   <aside id="thunderlink-system-identity" aria-label="ThunderLink software identity">
     <span>OS <strong>THUNDERLINK OBLIVION</strong></span>
-    <span>VERSION <strong>0.3.25</strong></span>
-    <span>KERNEL <strong>TBSGE-KERNEL-030.026</strong></span>
+    <span>VERSION <strong>0.3.26</strong></span>
+    <span>KERNEL <strong>TBSGE-KERNEL-030.027</strong></span>
     <button id="credits-footer-button" type="button">CREDITS &amp; OPEN SOURCES</button>
   </aside>
   <footer id="platform-legal-footer" aria-label="Legal and privacy policies">
@@ -710,31 +710,6 @@
     </div>
   </div>
 
-  <dialog id="cctv-viewer-dialog" class="cctv-viewer-dialog" aria-labelledby="cctv-viewer-title">
-    <div class="cctv-viewer-shell">
-      <header>
-        <div>
-          <span>THUNDERLINK · CCTV VIEWER</span>
-          <h2 id="cctv-viewer-title">CAMERA FEED</h2>
-        </div>
-        <button id="cctv-viewer-close" class="scene-btn" type="button" aria-label="Close camera viewer">CLOSE</button>
-      </header>
-      <div class="cctv-viewer-toolbar">
-        <div class="cctv-viewer-view-controls">
-          <button id="cctv-viewer-mode" class="scene-btn" type="button">MULTI VIEW</button>
-          <button id="cctv-viewer-fit" class="scene-btn active" type="button">FIT</button>
-          <button id="cctv-viewer-native" class="scene-btn" type="button">1:1 PIXELS</button>
-        </div>
-        <span id="cctv-viewer-status">LIVE SNAPSHOT</span>
-      </div>
-      <figure id="cctv-viewer-single" class="cctv-viewer-single">
-        <img id="cctv-viewer-frame" alt="Enlarged CCTV feed" />
-        <figcaption id="cctv-viewer-caption">NO CAMERA SELECTED</figcaption>
-      </figure>
-      <div id="cctv-viewer-grid" class="cctv-viewer-grid" hidden aria-label="Selected camera feeds"></div>
-    </div>
-  </dialog>
-
   <!-- Scene Director Panel -->
   <div id="scene-panel" class="panel-collapsible collapsed" data-panel-id="scene-panel">
     <div class="panel-glow"></div>
@@ -775,6 +750,33 @@
   </div>
 
   </div>
+
+  <!-- Keep the modal outside #left-panel-stack: that layout container
+       intentionally ignores pointer input between its compact panels. -->
+  <dialog id="cctv-viewer-dialog" class="cctv-viewer-dialog" aria-labelledby="cctv-viewer-title">
+    <div class="cctv-viewer-shell">
+      <header>
+        <div>
+          <span>THUNDERLINK · CCTV VIEWER</span>
+          <h2 id="cctv-viewer-title">CAMERA FEED</h2>
+        </div>
+        <button id="cctv-viewer-close" class="scene-btn" type="button" aria-label="Close camera viewer">CLOSE</button>
+      </header>
+      <div class="cctv-viewer-toolbar">
+        <div class="cctv-viewer-view-controls">
+          <button id="cctv-viewer-mode" class="scene-btn" type="button">MULTI VIEW</button>
+          <button id="cctv-viewer-fit" class="scene-btn active" type="button">FIT</button>
+          <button id="cctv-viewer-native" class="scene-btn" type="button">1:1 PIXELS</button>
+        </div>
+        <span id="cctv-viewer-status">LIVE SNAPSHOT</span>
+      </div>
+      <figure id="cctv-viewer-single" class="cctv-viewer-single">
+        <img id="cctv-viewer-frame" alt="Enlarged CCTV feed" />
+        <figcaption id="cctv-viewer-caption">NO CAMERA SELECTED</figcaption>
+      </figure>
+      <div id="cctv-viewer-grid" class="cctv-viewer-grid" hidden aria-label="Selected camera feeds"></div>
+    </div>
+  </dialog>
 
   <!-- Global Context is deliberately independent from the left layer accordion. -->
   <aside id="right-context-rail">

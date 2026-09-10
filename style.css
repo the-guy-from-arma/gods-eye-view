@@ -6999,6 +6999,8 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   border-radius: 12px;
   background: rgba(1, 8, 13, 0.98);
   color: var(--text-primary);
+  pointer-events: auto;
+  isolation: isolate;
   box-shadow: 0 0 80px rgba(0, 205, 239, 0.18), 0 30px 100px rgba(0, 0, 0, 0.8);
 }
 
@@ -7047,6 +7049,11 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   margin: 5px 0 0;
   color: #d5f9ff;
   font: 500 clamp(18px, 2vw, 30px)/1.1 var(--font-sans);
+}
+
+#cctv-viewer-close {
+  flex: 0 0 auto;
+  min-width: 96px;
 }
 
 .cctv-viewer-single {
