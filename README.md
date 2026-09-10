@@ -294,7 +294,7 @@ Sixteen live layers, with keyless coverage available immediately and optional cr
 | 📰 **Global News Reports** | Recent incident reports from CNN, Fox News, and ABC News, shown as approximate `REPORTED · UNVERIFIED` markers with direct article links | GDELT + publishers | 🟡 Google geocoding key for markers |
 | 📡 **Law Enforcement Transmissions** | Licensed public-safety directory, special/disaster event feeds, elevated listener-activity signals, and documented direct-stream playback inside the Radio panel | Broadcastify | 🟡 approved catalog key |
 | 🚗 **Traffic** | Live congestion driving per-vehicle flow at street level — dive below ~8 km and the dots color to real jams. Keyless it's an approximate simulation | TomTom + OSM | 🟢 (🟡 TomTom makes it real — get one) |
-| 📹 **CCTV Mesh** | ~800 public cameras projected *into* the 3D space — Austin · California (Caltrans) · London (TfL). Positions are published; poses are estimated priors **you calibrate by dragging a gizmo on the camera itself** | City APIs | 🟢 |
+| 📹 **CCTV Mesh** | ~2,500 public cameras projected *into* the 3D space — Austin · California (Caltrans) · London (TfL) · Washington 511 (WSDOT). Positions are published; poses are estimated priors **you calibrate by dragging a gizmo on the camera itself** | Public transport APIs | 🟢 |
 | 🔴 **Flock Cameras** | 36,750 unique public camera placements, viewport-loaded as a separate static layer; no upstream map, network graph, precinct overlay, or live video | Ringmast4r/FLOCK + OSM contributors | 🟢 |
 | 📻 **Radio** | Geolocated world radio with an **analog tuner** — drag the needle across up to 750 stations and the globe flies to each broadcaster | Radio Browser / broadcasters | 🟢 |
 | 🚲 **Bikeshare** | Live station availability | GBFS | 🟢 |

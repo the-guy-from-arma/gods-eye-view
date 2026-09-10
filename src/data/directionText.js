@@ -38,10 +38,10 @@ export function directionToHeading(value, allowBare = false) {
   if (/\bSOUTHWEST\b|\bSW\b/.test(text)) return 225;
   // Bare cardinals — dedicated direction fields only.
   if (allowBare) {
-    if (/\bNORTH\b/.test(text)) return 0;
-    if (/\bSOUTH\b/.test(text)) return 180;
-    if (/\bEAST\b/.test(text)) return 90;
-    if (/\bWEST\b/.test(text)) return 270;
+    if (text === 'N' || /\bNORTH\b/.test(text)) return 0;
+    if (text === 'S' || /\bSOUTH\b/.test(text)) return 180;
+    if (text === 'E' || /\bEAST\b/.test(text)) return 90;
+    if (text === 'W' || /\bWEST\b/.test(text)) return 270;
   }
   return NaN;
 }

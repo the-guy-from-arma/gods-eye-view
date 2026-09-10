@@ -65,8 +65,11 @@ try {
   await page.waitForSelector('[data-intel-shell]:not([hidden])');
   assert.equal(await page.$eval('[data-intel-gate]', (node) => getComputedStyle(node).display), 'none');
   assert.equal(await page.$$eval('.overview-card[data-module-id]', (nodes) => nodes.length), 4);
+  assert.equal(await page.$$eval('.fusion-node[data-module-id]', (nodes) => nodes.length), 4);
+  assert.equal(await page.$eval('[data-fusion-total]', (node) => node.textContent), '4');
+  assert.match(await page.$eval('[data-fusion-state]', (node) => node.textContent), /ALL CHANNELS LIVE/);
 
-  await page.click('.overview-card[data-module-id="cyber-threats"]');
+  await page.click('.fusion-node[data-module-id="cyber-threats"]');
   await page.waitForFunction(() => document.querySelector('[data-feed-view]')?.hidden === false);
   await page.waitForFunction(() => document.querySelector('[data-feed-records]')?.textContent.includes('CVE-2026-1234'));
   assert.match(await page.$eval('[data-feed-view]', (node) => node.textContent), /KNOWN EXPLOITED[\s\S]*CVE-2026-1234[\s\S]*SOURCE/);

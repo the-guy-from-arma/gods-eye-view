@@ -148,6 +148,12 @@ export const DATA_CREDITS = [
       'Contains OS data © Crown copyright and database rights.',
   },
   {
+    key: 'wsdot-511-cctv',
+    html:
+      'CCTV cameras &amp; frames (Washington): ' +
+      '<a href="https://data.wsdot.wa.gov/arcgis/rest/services/TravelInformation/TravelInfoCamerasWeather/FeatureServer/0" target="_blank" rel="noopener">Washington 511 · Washington State Department of Transportation</a>',
+  },
+  {
     key: 'gbfs',
     html: 'Bikeshare availability: GBFS operator feeds (e.g. Austin BCycle)',
   },

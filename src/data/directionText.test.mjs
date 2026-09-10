@@ -22,6 +22,10 @@ test('bare cardinal words resolve ONLY when allowBare (dedicated direction field
   assert.equal(directionToHeading('North', true), 0);
   assert.equal(directionToHeading('South', true), 180);
   assert.equal(directionToHeading('East', true), 90);
+  assert.equal(directionToHeading('N', true), 0);
+  assert.equal(directionToHeading('S', true), 180);
+  assert.equal(directionToHeading('E', true), 90);
+  assert.equal(directionToHeading('W', true), 270);
   // Caltrans-style field with trailing text still extracts the bare cardinal.
   assert.equal(directionToHeading('West / SR-24', true), 270);
 });

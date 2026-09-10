@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.16] — 2026-09-09 — Live fusion schematic + Washington 511 cameras
+
+- Rebuilt the Intelligence Console overview around a ThunderLink-style live
+  aggregation schematic: provider nodes, fusion totals, current source-backed
+  signal queue, channel health, real request latency, and a visible 60-second
+  refresh cadence. Every node opens its corresponding detailed feed.
+- Added the complete current 1,705-record Washington 511/WSDOT public camera catalog from
+  WSDOT's official keyless ArcGIS FeatureServer, including validated geometry,
+  HTTPS snapshot URLs, provider attribution, 15-minute catalog caching, and
+  bounded frame loading through the existing CCTV scheduler.
+- Raised CCTV catalog and health bounds to accommodate the 1,705
+  Washington records alongside Austin, Caltrans, and TfL without silently
+  dropping a provider; added schema regression tests and browser interaction QA.
+- Advanced ThunderLink Oblivion to public build `0.3.16` and kernel
+  `TBSGE-KERNEL-030.017`; legal acceptance remains `0.3.02`.
+
 ## [0.3.15] — 2026-09-07 — Interactive intelligence channels
 
 - Rebuilt the four Global Overview panels as keyboard-accessible live channel

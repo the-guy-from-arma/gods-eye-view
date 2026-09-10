@@ -11,6 +11,9 @@ const queryForm = q('[data-query-form]');
 const queryInput = q('[data-query-input]');
 const resultView = q('[data-result-view]');
 const overviewGrid = q('[data-overview-grid]');
+const fusionView = q('[data-fusion-view]');
+const fusionNodes = q('[data-fusion-nodes]');
+const fusionStream = q('[data-fusion-stream]');
 const feedView = q('[data-feed-view]');
 const feedMetrics = q('[data-feed-metrics]');
 const feedRecords = q('[data-feed-records]');
@@ -20,6 +23,9 @@ let catalog = [];
 let user = null;
 let activeModule = null;
 let toastTimer;
+let overviewLoading = false;
+let nextOverviewRefreshAt = 0;
+const OVERVIEW_REFRESH_MS = 60_000;
 
 async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'Content-Type':'application/json', ...(options.headers || {}) } });
@@ -70,6 +76,76 @@ function countRecord(value) {
   if (Array.isArray(value)) return value.length;
   if (!value || typeof value !== 'object') return value ? 1 : 0;
   return Object.values(value).reduce((best, item) => Math.max(best, Array.isArray(item) ? item.length : 0), 0);
+}
+
+function feedState(data) {
+  if (data?.error) return 'degraded';
+  if (data?.configured === false) return 'offline';
+  if (data?.degraded) return 'partial';
+  return 'live';
+}
+
+function overviewSignals(feeds = {}) {
+  const signals = [];
+  const space = feeds['space-weather'] || {};
+  for (const item of (space.alerts || []).slice(0, 2)) {
+    signals.push({ channel: 'SPACE WEATHER', title: firstValue(item, ['product_id','message','summary'], 'SWPC bulletin') });
+  }
+  for (const item of (space.flares || []).slice(0, 1)) {
+    signals.push({ channel: 'SOLAR', title: `Flare class ${safeText(firstValue(item, ['max_class','class_type','current_class']), 'unrated')}` });
+  }
+  for (const item of (feeds['cyber-threats']?.vulnerabilities || []).slice(0, 3)) {
+    signals.push({ channel: 'CYBER', title: `${safeText(item.cveID, 'CVE')} · ${safeText(item.vendorProject || item.product, 'Known exploited vulnerability')}` });
+  }
+  for (const item of (feeds['internet-outages']?.events || []).slice(0, 2)) {
+    signals.push({ channel: 'NETWORK', title: safeText(firstValue(item, ['entityName','name'], item.entity?.name || 'Disruption signal')) });
+  }
+  for (const quote of (feeds['market-watch']?.quotes || []).slice(0, 2)) {
+    signals.push({ channel: 'MARKET', title: `${safeText(quote.meta?.symbol, 'INSTRUMENT')} · ${numberText(quote.meta?.regularMarketPrice, 4)}` });
+  }
+  return signals.slice(0, 8);
+}
+
+function renderFusion(payload, latencyMs) {
+  const entries = Object.entries(payload.feeds || {});
+  const counts = entries.map(([, data]) => countRecord(data));
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  const states = entries.map(([, data]) => feedState(data));
+  const online = states.filter((state) => state === 'live' || state === 'partial').length;
+  const degraded = states.filter((state) => state !== 'live').length;
+
+  const nodes = entries.map(([id, data], index) => {
+    const state = feedState(data);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `fusion-node fusion-node-${index % 4}`;
+    button.dataset.moduleId = id;
+    button.dataset.state = state;
+    button.setAttribute('aria-label', `Open ${id.replaceAll('-', ' ')} feed`);
+    button.append(
+      text('i', '', 'fusion-node-pulse'),
+      text('span', id.replaceAll('-', ' ').toUpperCase()),
+      text('strong', String(countRecord(data))),
+      text('small', state.toUpperCase()),
+    );
+    return button;
+  });
+  fusionNodes.replaceChildren(...nodes);
+
+  const signals = overviewSignals(payload.feeds);
+  fusionStream.replaceChildren(...(signals.length ? signals.map((signal, index) => {
+    const row = document.createElement('li');
+    row.append(text('small', `${String(index + 1).padStart(2, '0')} · ${signal.channel}`), text('span', safeText(signal.title, 'Provider observation', 180)));
+    return row;
+  }) : [text('li', 'No current provider records returned.')]));
+
+  q('[data-fusion-total]').textContent = total.toLocaleString();
+  q('[data-fusion-online]').textContent = `${online} / ${entries.length}`;
+  q('[data-fusion-degraded]').textContent = String(degraded);
+  q('[data-fusion-latency]').textContent = `${Math.max(0, Math.round(latencyMs))} MS`;
+  q('[data-fusion-state]').textContent = degraded ? (online ? 'PARTIAL FUSION' : 'PROVIDERS DEGRADED') : 'ALL CHANNELS LIVE';
+  q('[data-fusion-generated]').textContent = `SOURCE SNAPSHOT ${new Date(payload.generatedAt).toLocaleTimeString()}`;
+  fusionView.dataset.state = degraded ? 'partial' : 'live';
 }
 
 function safeText(value, fallback = '—', max = 360) {
@@ -247,29 +323,42 @@ function renderFeed(module, payload) {
   feedView.hidden = false;
 }
 
-function renderOverview(payload) {
+function renderOverview(payload, latencyMs = 0) {
   const cards = Object.entries(payload.feeds || {}).map(([id, data]) => {
     const card = document.createElement('button'); card.type = 'button'; card.className = 'overview-card'; card.dataset.moduleId = id;
     card.setAttribute('aria-label', `Open ${id.replaceAll('-',' ')} intelligence feed`);
-    const header = document.createElement('span'); header.className = 'overview-card-head'; header.append(text('span', id.replaceAll('-',' ').toUpperCase()), text('span', data.error ? 'DEGRADED' : data.degraded ? 'PARTIAL' : 'LIVE'));
+    const header = document.createElement('span'); header.className = 'overview-card-head'; header.append(text('span', id.replaceAll('-',' ').toUpperCase()), text('span', feedState(data).toUpperCase()));
     const source = data.source || data.message || (data.error ? 'Provider unavailable' : 'Connected source');
     card.append(header, text('b', String(countRecord(data))), text('p', source), text('span', 'OPEN CHANNEL →', 'overview-card-open'));
     return card;
   });
   overviewGrid.replaceChildren(...cards);
+  renderFusion(payload, latencyMs);
   providerSummary(payload.feeds);
   q('[data-last-sync]').textContent = new Date(payload.generatedAt).toLocaleTimeString();
 }
 
 function resetWorkspace() {
-  queryForm.hidden = true; resultView.hidden = true; overviewGrid.hidden = true; feedView.hidden = true; notice.hidden = true; assetPanel.hidden = true;
+  queryForm.hidden = true; resultView.hidden = true; overviewGrid.hidden = true; fusionView.hidden = true; feedView.hidden = true; notice.hidden = true; assetPanel.hidden = true;
   resultView.textContent = ''; notice.textContent = '';
 }
 
 async function loadOverview() {
+  if (overviewLoading) return;
+  overviewLoading = true;
   q('[data-workspace-state]').textContent = 'SYNCING';
-  try { const payload = await api('/api/intelligence/overview'); renderOverview(payload); q('[data-workspace-state]').textContent = 'LIVE'; }
-  catch (error) { notice.hidden = false; notice.textContent = error.message; q('[data-workspace-state]').textContent = 'DEGRADED'; }
+  const startedAt = performance.now();
+  try {
+    const payload = await api('/api/intelligence/overview');
+    if (activeModule?.id === 'overview') renderOverview(payload, performance.now() - startedAt);
+    q('[data-workspace-state]').textContent = 'LIVE';
+    nextOverviewRefreshAt = Date.now() + OVERVIEW_REFRESH_MS;
+  } catch (error) {
+    notice.hidden = false; notice.textContent = error.message; q('[data-workspace-state]').textContent = 'DEGRADED';
+    nextOverviewRefreshAt = Date.now() + 15_000;
+  } finally {
+    overviewLoading = false;
+  }
 }
 
 async function loadTargets() {
@@ -294,7 +383,7 @@ async function selectModule(moduleId) {
   q('[data-module-title]').textContent = module.name; q('[data-module-description]').textContent = module.description;
   q('[data-workspace-title]').textContent = module.name; q('[data-workspace-state]').textContent = module.allowed ? 'READY' : 'CONTROLLED';
   if (!module.allowed) { notice.hidden = false; notice.textContent = module.status !== 'live' ? `The owner has set this module to ${module.status.replace('_',' ')}.` : `${module.access.toUpperCase()} access is required for this module.`; return; }
-  if (module.id === 'overview') { overviewGrid.hidden = false; await loadOverview(); return; }
+  if (module.id === 'overview') { fusionView.hidden = false; overviewGrid.hidden = false; await loadOverview(); return; }
   if (QUERY_MODULES.has(module.id) || SCAN_TYPES.has(module.id)) {
     queryForm.hidden = false; queryInput.value = ''; queryInput.placeholder = SCAN_TYPES.has(module.id) ? 'verified-domain.example' : (PLACEHOLDERS[module.id] || 'Enter query');
     q('[data-query-label]').firstChild.textContent = SCAN_TYPES.has(module.id) ? 'VERIFIED ASSET ' : 'PASSIVE QUERY ';
@@ -342,6 +431,7 @@ q('[data-targets]').addEventListener('click', async (event) => {
 
 nav.addEventListener('click',(event)=>{ const button=event.target.closest('[data-module-id]'); if(button) void selectModule(button.dataset.moduleId); });
 overviewGrid.addEventListener('click',(event)=>{ const button=event.target.closest('[data-module-id]'); if(button) void selectModule(button.dataset.moduleId); });
+fusionNodes.addEventListener('click',(event)=>{ const button=event.target.closest('[data-module-id]'); if(button) void selectModule(button.dataset.moduleId); });
 q('[data-provider-status]').addEventListener('click',(event)=>{ const button=event.target.closest('[data-module-id]'); if(button) void selectModule(button.dataset.moduleId); });
 q('[data-feed-back]').addEventListener('click',()=>void selectModule('overview'));
 q('[data-feed-refresh]').addEventListener('click',()=>{ if(activeModule && FEED_MODULES.has(activeModule.id)) void selectModule(activeModule.id); });
@@ -360,5 +450,12 @@ async function start() {
   } catch (error) { q('[data-gate-message]').textContent = error.message; }
 }
 
-setInterval(()=>{ q('[data-intel-clock]').textContent=`${new Date().toISOString().slice(11,19)} UTC`; },1000);
+setInterval(()=>{
+  q('[data-intel-clock]').textContent=`${new Date().toISOString().slice(11,19)} UTC`;
+  const remaining = Math.max(0, nextOverviewRefreshAt - Date.now());
+  q('[data-refresh-countdown]').textContent = nextOverviewRefreshAt
+    ? `NEXT POLL ${Math.ceil(remaining / 1000)}S`
+    : 'NEXT POLL --';
+  if (activeModule?.id === 'overview' && !document.hidden && nextOverviewRefreshAt && remaining === 0) void loadOverview();
+},1000);
 void start();

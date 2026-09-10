@@ -3690,8 +3690,9 @@ const DEFAULT_CCTV_SOURCE_FILE = 'config/cctv_sources.austin.json';
 const DEFAULT_AUSTIN_ROWS_URL = 'https://data.austintexas.gov/api/views/b4k4-adkb/rows.json?accessType=DOWNLOAD';
 /** Default cap on Austin cameras after distance-based prioritization. */
 const DEFAULT_AUSTIN_MAX_SOURCES = 250;
-/** Global cap on total CCTV sources served by the proxy. */
-const DEFAULT_CCTV_MAX_SOURCES = 900;
+/** Global cap on total CCTV sources served by the proxy. Sized for the
+ * existing city packs plus the complete Washington 511/WSDOT catalog. */
+const DEFAULT_CCTV_MAX_SOURCES = 3000;
 /** Reference point for Austin camera prioritization (Congress & 6th). */
 const AUSTIN_DOWNTOWN = { lat: 30.2672, lon: -97.7431 };
 /** Caltrans CCTV: one JSON feed per district, identical schema statewide. */
@@ -3712,6 +3713,11 @@ const TFL_JAMCAM_URL = 'https://api.tfl.gov.uk/Place/Type/JamCam';
 const TFL_IMAGE_ORIGIN = 'https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/';
 const DEFAULT_TFL_MAX_SOURCES = 250;
 const LONDON_CENTER = { lat: 51.5074, lon: -0.1278 };
+/** Washington 511 camera locations + registered snapshot URLs. The ArcGIS
+ * layer is the current keyless public replacement for WSDOT's retired
+ * data.wsdot.wa.gov/log/public/cameras.json endpoint. */
+const WSDOT_511_CAMERA_URL = 'https://data.wsdot.wa.gov/arcgis/rest/services/TravelInformation/TravelInfoCamerasWeather/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=geojson';
+const DEFAULT_WSDOT_511_MAX_SOURCES = 2000;
 /** Camera CATALOGS change rarely; 15 min keeps multi-megabyte upstream list refetches (Austin rows.json + 4 Caltrans districts + TfL) infrequent. Frames are fetched per-request and are unaffected. */
 const CCTV_SOURCE_CACHE_MS = 15 * 60 * 1000;
 /** Per-provider catalog-fetch timeout. Bounds the worst-case refresh so one
@@ -4338,6 +4344,82 @@ async function loadTflSourcesFromOpenData() {
 }
 
 /**
+ * Convert one feature from WSDOT's public Washington 511 ArcGIS camera layer
+ * into ThunderLink's canonical CCTV record. Exported for schema-regression
+ * tests because the agency layer is live and may evolve independently.
+ *
+ * @param {object} feature ArcGIS GeoJSON feature.
+ * @returns {object|null} Normalized source or null when unusable.
+ */
+export function normalizeWsdot511Camera(feature) {
+  const props = feature?.properties || {};
+  const coords = feature?.geometry?.type === 'Point' ? feature.geometry.coordinates : null;
+  const lon = toFiniteNumber(coords?.[0], NaN);
+  const lat = toFiniteNumber(coords?.[1], NaN);
+  const objectId = String(props.OBJECTID ?? feature?.id ?? '').trim();
+  const imageUrl = String(props.ImageURL || '').trim();
+  if (!objectId || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  // WSDOT intentionally publishes eight Portland-metro TripCheck partners
+  // just south of the state line; retain that official cross-border coverage.
+  if (lat < 42 || lat > 49.1 || lon < -125 || lon > -116.7) return null;
+  if (!/^https:\/\//i.test(imageUrl)) return null;
+
+  const sourceHeading = directionToHeading(props.CompassDirection, true);
+  const hasHeading = Number.isFinite(sourceHeading);
+  const cameraId = `wsdot-${objectId}`;
+  return {
+    id: cameraId,
+    name: String(props.CameraTitle || `Washington 511 Camera ${objectId}`).trim(),
+    city: 'Washington State',
+    cityId: '',
+    provider: 'Washington 511 · WSDOT',
+    lat,
+    lon,
+    headingDeg: hasHeading ? sourceHeading : fallbackHeadingFromId(cameraId),
+    headingConfidence: hasHeading ? 'high' : 'low',
+    pitchDeg: hasHeading ? -24 : -18,
+    fovDeg: hasHeading ? 56 : 44,
+    rangeM: hasHeading ? 210 : 145,
+    mountHeightM: 10,
+    groundElevationM: 150,
+    feedType: 'image',
+    url: imageUrl,
+    snapshotUrl: imageUrl,
+    sourceKind: 'wsdot-511-open-data',
+    license: 'Washington State Department of Transportation public traveler-information camera',
+  };
+}
+
+/** Load the full keyless Washington 511/WSDOT public camera catalog. */
+async function loadWsdot511SourcesFromOpenData() {
+  try {
+    const resp = await fetch(WSDOT_511_CAMERA_URL, {
+      headers: { Accept: 'application/geo+json, application/json' },
+      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
+    });
+    if (!resp.ok) {
+      console.warn('[CCTV] Washington 511 catalog download failed:', resp.status);
+      return [];
+    }
+    const payload = await resp.json();
+    const cameras = (Array.isArray(payload?.features) ? payload.features : [])
+      .map(normalizeWsdot511Camera)
+      .filter(Boolean);
+    const unique = Array.from(new Map(cameras.map((camera) => [camera.id, camera])).values());
+    const maxRaw = Number(process.env.CCTV_WSDOT_511_MAX_SOURCES || DEFAULT_WSDOT_511_MAX_SOURCES);
+    const maxCount = Number.isFinite(maxRaw)
+      ? Math.max(8, Math.min(2000, Math.floor(maxRaw)))
+      : DEFAULT_WSDOT_511_MAX_SOURCES;
+    const served = unique.slice(0, maxCount);
+    console.log(`[CCTV] Loaded Washington 511 camera sources: ${unique.length} (serving ${served.length})`);
+    return served;
+  } catch (error) {
+    console.warn('[CCTV] Washington 511 catalog download error:', error?.message || error);
+    return [];
+  }
+}
+
+/**
  * Normalize a raw CCTV source item into a canonical shape with safe defaults.
  *
  * @param {object} item - Raw source from file, env, or Austin Open Data.
@@ -4413,22 +4495,26 @@ async function refreshCctvSources() {
   // Austin-only fetch, now governing all three. Each pack fails independently.
   const needsLiveSources = forceAustin || ((fromFile.length + fromEnv.length) === 0 && preferAustin);
   const tflEnabled = String(process.env.CCTV_TFL_ENABLED || '1').trim() !== '0';
+  const wsdot511Enabled = String(process.env.CCTV_WSDOT_511_ENABLED || '1').trim() !== '0';
 
   let fromAustin = [];
   let fromCaltrans = [];
   let fromTfl = [];
+  let fromWsdot511 = [];
   if (needsLiveSources) {
-    const [austinResult, caltransResult, tflResult] = await Promise.allSettled([
+    const [austinResult, caltransResult, tflResult, wsdot511Result] = await Promise.allSettled([
       loadAustinSourcesFromOpenData(),
       loadCaltransSourcesFromOpenData(),
       tflEnabled ? loadTflSourcesFromOpenData() : Promise.resolve([]),
+      wsdot511Enabled ? loadWsdot511SourcesFromOpenData() : Promise.resolve([]),
     ]);
     fromAustin = austinResult.status === 'fulfilled' ? austinResult.value : [];
     fromCaltrans = caltransResult.status === 'fulfilled' ? caltransResult.value : [];
     fromTfl = tflResult.status === 'fulfilled' ? tflResult.value : [];
+    fromWsdot511 = wsdot511Result.status === 'fulfilled' ? wsdot511Result.value : [];
   }
   // Live sources first so file/env overrides win on duplicate IDs (Map last-write).
-  const merged = [...fromAustin, ...fromCaltrans, ...fromTfl, ...fromFile, ...fromEnv];
+  const merged = [...fromAustin, ...fromCaltrans, ...fromTfl, ...fromWsdot511, ...fromFile, ...fromEnv];
 
   // Deduplicate by camera ID (last-write wins because of Map.set)
   const byId = new Map();
@@ -4441,7 +4527,7 @@ async function refreshCctvSources() {
 
   const mergedSources = Array.from(byId.values());
   const maxRaw = Number(process.env.CCTV_MAX_SOURCES || DEFAULT_CCTV_MAX_SOURCES);
-  const maxCount = Number.isFinite(maxRaw) ? Math.max(8, Math.min(1200, Math.floor(maxRaw))) : DEFAULT_CCTV_MAX_SOURCES;
+  const maxCount = Number.isFinite(maxRaw) ? Math.max(8, Math.min(5000, Math.floor(maxRaw))) : DEFAULT_CCTV_MAX_SOURCES;
   if (mergedSources.length > maxCount) {
     console.warn(`[CCTV] source catalog ${mergedSources.length} exceeds cap ${maxCount}; keeping the first ${maxCount} (raise CCTV_MAX_SOURCES or lower a per-pack cap to change which).`);
   }
@@ -4687,10 +4773,9 @@ export async function fetchCctvImageFromUpstream(url, {
 function cctvProxy() {
   /** @type {Map<string,{id:string,status:string,sourceKind:string,label:string,message:string,updatedAt:number}>} */
   const health = new Map();
-  /** Cap on health map entries to prevent unbounded growth. Sized to cover the
-   * full served catalog (CCTV_MAX_SOURCES hard-bounds at 1200) so health/status
-   * observability isn't silently evicted for a default 800-camera catalog. */
-  const HEALTH_MAX_ENTRIES = 1200;
+  /** Cap on health map entries to prevent unbounded growth. Matches the CCTV
+   * catalog hard bound so Washington 511 records retain honest health state. */
+  const HEALTH_MAX_ENTRIES = 5000;
 
   /** Update the health entry for a camera, evicting the oldest entry if at capacity. */
   const setHealth = (cameraId, patch) => {

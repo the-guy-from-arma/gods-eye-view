@@ -16,7 +16,7 @@
   <div class="intel-grid" aria-hidden="true"></div>
   <header class="intel-topbar">
     <a class="intel-brand" href="/"><img src="/logo.svg" alt="" /><span><strong>THUNDERLINK</strong><small>INTELLIGENCE CONSOLE</small></span></a>
-    <div class="intel-system"><span><i></i>SECURE SESSION</span><span data-intel-clock>--:--:-- UTC</span><span>VERSION <strong>0.3.15</strong></span><span>TBSGE-KERNEL-030.016</span></div>
+    <div class="intel-system"><span><i></i>SECURE SESSION</span><span data-intel-clock>--:--:-- UTC</span><span>VERSION <strong>0.3.16</strong></span><span>TBSGE-KERNEL-030.017</span></div>
     <nav><a href="/">OPERATIONS MAP</a><a href="/owner.html" data-owner-link hidden>OWNER COMMAND</a><button type="button" data-intel-logout>SIGN OUT</button></nav>
   </header>
 
@@ -42,6 +42,36 @@
           <button type="submit">RUN PASSIVE QUERY</button>
         </form>
         <div class="module-notice" data-module-notice hidden></div>
+        <section class="fusion-view" data-fusion-view aria-label="Live intelligence aggregation fabric">
+          <header class="fusion-header">
+            <div><span class="eyebrow">LIVE AGGREGATION FABRIC</span><strong>PROVIDER FUSION BUS</strong></div>
+            <div class="fusion-clock"><i aria-hidden="true"></i><span data-fusion-state>SYNCHRONIZING</span><small data-refresh-countdown>NEXT POLL --</small></div>
+          </header>
+          <div class="fusion-layout">
+            <div class="fusion-schematic" data-fusion-schematic>
+              <svg viewBox="0 0 800 360" preserveAspectRatio="none" aria-hidden="true">
+                <path class="fusion-orbit" d="M112 180C112 69 241 28 400 28s288 41 288 152-129 152-288 152S112 291 112 180Z" />
+                <path class="fusion-orbit fusion-orbit-inner" d="M228 180c0-65 77-104 172-104s172 39 172 104-77 104-172 104-172-39-172-104Z" />
+                <path class="fusion-link" d="M128 88L400 180 672 88M128 272L400 180 672 272" />
+                <path class="fusion-axis" d="M34 180H766M400 14V346" />
+              </svg>
+              <div class="fusion-core">
+                <span>FUSION CORE</span><strong data-fusion-total>0</strong><small>LIVE RECORDS</small>
+              </div>
+              <div class="fusion-nodes" data-fusion-nodes></div>
+            </div>
+            <aside class="fusion-stream">
+              <header><span>AGGREGATED SIGNALS</span><small data-fusion-generated>WAITING FOR PROVIDERS</small></header>
+              <ol data-fusion-stream><li>Establishing source channels…</li></ol>
+            </aside>
+          </div>
+          <footer class="fusion-readouts">
+            <span><small>CHANNELS ONLINE</small><b data-fusion-online>0 / 0</b></span>
+            <span><small>DEGRADED</small><b data-fusion-degraded>0</b></span>
+            <span><small>ROUND TRIP</small><b data-fusion-latency>—</b></span>
+            <span><small>DATA WINDOW</small><b>PROVIDER CURRENT</b></span>
+          </footer>
+        </section>
         <div class="overview-grid" data-overview-grid></div>
         <section class="feed-view" data-feed-view hidden aria-live="polite">
           <header class="feed-toolbar">
