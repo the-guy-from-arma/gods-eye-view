@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.25] — 2026-09-10 — Six-state 511 camera expansion
+
+- Added official Rhode Island, New Hampshire, Maine, West Virginia, and
+  Kentucky traveler-camera catalogs, including statewide RIDOT and WV511
+  placement data plus statewide and Lexington-Fayette Kentucky snapshots.
+- Replaced Missouri's 12-camera legacy snapshot file with MoDOT's current
+  880-placement statewide catalog, retaining live stream endpoints when MoDOT
+  reports them available and placement-only markers for unavailable streams.
+- Added the new state providers to the default catalog, state filters, provider
+  health reporting, source credits, and normalization regression coverage.
+- Advanced ThunderLink Oblivion to public build `0.3.25` and kernel
+  `TBSGE-KERNEL-030.026`; legal acceptance remains `0.3.02`.
+
 ## [0.3.24] — 2026-09-10 — Owner-only vehicle classification
 
 - Added an owner-only vehicle analytics workspace with state/camera selection,

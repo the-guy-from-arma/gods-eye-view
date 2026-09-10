@@ -70,8 +70,13 @@ const PROVIDER_LABELS = {
   sc: '511SC · SCDOT',
   al: 'ALGO Traffic · ALDOT',
   oh: 'OHGO · ODOT',
+  ri: 'Rhode Island Travel Cameras · RIDOT',
+  nh: 'New England 511 · NHDOT',
+  me: 'New England 511 · MaineDOT',
   vt: 'New England 511 · VTrans',
   ct: 'CTroads · CTDOT',
+  wv: 'WV511 · West Virginia DOT',
+  ky: 'GoKY · Kentucky Transportation Cabinet',
   or: 'Oregon 511 · ODOT TripCheck',
   mi: 'Michigan 511 · MDOT MiDrive',
   in: 'Indiana 511 · INDOT TrafficWise',
@@ -798,19 +803,174 @@ async function loadOklahoma() {
 }
 
 export function normalizeMissouriCamera(record) {
-  const id = String(record?.id || '').trim();
-  const lat = finite(record?.location?.y);
-  const lon = finite(record?.location?.x);
+  const p = record?.attributes || record || {};
+  const id = String(p.CAM_ID ?? record?.id ?? '').trim();
+  const lat = finite(record?.geometry?.y ?? p.Y ?? record?.location?.y);
+  const lon = finite(record?.geometry?.x ?? p.X ?? record?.location?.x);
   if (!id || !inBounds(lat, lon, [35.9, 40.7, -95.8, -89.0])) return null;
+  const candidate = p.URL2 ?? p.URL1 ?? record?.url;
   let url = '';
-  try { url = new URL(record.url, 'https://traveler.modot.org').toString(); } catch { return null; }
-  return cameraDefaults({ id: `modot-${id}`, name: String(record.caption || `MoDOT camera ${id}`).trim(), state: 'Missouri', stateCode: 'mo', provider: PROVIDER_LABELS.mo, lat, lon, url, sourceKind: 'state-511-mo' });
+  try { url = candidate ? new URL(candidate, 'https://traveler.modot.org').toString() : ''; } catch { /* malformed provider URL */ }
+  const streamAvailable = Boolean(record?.attributes)
+    && String(p.STREAM_ERROR || 'N').toUpperCase() !== 'Y' && /^https:\/\//i.test(url);
+  const legacySnapshotAvailable = !record?.attributes && Boolean(url);
+  const mediaUrl = streamAvailable || legacySnapshotAvailable ? url : '';
+  return cameraDefaults({
+    id: `modot-${id}`,
+    name: String(p.DESCRIPTION || record?.caption || `MoDOT camera ${id}`).trim(),
+    state: 'Missouri',
+    stateCode: 'mo',
+    provider: PROVIDER_LABELS.mo,
+    lat,
+    lon,
+    url: mediaUrl,
+    snapshotUrl: legacySnapshotAvailable ? url : '',
+    feedType: streamAvailable ? 'hls' : 'image',
+    sourceKind: mediaUrl ? 'state-511-mo' : 'state-511-mo-metadata',
+    framePolicy: mediaUrl ? '' : 'metadata-only',
+    license: mediaUrl
+      ? 'MoDOT public traveler-information camera'
+      : 'MoDOT public camera placement metadata; provider currently reports the stream unavailable',
+  });
 }
 
 async function loadMissouri() {
-  const payload = await fetchJson('https://traveler.modot.org/map/js/snapshot.json', { headers: { Referer: 'https://traveler.modot.org/map/' } });
-  if (!Array.isArray(payload?.cameras)) throw new Error('no camera array');
-  return payload.cameras.map(normalizeMissouriCamera).filter(Boolean);
+  const payload = await fetchJson('https://mapping.modot.mo.gov/arcgis/rest/services/TravelerInformation/NWSDATA/MapServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=json', {
+    headers: { Referer: 'https://traveler.modot.org/map/' },
+  });
+  if (!Array.isArray(payload?.features)) throw new Error('no camera features');
+  return payload.features.map(normalizeMissouriCamera).filter(Boolean);
+}
+
+function normalizeHttpUrl(value, base = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw, base || undefined).toString();
+  } catch {
+    return '';
+  }
+}
+
+export function normalizeRhodeIslandCamera(feature) {
+  const p = feature?.attributes || {};
+  const id = String(p.EquipmentID ?? p.OBJECTID ?? '').trim();
+  const lat = finite(feature?.geometry?.y ?? p.Latitude);
+  const lon = finite(feature?.geometry?.x ?? p.Longitude);
+  let url = normalizeHttpUrl(p.CCVEWebURL);
+  if (url.startsWith('http://www.dot.ri.gov/')) url = `https://${url.slice('http://'.length)}`;
+  if (!id || Number(p.Enabled) !== 1 || !url || !inBounds(lat, lon, [41.1, 42.1, -71.9, -71.0])) return null;
+  return cameraDefaults({
+    id: `ridot-${id}`,
+    name: String(p.Description || `RIDOT camera ${id}`).trim(),
+    state: 'Rhode Island',
+    stateCode: 'ri',
+    provider: PROVIDER_LABELS.ri,
+    lat,
+    lon,
+    url,
+    sourceKind: 'state-511-ri',
+  });
+}
+
+async function loadRhodeIsland() {
+  const payload = await fetchJson('https://risegis.ri.gov/hosting/rest/services/RIDOT/Rhodeways/MapServer/6/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=json', {
+    headers: { Referer: 'https://www.dot.ri.gov/travel/' },
+  });
+  if (!Array.isArray(payload?.features)) throw new Error('no camera features');
+  return payload.features.map(normalizeRhodeIslandCamera).filter(Boolean);
+}
+
+export function normalizeKentuckyCamera(feature, source = 'statewide') {
+  const p = feature?.attributes || {};
+  const id = String(p.OBJECTID ?? p.objectid ?? '').trim();
+  const lat = finite(p.latitude ?? feature?.geometry?.y);
+  const lon = finite(p.longitude ?? feature?.geometry?.x);
+  const url = normalizeHttpUrl(p.snapshot ?? p.still_url);
+  if (!id || !url || !inBounds(lat, lon, [36.4, 39.3, -89.7, -81.8])) return null;
+  const isLexington = source === 'lexington';
+  return cameraDefaults({
+    id: `kydot-${isLexington ? 'lex-' : ''}${id}`,
+    name: String(p.description || p.location || p.name || `Kentucky camera ${id}`).trim(),
+    state: p.county ? `${String(p.county).trim()} County, Kentucky` : 'Kentucky',
+    stateCode: 'ky',
+    provider: isLexington ? `${PROVIDER_LABELS.ky} · Lexington-Fayette` : PROVIDER_LABELS.ky,
+    lat,
+    lon,
+    url,
+    sourceKind: 'state-511-ky',
+  });
+}
+
+async function loadKentucky() {
+  const [statewideResult, lexingtonResult] = await Promise.allSettled([
+    fetchJson('https://services2.arcgis.com/CcI36Pduqd0OR4W9/ArcGIS/rest/services/trafficCamerasCur_Prd/FeatureServer/0/query?where=1%3D1&outFields=OBJECTID%2Cname%2Cdescription%2Csnapshot%2Cstatus%2Clatitude%2Clongitude%2Ccounty&returnGeometry=false&f=json', {
+      headers: { Referer: 'https://goky.ky.gov/' },
+    }),
+    fetchJson('https://services1.arcgis.com/Mg7DLdfYcSWIaDnu/ArcGIS/rest/services/Traffic_Camera_Locations_Public_view/FeatureServer/0/query?where=1%3D1&outFields=OBJECTID%2Clocation%2Cstill_url&returnGeometry=true&outSR=4326&f=json', {
+      headers: { Referer: 'https://goky.ky.gov/' },
+    }),
+  ]);
+  const statewide = statewideResult.status === 'fulfilled' ? statewideResult.value : null;
+  const lexington = lexingtonResult.status === 'fulfilled' ? lexingtonResult.value : null;
+  const statewideFeatures = Array.isArray(statewide?.features) ? statewide.features : [];
+  const lexingtonFeatures = Array.isArray(lexington?.features) ? lexington.features : [];
+  if (!statewideFeatures.length && !lexingtonFeatures.length) throw new Error('no camera features');
+  const cameras = [
+    ...statewideFeatures.map((feature) => normalizeKentuckyCamera(feature, 'statewide')),
+    ...lexingtonFeatures.map((feature) => normalizeKentuckyCamera(feature, 'lexington')),
+  ].filter(Boolean);
+  const unavailable = [
+    ...(statewideResult.status === 'rejected' ? ['statewide'] : []),
+    ...(lexingtonResult.status === 'rejected' ? ['Lexington-Fayette'] : []),
+  ];
+  return unavailable.length ? { cameras, warning: `partial catalog; ${unavailable.join(' and ')} source unavailable` } : cameras;
+}
+
+export function parseWestVirginiaCameraCatalog(script) {
+  const prefix = 'var camera_data = ';
+  const start = String(script || '').indexOf(prefix);
+  if (start < 0) return [];
+  const json = String(script).slice(start + prefix.length).trim().replace(/;\s*$/, '');
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed?.cams) ? parsed.cams : [];
+  } catch {
+    return [];
+  }
+}
+
+export function normalizeWestVirginiaCamera(record) {
+  const id = String(record?.md5 || '').trim();
+  const lat = finite(record?.start_lat);
+  const lon = finite(record?.start_lng);
+  if (!id || !inBounds(lat, lon, [37.0, 40.7, -82.7, -77.6])) return null;
+  const detail = stripHtml(record?.description).replace(/West Virginia DOT$/i, '').trim();
+  return cameraDefaults({
+    id: `wvdot-${id}`,
+    name: detail || String(record?.title || `WV511 camera ${id}`).trim(),
+    state: 'West Virginia',
+    stateCode: 'wv',
+    provider: PROVIDER_LABELS.wv,
+    lat,
+    lon,
+    url: '',
+    snapshotUrl: '',
+    sourceKind: 'state-511-wv-metadata',
+    framePolicy: 'metadata-only',
+    license: 'WV511 public camera placement metadata; embedded provider video is not retransmitted',
+  });
+}
+
+async function loadWestVirginia() {
+  const response = await fetch('https://wv511.org/wsvc/gmap.asmx/buildCamerasJSONjs', {
+    headers: { Accept: 'application/javascript', Referer: 'https://wv511.org/default.aspx' },
+    signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const records = parseWestVirginiaCameraCatalog(await response.text());
+  if (!records.length) throw new Error('no camera records');
+  return records.map(normalizeWestVirginiaCamera).filter(Boolean);
 }
 
 export function normalizeSouthDakotaCameras(feature) {
@@ -880,7 +1040,7 @@ function buildRegional511Query(start, length, state = '') {
 
 async function createRegional511Session(base) {
   const response = await fetch(`${base}/cctv`, {
-    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.24' },
+    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.25' },
     signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`session HTTP ${response.status}`);
@@ -941,6 +1101,14 @@ async function loadRegional511(config) {
 }
 
 const REGIONAL_511_PROVIDERS = {
+  me: {
+    key: 'me', base: 'https://newengland511.org', idPrefix: 'mainedot', provider: PROVIDER_LABELS.me,
+    state: 'Maine', filterState: 'Maine', lang: 'en', bounds: [42.9, 47.6, -71.2, -66.8],
+  },
+  nh: {
+    key: 'nh', base: 'https://newengland511.org', idPrefix: 'nhdot', provider: PROVIDER_LABELS.nh,
+    state: 'New Hampshire', filterState: 'New Hampshire', lang: 'en', bounds: [42.6, 45.4, -72.7, -70.5],
+  },
   vt: {
     key: 'vt', base: 'https://newengland511.org', idPrefix: 'vtrans', provider: PROVIDER_LABELS.vt,
     state: 'Vermont', filterState: 'Vermont', lang: 'en', bounds: [42.7, 45.1, -73.5, -71.4],
@@ -997,8 +1165,13 @@ export async function loadState511Cameras(env = process.env) {
     ...(enabled.has('sc') ? [{ key: 'sc', state: 'South Carolina', load: loadSouthCarolina }] : []),
     ...(enabled.has('al') ? [{ key: 'al', state: 'Alabama', load: loadAlabama }] : []),
     ...(enabled.has('oh') ? [{ key: 'oh', state: 'Ohio', load: loadOhio }] : []),
+    ...(enabled.has('ri') ? [{ key: 'ri', state: 'Rhode Island', load: loadRhodeIsland }] : []),
+    ...(enabled.has('me') ? [{ key: 'me', state: 'Maine', load: () => loadRegional511(REGIONAL_511_PROVIDERS.me) }] : []),
+    ...(enabled.has('nh') ? [{ key: 'nh', state: 'New Hampshire', load: () => loadRegional511(REGIONAL_511_PROVIDERS.nh) }] : []),
     ...(enabled.has('vt') ? [{ key: 'vt', state: 'Vermont', load: () => loadRegional511(REGIONAL_511_PROVIDERS.vt) }] : []),
     ...(enabled.has('ct') ? [{ key: 'ct', state: 'Connecticut', load: () => loadRegional511(REGIONAL_511_PROVIDERS.ct) }] : []),
+    ...(enabled.has('wv') ? [{ key: 'wv', state: 'West Virginia', load: loadWestVirginia }] : []),
+    ...(enabled.has('ky') ? [{ key: 'ky', state: 'Kentucky', load: loadKentucky }] : []),
     ...(enabled.has('wi') ? [{ key: 'wi', state: 'Wisconsin', load: () => loadRegional511(REGIONAL_511_PROVIDERS.wi) }] : []),
     ...(enabled.has('co') ? [{ key: 'co', state: 'Colorado', load: loadColorado }] : []),
     ...(enabled.has('nm') ? [{ key: 'nm', state: 'New Mexico', load: loadNewMexico }] : []),

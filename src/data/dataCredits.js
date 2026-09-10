@@ -176,8 +176,11 @@ export const DATA_CREDITS = [
       '<a href="https://www.511sc.org/" target="_blank" rel="noopener">SCDOT</a> · ' +
       '<a href="https://www.algotraffic.com/" target="_blank" rel="noopener">ALDOT ALGO</a> · ' +
       '<a href="https://ohgo.com/" target="_blank" rel="noopener">ODOT OHGO</a> · ' +
-      '<a href="https://newengland511.org/" target="_blank" rel="noopener">VTrans</a> · ' +
+      '<a href="https://www.dot.ri.gov/travel/" target="_blank" rel="noopener">RIDOT</a> · ' +
+      '<a href="https://newengland511.org/" target="_blank" rel="noopener">MaineDOT / NHDOT / VTrans</a> · ' +
       '<a href="https://www.ctroads.org/" target="_blank" rel="noopener">CTDOT</a> · ' +
+      '<a href="https://wv511.org/" target="_blank" rel="noopener">West Virginia DOT</a> · ' +
+      '<a href="https://goky.ky.gov/" target="_blank" rel="noopener">Kentucky Transportation Cabinet</a> · ' +
       '<a href="https://www.cotrip.org/" target="_blank" rel="noopener">Colorado DOT</a> · ' +
       '<a href="https://nmroads.com/" target="_blank" rel="noopener">New Mexico DOT</a> · ' +
       '<a href="https://www.kandrive.gov/" target="_blank" rel="noopener">Kansas DOT</a> · ' +

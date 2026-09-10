@@ -13,16 +13,20 @@ import {
   normalizeMassachusettsCamera,
   normalizeMichiganCamera,
   normalizeMissouriCamera,
+  normalizeKentuckyCamera,
   normalizeNewJerseyCamera,
   normalizeNewMexicoCamera,
   normalizeOklahomaCamera,
   normalizeOhioCamera,
   normalizeOregonCamera,
+  normalizeRhodeIslandCamera,
   normalizeSouthCarolinaCamera,
   normalizeSouthDakotaCameras,
   normalizeTennesseeCamera,
   normalizeTravelMidwestCamera,
   normalizeVirginiaCamera,
+  normalizeWestVirginiaCamera,
+  parseWestVirginiaCameraCatalog,
   parseIbi511Wkt,
 } from './cctv511Providers.js';
 
@@ -169,7 +173,7 @@ test('Alabama placements and Ohio snapshots honor provider media rules', () => {
 
 test('legacy provider override cannot hide newly added defaults, but explicit exclusions can', () => {
   const enabled = enabledProviderKeys({ CCTV_STATE_511_PROVIDERS: 'az,fl,ga' });
-  for (const key of ['ny', 'tn', 'sc', 'al', 'oh', 'vt', 'ct', 'co', 'nm', 'ks', 'ok', 'ar', 'mo', 'ia', 'ne', 'sd', 'mn', 'wi', 'il']) assert.equal(enabled.has(key), true);
+  for (const key of ['ny', 'tn', 'sc', 'al', 'oh', 'ri', 'nh', 'me', 'vt', 'ct', 'wv', 'ky', 'co', 'nm', 'ks', 'ok', 'ar', 'mo', 'ia', 'ne', 'sd', 'mn', 'wi', 'il']) assert.equal(enabled.has(key), true);
   const excluded = enabledProviderKeys({ CCTV_STATE_511_EXCLUDE_PROVIDERS: 'ny,al' });
   assert.equal(excluded.has('ny'), false);
   assert.equal(excluded.has('al'), false);
@@ -202,9 +206,43 @@ test('new state schemas normalize public media and placement-only records', () =
   const missouri = normalizeMissouriCamera({ id: 1, caption: 'US-60', url: '/camera.jpg', location: { x: -90.4, y: 36.7 } });
   assert.equal(missouri?.stateCode, 'MO');
 
+  const missouriArcGis = normalizeMissouriCamera({
+    attributes: { CAM_ID: 2487, DESCRIPTION: 'I-70 at MM 167.25', URL2: 'https://example.gov/mo.m3u8', STREAM_ERROR: 'N' },
+    geometry: { x: -91.597609, y: 38.89725 },
+  });
+  assert.equal(missouriArcGis?.feedType, 'hls');
+
   const southDakota = normalizeSouthDakotaCameras({ id: 'SITE', geometry: { coordinates: [-97.06, 44.95] }, properties: { cameras: [{ id: 1, description: 'I-29 south', image: 'https://example.gov/sd.jpg' }] } });
   assert.equal(southDakota[0]?.stateCode, 'SD');
 
   const illinois = normalizeTravelMidwestCamera({ geometry: { coordinates: [-88.1, 42.2] }, properties: { id: 'IL-IDOT-1', locDesc: 'I-90', remUrls: ['https://example.gov/il.jpg'], dirs: ['W'] } });
   assert.equal(illinois[0]?.minFrameRefreshMs, 300000);
+});
+
+test('Rhode Island, Kentucky, and West Virginia camera catalogs normalize', () => {
+  const rhodeIsland = normalizeRhodeIslandCamera({
+    attributes: {
+      OBJECTID: 19436, EquipmentID: 24, Description: 'I-95 at Broadway', Enabled: 1,
+      CCVEWebURL: 'http://www.dot.ri.gov/img/travel/camimages/sample.jpg',
+    },
+    geometry: { x: -71.37709, y: 41.88116 },
+  });
+  assert.equal(rhodeIsland?.id, 'ridot-24');
+  assert.equal(rhodeIsland?.stateCode, 'RI');
+  assert.match(rhodeIsland?.url || '', /^https:\/\/www\.dot\.ri\.gov\//);
+
+  const kentucky = normalizeKentuckyCamera({
+    attributes: { objectid: 7, location: 'Main Street / Broadway', still_url: 'https://example.gov/lex.jpg' },
+    geometry: { x: -84.50, y: 38.04 },
+  }, 'lexington');
+  assert.equal(kentucky?.id, 'kydot-lex-7');
+  assert.equal(kentucky?.stateCode, 'KY');
+
+  const script = 'var camera_data = {"count":1,"cams":[{"md5":"CAM117","title":"I-81","description":"<div>[BER] I-81 @ 0.5<span>West Virginia DOT</span></div>","start_lat":"39.302863","start_lng":"-78.078892"}]}';
+  const westVirginiaRows = parseWestVirginiaCameraCatalog(script);
+  assert.equal(westVirginiaRows.length, 1);
+  const westVirginia = normalizeWestVirginiaCamera(westVirginiaRows[0]);
+  assert.equal(westVirginia?.id, 'wvdot-CAM117');
+  assert.equal(westVirginia?.stateCode, 'WV');
+  assert.equal(westVirginia?.framePolicy, 'metadata-only');
 });
