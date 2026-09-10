@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.19] — 2026-09-10 — Southeast and New England 511 expansion
+
+- Added complete current camera catalogs for Tennessee SmartWay, South Carolina
+  511, Alabama ALGO Traffic, Ohio OHGO, Vermont through New England 511, and
+  Connecticut CTroads. The release audit accepted 3,677 additional placements:
+  668 Tennessee, 772 South Carolina, 639 Alabama, 1,162 Ohio, 89 Vermont, and
+  347 Connecticut records, bringing the merged CCTV endpoint to 31,723 sources.
+- Added provider-native HLS playback for Tennessee and South Carolina and live
+  snapshots for Ohio, Vermont, and Connecticut. Alabama is placement-only because
+  ALGO's published camera notice prohibits unauthorized retransmission of imagery.
+- Confirmed New York's complete 1,874-camera 511NY catalog and changed legacy
+  `CCTV_STATE_511_PROVIDERS` handling so an old Railway value cannot silently hide
+  newly shipped states. Operators can deliberately suppress providers with the
+  new `CCTV_STATE_511_EXCLUDE_PROVIDERS` list.
+- Added public-session pagination for the Vermont and Connecticut camera lists,
+  provider-specific media headers, normalized state/local jurisdiction labels,
+  source credits, and regression coverage for every new schema and media policy.
+- Advanced ThunderLink Oblivion to public build `0.3.19` and kernel
+  `TBSGE-KERNEL-030.020`; legal acceptance remains `0.3.02`.
+
 ## [0.3.18] — 2026-09-10 — Mid-Atlantic and Northeast 511 expansion
 
 - Added complete official 511 camera catalogs for Virginia, Pennsylvania,

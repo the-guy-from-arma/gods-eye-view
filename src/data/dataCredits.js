@@ -166,7 +166,18 @@ export const DATA_CREDITS = [
       '<a href="https://511la.org/" target="_blank" rel="noopener">LADOTD</a> · ' +
       '<a href="https://www.tripcheck.com/" target="_blank" rel="noopener">ODOT</a> · ' +
       '<a href="https://mdotjboss.state.mi.us/MiDrive/" target="_blank" rel="noopener">MDOT</a> · ' +
-      '<a href="https://511in.org/" target="_blank" rel="noopener">INDOT</a>',
+      '<a href="https://511in.org/" target="_blank" rel="noopener">INDOT</a> · ' +
+      '<a href="https://www.511pa.com/" target="_blank" rel="noopener">PennDOT</a> · ' +
+      '<a href="https://www.511ny.org/" target="_blank" rel="noopener">NYSDOT</a> · ' +
+      '<a href="https://511.vdot.virginia.gov/" target="_blank" rel="noopener">VDOT</a> · ' +
+      '<a href="https://511nj.org/" target="_blank" rel="noopener">NJDOT</a> · ' +
+      '<a href="https://mass511.com/" target="_blank" rel="noopener">MassDOT</a> · ' +
+      '<a href="https://smartway.tn.gov/" target="_blank" rel="noopener">TDOT SmartWay</a> · ' +
+      '<a href="https://www.511sc.org/" target="_blank" rel="noopener">SCDOT</a> · ' +
+      '<a href="https://www.algotraffic.com/" target="_blank" rel="noopener">ALDOT ALGO</a> · ' +
+      '<a href="https://ohgo.com/" target="_blank" rel="noopener">ODOT OHGO</a> · ' +
+      '<a href="https://newengland511.org/" target="_blank" rel="noopener">VTrans</a> · ' +
+      '<a href="https://www.ctroads.org/" target="_blank" rel="noopener">CTDOT</a>',
   },
   {
     key: 'gbfs',

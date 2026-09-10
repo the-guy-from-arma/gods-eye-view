@@ -66,6 +66,12 @@ const PROVIDER_LABELS = {
   va: 'Virginia 511 · VDOT',
   nj: '511NJ · NJDOT',
   ma: 'Massachusetts 511 · MassDOT',
+  tn: 'Tennessee SmartWay · TDOT',
+  sc: '511SC · SCDOT',
+  al: 'ALGO Traffic · ALDOT',
+  oh: 'OHGO · ODOT',
+  vt: 'New England 511 · VTrans',
+  ct: 'CTroads · CTDOT',
   or: 'Oregon 511 · ODOT TripCheck',
   mi: 'Michigan 511 · MDOT MiDrive',
   in: 'Indiana 511 · INDOT TrafficWise',
@@ -493,10 +499,240 @@ async function loadMassachusetts() {
   return features.map(normalizeMassachusettsCamera).filter(Boolean);
 }
 
-function enabledProviderKeys(env) {
-  const configured = String(env.CCTV_STATE_511_PROVIDERS || 'az,fl,ga,nc,ut,nv,la,or,mi,in,pa,ny,va,nj,ma')
+export function normalizeTennesseeCamera(record) {
+  if (!record || String(record.active).toLowerCase() !== 'true') return null;
+  const id = String(record.id || '').trim();
+  const lat = finite(record.lat);
+  const lon = finite(record.lng);
+  if (!id || !inBounds(lat, lon, [34.9, 36.8, -90.4, -81.5])) return null;
+  const streamUrl = /^https:\/\/[^\s]+\.m3u8(?:\?|$)/i.test(String(record.httpsVideoUrl || ''))
+    ? String(record.httpsVideoUrl) : '';
+  const snapshotUrl = /^https:\/\//i.test(String(record.thumbnailUrl || '')) ? String(record.thumbnailUrl) : '';
+  if (!streamUrl && !snapshotUrl) return null;
+  const jurisdiction = String(record.jurisdiction || record.county || '').trim();
+  return cameraDefaults({
+    id: `tdot-${id}`,
+    name: String(record.title || record.description || `TDOT camera ${id}`).trim(),
+    state: jurisdiction ? `${jurisdiction}, Tennessee` : 'Tennessee',
+    provider: PROVIDER_LABELS.tn,
+    lat,
+    lon,
+    url: streamUrl || snapshotUrl,
+    snapshotUrl,
+    feedType: streamUrl ? 'hls' : 'image',
+    sourceKind: 'state-511-tn',
+  });
+}
+
+async function loadTennessee() {
+  const payload = await fetchJson('https://www.tdot.tn.gov/opendata/api/public/RoadwayCameras', {
+    headers: {
+      ApiKey: '8d3b7a82635d476795c09b2c41facc60',
+      Accept: 'application/json', Origin: 'https://smartway.tn.gov', Referer: 'https://smartway.tn.gov/',
+    },
+  });
+  if (!Array.isArray(payload)) throw new Error('no camera array');
+  return payload.map(normalizeTennesseeCamera).filter(Boolean);
+}
+
+export function normalizeSouthCarolinaCamera(feature) {
+  const properties = feature?.properties || {};
+  if (properties.active === false) return null;
+  const id = String(properties.id || properties.guid || '').trim();
+  const coords = feature?.geometry?.coordinates;
+  const lon = finite(coords?.[0]);
+  const lat = finite(coords?.[1]);
+  if (!id || !inBounds(lat, lon, [32.0, 35.3, -83.4, -78.4])) return null;
+  const streamUrl = properties.problem_stream !== true && /^https:\/\/[^\s]+\.m3u8(?:\?|$)/i.test(String(properties.https_url || ''))
+    ? String(properties.https_url) : '';
+  const snapshotUrl = /^https:\/\//i.test(String(properties.image_url || '')) ? String(properties.image_url) : '';
+  if (!streamUrl && !snapshotUrl) return null;
+  const jurisdiction = String(properties.jurisdiction || '').trim();
+  return cameraDefaults({
+    id: `scdot-${id}`,
+    name: String(properties.description || properties.name || `SCDOT camera ${id}`).trim(),
+    state: jurisdiction ? `${jurisdiction}, South Carolina` : 'South Carolina',
+    provider: PROVIDER_LABELS.sc,
+    lat,
+    lon,
+    url: streamUrl || snapshotUrl,
+    snapshotUrl,
+    feedType: streamUrl ? 'hls' : 'image',
+    sourceKind: 'state-511-sc',
+    license: '511SC public traveler-information camera; SCDOT does not record footage',
+  });
+}
+
+async function loadSouthCarolina() {
+  const payload = await fetchJson('https://sc.cdn.iteris-atis.com/geojson/icons/metadata/icons.cameras.geojson', {
+    headers: { Accept: 'application/json', Referer: 'https://www.511sc.org/' },
+  });
+  const features = payload?.features;
+  if (!Array.isArray(features)) throw new Error('no camera features');
+  return features.map(normalizeSouthCarolinaCamera).filter(Boolean);
+}
+
+export function normalizeAlabamaCamera(record) {
+  const location = record?.location || {};
+  const id = String(record?.id || '').trim();
+  const lat = finite(location.latitude);
+  const lon = finite(location.longitude);
+  if (!id || String(record?.accessLevel || '').toLowerCase() !== 'public'
+    || !inBounds(lat, lon, [30.1, 35.1, -88.6, -84.8])) return null;
+  const route = String(location.displayRouteDesignator || location.routeDesignator || '').trim();
+  const crossStreet = String(location.displayCrossStreet || location.crossStreet || '').trim();
+  const city = String(location.city || '').trim();
+  const direction = String(location.direction || '').trim();
+  const name = [route, crossStreet ? `at ${crossStreet}` : '', direction ? `(${direction})` : ''].filter(Boolean).join(' ');
+  return cameraDefaults({
+    id: `aldot-${id}`,
+    name: name || `ALDOT camera ${id}`,
+    state: city ? `${city}, Alabama` : 'Alabama',
+    provider: PROVIDER_LABELS.al,
+    lat,
+    lon,
+    url: '',
+    snapshotUrl: '',
+    sourceKind: 'state-511-al-metadata',
+    framePolicy: 'metadata-only',
+    license: 'ALDOT ALGO camera placement metadata; visual media is not retransmitted under ALGO camera-use restrictions',
+  });
+}
+
+async function loadAlabama() {
+  const payload = await fetchJson('https://api.algotraffic.com/v4.0/Cameras', {
+    headers: { Accept: 'application/json', Origin: 'https://algotraffic.com', Referer: 'https://algotraffic.com/' },
+  });
+  if (!Array.isArray(payload)) throw new Error('no camera array');
+  return payload.map(normalizeAlabamaCamera).filter(Boolean);
+}
+
+export function normalizeOhioCamera(record, view, index = 0) {
+  const siteId = String(record?.Id || '').trim();
+  const lat = finite(record?.Latitude);
+  const lon = finite(record?.Longitude);
+  const mediaUrl = String(view?.LargeURL || view?.SmallURL || '').trim();
+  if (!siteId || !/^https:\/\//i.test(mediaUrl) || !inBounds(lat, lon, [38.3, 42.1, -84.9, -80.4])) return null;
+  const direction = String(view?.Direction || '').trim();
+  return cameraDefaults({
+    id: `ohdot-${siteId}-${index}`,
+    name: [String(record?.Description || record?.Location || `ODOT camera ${siteId}`).trim(), direction].filter(Boolean).join(' · '),
+    state: 'Ohio',
+    provider: PROVIDER_LABELS.oh,
+    lat,
+    lon,
+    url: mediaUrl,
+    sourceKind: 'state-511-oh',
+    license: 'OHGO · Ohio Department of Transportation public-domain traveler information',
+  });
+}
+
+async function loadOhio() {
+  const payload = await fetchJson('https://api.ohgo.com/cameras', {
+    headers: { Accept: 'application/json', Referer: 'https://ohgo.com/' },
+  });
+  if (!Array.isArray(payload)) throw new Error('no camera array');
+  return payload.flatMap((record) => (Array.isArray(record?.Cameras) ? record.Cameras : [])
+    .map((view, index) => normalizeOhioCamera(record, view, index)).filter(Boolean));
+}
+
+function buildRegional511Query(start, length, state = '') {
+  return encodeURIComponent(JSON.stringify({
+    columns: [
+      { data: null, name: '' },
+      { name: 'sortOrder', s: true },
+      ...(state ? [{ name: 'state', search: { value: state }, s: true }] : [{ name: 'region', s: true }]),
+      { name: 'roadway', s: true },
+      ...(state ? [{ name: 'location' }] : []),
+      { data: state ? 5 : 4, name: '' },
+    ],
+    order: state ? [{ column: 2, dir: 'asc' }, { column: 1, dir: 'asc' }]
+      : [{ column: 1, dir: 'asc' }, { column: 2, dir: 'asc' }, { column: 3, dir: 'asc' }],
+    start,
+    length,
+    search: { value: '' },
+  }));
+}
+
+async function createRegional511Session(base) {
+  const response = await fetch(`${base}/cctv`, {
+    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.19' },
+    signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`session HTTP ${response.status}`);
+  const html = await response.text();
+  const token = html.match(/name=["']__RequestVerificationToken["'][^>]*value=["']([^"']+)/i)?.[1]
+    || html.match(/value=["']([^"']+)["'][^>]*name=["']__RequestVerificationToken["']/i)?.[1];
+  const setCookies = typeof response.headers.getSetCookie === 'function'
+    ? response.headers.getSetCookie() : [response.headers.get('set-cookie')].filter(Boolean);
+  if (!token) throw new Error('session verification token unavailable');
+  return { token, cookie: setCookies.map((value) => value.split(';')[0]).join('; ') };
+}
+
+async function fetchRegional511Page(config, session, start) {
+  const query = buildRegional511Query(start, PAGE_SIZE, config.filterState || '');
+  const payload = await fetchJson(`${config.base}/List/GetData/Cameras?query=${query}&lang=${config.lang}`, {
+    headers: {
+      __requestverificationtoken: session.token,
+      Cookie: session.cookie,
+      Accept: 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      Referer: `${config.base}/cctv`,
+    },
+  });
+  return {
+    rows: Array.isArray(payload?.data) ? payload.data : [],
+    total: Number(config.filterState ? payload?.recordsFiltered : payload?.recordsTotal) || 0,
+  };
+}
+
+async function loadRegional511(config) {
+  const session = await createRegional511Session(config.base);
+  const first = await fetchRegional511Page(config, session, 0);
+  const cameras = new Map();
+  let rawRowCount = first.rows.length;
+  const ingest = (rows) => {
+    for (const row of rows) {
+      const camera = normalizeIbi511Camera(row, config);
+      if (camera) cameras.set(camera.id, camera);
+    }
+  };
+  ingest(first.rows);
+  const starts = [];
+  for (let start = PAGE_SIZE; start < first.total && start < PAGE_SIZE * MAX_IBI_PAGES; start += PAGE_SIZE) starts.push(start);
+  for (let index = 0; index < starts.length; index += PAGE_CONCURRENCY) {
+    const batch = await Promise.allSettled(starts.slice(index, index + PAGE_CONCURRENCY)
+      .map((start) => fetchRegional511Page(config, session, start)));
+    for (const result of batch) {
+      if (result.status !== 'fulfilled') continue;
+      rawRowCount += result.value.rows.length;
+      ingest(result.value.rows);
+    }
+  }
+  if (first.total && rawRowCount < first.total * 0.9) throw new Error(`short pagination ${rawRowCount}/${first.total}`);
+  return [...cameras.values()];
+}
+
+const REGIONAL_511_PROVIDERS = {
+  vt: {
+    key: 'vt', base: 'https://newengland511.org', idPrefix: 'vtrans', provider: PROVIDER_LABELS.vt,
+    state: 'Vermont', filterState: 'Vermont', lang: 'en', bounds: [42.7, 45.1, -73.5, -71.4],
+  },
+  ct: {
+    key: 'ct', base: 'https://ctroads.org', idPrefix: 'ctdot', provider: PROVIDER_LABELS.ct,
+    state: 'Connecticut', filterState: '', lang: 'en-US', bounds: [40.9, 42.1, -73.8, -71.7],
+  },
+};
+
+const DEFAULT_PROVIDER_KEYS = Object.freeze(Object.keys(PROVIDER_LABELS));
+
+export function enabledProviderKeys(env = process.env) {
+  const additions = String(env.CCTV_STATE_511_PROVIDERS || '')
     .split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
-  return new Set(configured.filter((key) => Object.hasOwn(PROVIDER_LABELS, key)));
+  const exclusions = new Set(String(env.CCTV_STATE_511_EXCLUDE_PROVIDERS || '')
+    .split(',').map((value) => value.trim().toLowerCase()).filter(Boolean));
+  return new Set([...DEFAULT_PROVIDER_KEYS, ...additions]
+    .filter((key) => Object.hasOwn(PROVIDER_LABELS, key) && !exclusions.has(key)));
 }
 
 function recordStatus(key, state, count = 0, error = '', stale = false) {
@@ -526,6 +762,12 @@ export async function loadState511Cameras(env = process.env) {
     ...(enabled.has('va') ? [{ key: 'va', state: 'Virginia', load: loadVirginia }] : []),
     ...(enabled.has('nj') ? [{ key: 'nj', state: 'New Jersey', load: loadNewJersey }] : []),
     ...(enabled.has('ma') ? [{ key: 'ma', state: 'Massachusetts', load: loadMassachusetts }] : []),
+    ...(enabled.has('tn') ? [{ key: 'tn', state: 'Tennessee', load: loadTennessee }] : []),
+    ...(enabled.has('sc') ? [{ key: 'sc', state: 'South Carolina', load: loadSouthCarolina }] : []),
+    ...(enabled.has('al') ? [{ key: 'al', state: 'Alabama', load: loadAlabama }] : []),
+    ...(enabled.has('oh') ? [{ key: 'oh', state: 'Ohio', load: loadOhio }] : []),
+    ...(enabled.has('vt') ? [{ key: 'vt', state: 'Vermont', load: () => loadRegional511(REGIONAL_511_PROVIDERS.vt) }] : []),
+    ...(enabled.has('ct') ? [{ key: 'ct', state: 'Connecticut', load: () => loadRegional511(REGIONAL_511_PROVIDERS.ct) }] : []),
   ];
 
   const settled = await Promise.allSettled(loaders.map((entry) => entry.load()));

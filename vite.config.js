@@ -4817,6 +4817,15 @@ function cctvProxy() {
     ...(source?.sourceKind === 'state-511-nj'
       ? { Origin: 'https://511nj.org', Referer: 'https://511nj.org/' }
       : {}),
+    ...(source?.sourceKind === 'state-511-tn'
+      ? { Origin: 'https://smartway.tn.gov', Referer: 'https://smartway.tn.gov/' }
+      : {}),
+    ...(source?.sourceKind === 'state-511-sc'
+      ? { Referer: 'https://www.511sc.org/' }
+      : {}),
+    ...(source?.sourceKind === 'state-511-oh'
+      ? { Referer: 'https://ohgo.com/' }
+      : {}),
   });
 
   const registerHlsTarget = (cameraId, targetUrl) => {

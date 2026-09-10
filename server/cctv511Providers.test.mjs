@@ -2,13 +2,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildIbi511Query,
+  enabledProviderKeys,
   encryptNewJersey511Payload,
+  normalizeAlabamaCamera,
   normalizeIbi511Camera,
   normalizeIndianaCamera,
   normalizeMassachusettsCamera,
   normalizeMichiganCamera,
   normalizeNewJerseyCamera,
+  normalizeOhioCamera,
   normalizeOregonCamera,
+  normalizeSouthCarolinaCamera,
+  normalizeTennesseeCamera,
   normalizeVirginiaCamera,
   parseIbi511Wkt,
 } from './cctv511Providers.js';
@@ -111,4 +116,54 @@ test('511NJ public-role request envelope is deterministic AES hex', () => {
   assert.match(encrypted, /^[0-9a-f]+$/);
   assert.equal(encrypted.length % 32, 0);
   assert.equal(encrypted, encryptNewJersey511Payload({ username: 'public', password: '', role: 'public' }));
+});
+
+test('Tennessee and South Carolina rows normalize public HLS cameras', () => {
+  const tennessee = normalizeTennesseeCamera({
+    id: 3165, active: 'true', title: 'I-40/75 @ West Hills', jurisdiction: 'Knoxville',
+    lat: 35.928889, lng: -84.039167,
+    thumbnailUrl: 'https://tnsnapshots.com/thumbs/R1_010.flv.png',
+    httpsVideoUrl: 'https://mcleansfs1.us-east-1.skyvdn.com/rtplive/R1_010/playlist.m3u8',
+  });
+  assert.equal(tennessee?.id, 'tdot-3165');
+  assert.equal(tennessee?.feedType, 'hls');
+  assert.match(tennessee?.city || '', /Knoxville, Tennessee/);
+
+  const southCarolina = normalizeSouthCarolinaCamera({
+    geometry: { coordinates: [-80.997286, 33.948503] },
+    properties: {
+      id: '2735', active: true, problem_stream: false, description: 'I-77 S @ MM 4.9', jurisdiction: 'Columbia',
+      https_url: 'https://s18.us-east-1.skyvdn.com/rtplive/10002/playlist.m3u8',
+      image_url: 'https://scdotsnap.us-east-1.skyvdn.com/thumbs/10002.flv.png',
+    },
+  });
+  assert.equal(southCarolina?.id, 'scdot-2735');
+  assert.equal(southCarolina?.feedType, 'hls');
+});
+
+test('Alabama placements and Ohio snapshots honor provider media rules', () => {
+  const alabama = normalizeAlabamaCamera({
+    id: 1845, accessLevel: 'Public',
+    location: { latitude: 30.535105, longitude: -88.23953, city: 'Mobile', displayRouteDesignator: 'I-10', displayCrossStreet: 'McDonald Rd', direction: 'East' },
+    snapshotImageUrl: 'https://api.algotraffic.com/v4/Cameras/1845/snapshot.jpg',
+  });
+  assert.equal(alabama?.id, 'aldot-1845');
+  assert.equal(alabama?.url, '');
+  assert.equal(alabama?.framePolicy, 'metadata-only');
+
+  const ohio = normalizeOhioCamera({
+    Id: '00000000000001', Latitude: 41.50557, Longitude: -82.84921,
+    Description: 'SR-2 at S Lightner Rd',
+  }, { Direction: 'View', LargeURL: 'https://itscameras.dot.state.oh.us/images/toledo/sample.jpg' }, 0);
+  assert.equal(ohio?.id, 'ohdot-00000000000001-0');
+  assert.equal(ohio?.feedType, 'image');
+});
+
+test('legacy provider override cannot hide newly added defaults, but explicit exclusions can', () => {
+  const enabled = enabledProviderKeys({ CCTV_STATE_511_PROVIDERS: 'az,fl,ga' });
+  for (const key of ['ny', 'tn', 'sc', 'al', 'oh', 'vt', 'ct']) assert.equal(enabled.has(key), true);
+  const excluded = enabledProviderKeys({ CCTV_STATE_511_EXCLUDE_PROVIDERS: 'ny,al' });
+  assert.equal(excluded.has('ny'), false);
+  assert.equal(excluded.has('al'), false);
+  assert.equal(excluded.has('tn'), true);
 });
