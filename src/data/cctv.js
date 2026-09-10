@@ -1527,7 +1527,7 @@ function refreshProjectionTextures(record) {
   if (!textureSource) return;
   runtime.lastTextureSwapAt = now;
   runtime.lastSwappedCanvasStamp = runtime.canvasStamp;
-  runtime.planeMaterial.image = textureSource;
+  runtime.textureSource = textureSource;
   // The decode completes outside Cesium's scene lifecycle. Explicitly ask
   // for the upload frame as well as holding the active projection loop; this
   // closes the requestRenderMode race when a selection is changed quickly.
@@ -1545,6 +1545,25 @@ function refreshProjectionTextures(record) {
 export function decodedProjectionTextureSource(runtime) {
   if (!runtime?.imageReady || !runtime.image) return null;
   return runtime.drawnImageStamp === runtime.imageStamp ? runtime.image : null;
+}
+
+/**
+ * Creates a dynamic image material whose value is read from the runtime on
+ * every Cesium material update. PlaneGraphics can treat a raw image property
+ * as constant after its first upload on some WebGL/browser combinations; the
+ * callback keeps the material live without rebuilding the plane entity.
+ *
+ * @param {Object} runtime
+ * @param {HTMLCanvasElement|HTMLImageElement|HTMLVideoElement|Object} initialSource
+ * @returns {Cesium.ImageMaterialProperty}
+ */
+export function createProjectionImageMaterial(runtime, initialSource) {
+  runtime.textureSource = initialSource;
+  return new Cesium.ImageMaterialProperty({
+    image: new Cesium.CallbackProperty(() => runtime.textureSource, false),
+    transparent: true,
+    color: Cesium.Color.WHITE.withAlpha(0.95),
+  });
 }
 
 /**
@@ -1793,6 +1812,7 @@ function createProjectionRuntime(record) {
     labelPosition: new Cesium.Cartesian3(),
     overlayEntry: null,
     planeMaterial: null,
+    textureSource: null,
     buffers: null,
     bufferIndex: 0,
     lastTextureSwapAt: 0,
@@ -1839,11 +1859,10 @@ function createProjectionRuntime(record) {
   const geometry = record.frustumGeometry
     || computeFrustumGeometry(record.camera, groundAltFor(record), record.probeClampRangeM);
   const positions = record.frustumPositions || frustumCartesians(geometry);
-  runtime.planeMaterial = new Cesium.ImageMaterialProperty({
-    image: (mode === 'video' && runtime.video) ? runtime.video : canvas,
-    transparent: true,
-    color: Cesium.Color.WHITE.withAlpha(0.95),
-  });
+  runtime.planeMaterial = createProjectionImageMaterial(
+    runtime,
+    (mode === 'video' && runtime.video) ? runtime.video : canvas,
+  );
   createProjectionPlane(record, runtime, geometry, positions);
 
   return runtime;

@@ -37,8 +37,8 @@
   <div id="cesiumContainer"></div>
   <aside id="thunderlink-system-identity" aria-label="ThunderLink software identity">
     <span>OS <strong>THUNDERLINK OBLIVION</strong></span>
-    <span>VERSION <strong>0.3.21</strong></span>
-    <span>KERNEL <strong>TBSGE-KERNEL-030.022</strong></span>
+    <span>VERSION <strong>0.3.22</strong></span>
+    <span>KERNEL <strong>TBSGE-KERNEL-030.023</strong></span>
     <button id="credits-footer-button" type="button">CREDITS &amp; OPEN SOURCES</button>
   </aside>
   <footer id="platform-legal-footer" aria-label="Legal and privacy policies">
@@ -636,6 +636,7 @@
       </div>
       <div id="cctv-frame-wrap" class="cctv-frame-wrap">
         <img id="cctv-frame" alt="CCTV feed frame" />
+        <button id="cctv-enlarge-btn" class="cctv-frame-action" type="button" aria-haspopup="dialog" aria-controls="cctv-viewer-dialog">ENLARGE</button>
       </div>
       <div id="cctv-source-badge" role="status" aria-live="polite">SOURCE · UNKNOWN</div>
       <div id="cctv-meta">Enable CCTV to load camera intersections</div>
@@ -665,6 +666,26 @@
         <button id="cctv-projection-btn" class="scene-btn">PROJECTION ON</button>
         <span id="cctv-quality-chip">CAL · --</span>
       </div>
+      <div class="cctv-watch-block">
+        <div class="cctv-watch-header">
+          <span>CAMERA WATCH ROUTE</span>
+          <small id="cctv-watch-count">0 / 12</small>
+        </div>
+        <div class="cctv-controls">
+          <button id="cctv-watch-add-btn" class="scene-btn" type="button">ADD CAMERA</button>
+          <button id="cctv-watch-clear-btn" class="scene-btn" type="button">CLEAR</button>
+        </div>
+        <div id="cctv-watch-list" class="cctv-watch-list" aria-label="Selected CCTV route"></div>
+        <div class="cctv-controls cctv-watch-actions">
+          <button id="cctv-watch-track-btn" class="scene-btn" type="button">TRACK ROUTE</button>
+          <select id="cctv-watch-interval" aria-label="Camera route interval">
+            <option value="6">6 SEC</option>
+            <option value="10" selected>10 SEC</option>
+            <option value="15">15 SEC</option>
+          </select>
+          <button id="cctv-watch-view-btn" class="scene-btn" type="button" aria-haspopup="dialog" aria-controls="cctv-viewer-dialog">MULTI VIEW</button>
+        </div>
+      </div>
       <div class="cctv-calibration-block">
         <div class="cctv-calibration-header">
           <div class="cctv-summary-label">CALIBRATION</div>
@@ -688,6 +709,27 @@
       <div id="cctv-summary">Enable CCTV to start camera-linked intelligence summaries.</div>
     </div>
   </div>
+
+  <dialog id="cctv-viewer-dialog" class="cctv-viewer-dialog" aria-labelledby="cctv-viewer-title">
+    <div class="cctv-viewer-shell">
+      <header>
+        <div>
+          <span>THUNDERLINK · CCTV VIEWER</span>
+          <h2 id="cctv-viewer-title">CAMERA FEED</h2>
+        </div>
+        <button id="cctv-viewer-close" class="scene-btn" type="button" aria-label="Close camera viewer">CLOSE</button>
+      </header>
+      <div class="cctv-viewer-toolbar">
+        <button id="cctv-viewer-mode" class="scene-btn" type="button">MULTI VIEW</button>
+        <span id="cctv-viewer-status">LIVE SNAPSHOT</span>
+      </div>
+      <figure id="cctv-viewer-single" class="cctv-viewer-single">
+        <img id="cctv-viewer-frame" alt="Enlarged CCTV feed" />
+        <figcaption id="cctv-viewer-caption">NO CAMERA SELECTED</figcaption>
+      </figure>
+      <div id="cctv-viewer-grid" class="cctv-viewer-grid" hidden aria-label="Selected camera feeds"></div>
+    </div>
+  </dialog>
 
   <!-- Scene Director Panel -->
   <div id="scene-panel" class="panel-collapsible collapsed" data-panel-id="scene-panel">

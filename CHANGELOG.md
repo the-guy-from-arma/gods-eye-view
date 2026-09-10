@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.22] — 2026-09-10 — Live CCTV projection and watch routes
+
+- Changed the Cesium CCTV monitor material to a callback-backed texture. The
+  plane now reads the current decoded frame during every material update instead
+  of allowing PlaneGraphics to retain its initial black/default texture.
+- Added a full-size CCTV viewer with single-feed and selected-feed mosaic modes.
+  The compact panel preview now exposes an ENLARGE action whenever a frame is
+  available.
+- Added a 12-camera watch-route builder with ordered camera selection, removal,
+  configurable 6/10/15-second cycling, route tracking, and multi-camera viewing.
+- Added regression coverage for dynamic texture replacement and the enlarged,
+  multi-feed, bounded-route interface.
+- Advanced ThunderLink Oblivion to public build `0.3.22` and kernel
+  `TBSGE-KERNEL-030.023`; legal acceptance remains `0.3.02`.
+
 ## [0.3.21] — 2026-09-10 — CCTV monitor-plane frame recovery
 
 - Fixed CCTV frames appearing normally in the sidebar while the corresponding

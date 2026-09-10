@@ -6803,6 +6803,31 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   flex-shrink: 0;
 }
 
+.cctv-frame-action {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  border: 1px solid rgba(73, 229, 250, 0.72);
+  border-radius: 5px;
+  padding: 5px 8px;
+  background: rgba(1, 12, 17, 0.88);
+  color: #8cefff;
+  font: 700 8px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease, background 150ms ease;
+}
+
+.cctv-frame-wrap.has-frame .cctv-frame-action {
+  opacity: 1;
+}
+
+.cctv-frame-action:hover {
+  background: rgba(0, 121, 146, 0.72);
+}
+
 /* Lightweight loading shimmer while the active frame is fetching */
 .cctv-frame-wrap::after {
   content: '';
@@ -6867,6 +6892,204 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 
 #cctv-frame.active {
   opacity: 1;
+}
+
+.cctv-watch-block {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(45, 216, 239, 0.24);
+  background: rgba(1, 15, 21, 0.62);
+  padding: 8px;
+}
+
+.cctv-watch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: rgba(149, 222, 232, 0.78);
+  font: 700 8px/1.2 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.cctv-watch-header small {
+  color: rgba(116, 232, 250, 0.62);
+  font-size: 8px;
+}
+
+.cctv-watch-list {
+  display: grid;
+  gap: 4px;
+  max-height: 112px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.cctv-watch-list:empty::before {
+  content: 'ADD CAMERAS TO BUILD A WATCH ROUTE';
+  padding: 8px 4px;
+  color: rgba(132, 185, 194, 0.48);
+  font: 600 8px/1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.cctv-watch-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(64, 194, 216, 0.18);
+  background: rgba(4, 22, 29, 0.82);
+  color: rgba(185, 229, 235, 0.8);
+  min-height: 28px;
+}
+
+.cctv-watch-item > span {
+  padding-left: 7px;
+  color: #42dff5;
+  font: 700 8px/1 var(--font-mono);
+}
+
+.cctv-watch-item button {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: 600 8px/1.25 var(--font-mono);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cctv-watch-item button:last-child {
+  padding: 7px;
+  color: rgba(255, 132, 142, 0.72);
+}
+
+.cctv-watch-item.active {
+  border-color: rgba(59, 228, 250, 0.7);
+  box-shadow: inset 0 0 12px rgba(0, 212, 255, 0.09);
+}
+
+.cctv-watch-actions {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+}
+
+#cctv-watch-interval {
+  min-width: 66px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(4, 17, 23, 0.94);
+  color: #9defff;
+  font: 700 8px/1 var(--font-mono);
+}
+
+#cctv-watch-track-btn.active {
+  border-color: #32e3f8;
+  color: #8ff2ff;
+  background: rgba(0, 150, 178, 0.2);
+}
+
+.cctv-viewer-dialog {
+  width: min(1120px, calc(100vw - 56px));
+  max-width: none;
+  max-height: calc(100vh - 56px);
+  padding: 0;
+  border: 1px solid rgba(61, 225, 247, 0.66);
+  border-radius: 12px;
+  background: rgba(1, 8, 13, 0.98);
+  color: var(--text-primary);
+  box-shadow: 0 0 80px rgba(0, 205, 239, 0.18), 0 30px 100px rgba(0, 0, 0, 0.8);
+}
+
+.cctv-viewer-dialog::backdrop {
+  background: rgba(0, 3, 7, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.cctv-viewer-shell {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.025) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.cctv-viewer-shell > header,
+.cctv-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cctv-viewer-shell > header span,
+.cctv-viewer-toolbar span {
+  color: #55deef;
+  font: 700 9px/1 var(--font-mono);
+  letter-spacing: 0.16em;
+}
+
+.cctv-viewer-shell h2 {
+  margin: 5px 0 0;
+  color: #d5f9ff;
+  font: 500 clamp(18px, 2vw, 30px)/1.1 var(--font-sans);
+}
+
+.cctv-viewer-single {
+  position: relative;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  min-height: min(68vh, 680px);
+  overflow: hidden;
+  border: 1px solid rgba(56, 216, 238, 0.3);
+  background: #02070a;
+}
+
+.cctv-viewer-single img {
+  width: 100%;
+  height: min(68vh, 680px);
+  object-fit: contain;
+}
+
+.cctv-viewer-single figcaption,
+.cctv-viewer-tile span {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 7px 9px;
+  background: rgba(0, 10, 15, 0.84);
+  color: #c2f5fc;
+  font: 600 9px/1.35 var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+.cctv-viewer-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 9px;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.cctv-viewer-grid:not([hidden]) { display: grid; }
+
+.cctv-viewer-tile {
+  position: relative;
+  min-height: 180px;
+  border: 1px solid rgba(55, 207, 230, 0.24);
+  background: #02070a;
+  overflow: hidden;
+}
+
+.cctv-viewer-tile img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  display: block;
 }
 
 #cctv-meta {
@@ -7334,6 +7557,7 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 #radio-panel.collapsed .radio-panel-inner > :not(.panel-header),
 #cctv-panel.collapsed .cctv-controls,
 #cctv-panel.collapsed .cctv-state-filter-block,
+#cctv-panel.collapsed .cctv-watch-block,
 #cctv-panel.collapsed .cctv-calibration-block,
 #cctv-panel.collapsed .cctv-frame-wrap,
 #cctv-panel.collapsed #cctv-source-badge,

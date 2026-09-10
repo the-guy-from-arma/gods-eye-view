@@ -46,6 +46,7 @@ import cctvLayer, {
   calibrationPatchMovesAnchor,
   cctvGeometryDrainPacing,
   createGeometryProgressNotifier,
+  createProjectionImageMaterial,
   decodedProjectionTextureSource,
   normalizeCoverageMode,
   frameSignatureFromPixels,
@@ -71,6 +72,14 @@ import {
 
 const UI_SOURCE = fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'ui.js'),
+  'utf8',
+);
+const INDEX_SOURCE = fs.readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'index.html'),
+  'utf8',
+);
+const STYLE_SOURCE = fs.readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'style.css'),
   'utf8',
 );
 
@@ -1332,4 +1341,29 @@ test('projection image lifecycle ignores stale requests and preserves the last g
   assert.equal(runtime.image, previous);
   assert.equal(runtime.imageReady, true);
   assert.equal(decodedProjectionTextureSource(runtime), previous);
+});
+
+test('projection material reads the latest runtime texture instead of freezing its first canvas', () => {
+  const placeholder = { id: 'placeholder-canvas' };
+  const decoded = { id: 'decoded-camera-frame' };
+  const runtime = {};
+  const material = createProjectionImageMaterial(runtime, placeholder);
+
+  assert.equal(material.getValue(Cesium.JulianDate.now()).image, placeholder);
+  runtime.textureSource = decoded;
+  assert.equal(material.getValue(Cesium.JulianDate.now()).image, decoded);
+  assert.equal(material.isConstant, false);
+});
+
+test('CCTV panel exposes enlarged single/multi viewing and a bounded camera watch route', () => {
+  assert.match(INDEX_SOURCE, /id="cctv-enlarge-btn"/);
+  assert.match(INDEX_SOURCE, /id="cctv-viewer-dialog"/);
+  assert.match(INDEX_SOURCE, /id="cctv-viewer-grid"/);
+  assert.match(INDEX_SOURCE, /id="cctv-watch-add-btn"/);
+  assert.match(INDEX_SOURCE, /id="cctv-watch-track-btn"/);
+  assert.match(UI_SOURCE, /_cctvWatchCameras\.size >= 12/);
+  assert.match(UI_SOURCE, /_advanceCctvWatchRoute/);
+  assert.match(UI_SOURCE, /_activateCctvWatchCamera/);
+  assert.match(STYLE_SOURCE, /\.cctv-viewer-dialog/);
+  assert.match(STYLE_SOURCE, /\.cctv-viewer-grid/);
 });

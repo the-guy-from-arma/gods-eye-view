@@ -2173,6 +2173,10 @@ export class StyleManager {
     this._cctvState = null;
     this._cctvSummaryTypingTimer = null;
     this._lastCctvSummaryText = '';
+    this._cctvWatchCameras = new Map();
+    this._cctvRouteTimer = null;
+    this._cctvRouteIndex = -1;
+    this._cctvViewerMode = 'single';
     // Auto-expand guard: last active camera id seen while the layer was
     // enabled; routine state notifications with the same id never re-expand.
     this._lastSeenCctvActiveId = null;
@@ -2346,6 +2350,7 @@ export class StyleManager {
     this._cctvCalibResetBtn = document.getElementById('cctv-calib-reset-btn');
     this._cctvFrame = document.getElementById('cctv-frame');
     this._cctvFrameWrap = document.getElementById('cctv-frame-wrap');
+    this._cctvEnlargeBtn = document.getElementById('cctv-enlarge-btn');
     this._cctvFrameRequestToken = 0;
     this._cctvFramePreloader = null;
     this._cctvSourceBadge = document.getElementById('cctv-source-badge');
@@ -2353,6 +2358,21 @@ export class StyleManager {
     this._cctvStateToggles = document.getElementById('cctv-state-toggles');
     this._cctvStatesAll = document.getElementById('cctv-states-all');
     this._cctvStatesNone = document.getElementById('cctv-states-none');
+    this._cctvWatchAddBtn = document.getElementById('cctv-watch-add-btn');
+    this._cctvWatchClearBtn = document.getElementById('cctv-watch-clear-btn');
+    this._cctvWatchTrackBtn = document.getElementById('cctv-watch-track-btn');
+    this._cctvWatchViewBtn = document.getElementById('cctv-watch-view-btn');
+    this._cctvWatchInterval = document.getElementById('cctv-watch-interval');
+    this._cctvWatchList = document.getElementById('cctv-watch-list');
+    this._cctvWatchCount = document.getElementById('cctv-watch-count');
+    this._cctvViewerDialog = document.getElementById('cctv-viewer-dialog');
+    this._cctvViewerClose = document.getElementById('cctv-viewer-close');
+    this._cctvViewerModeBtn = document.getElementById('cctv-viewer-mode');
+    this._cctvViewerSingle = document.getElementById('cctv-viewer-single');
+    this._cctvViewerFrame = document.getElementById('cctv-viewer-frame');
+    this._cctvViewerCaption = document.getElementById('cctv-viewer-caption');
+    this._cctvViewerGrid = document.getElementById('cctv-viewer-grid');
+    this._cctvViewerStatus = document.getElementById('cctv-viewer-status');
     this._cctvSummary = document.getElementById('cctv-summary');
     this._shareBtn = document.getElementById('share-btn');
     this._clearSelectedLayersBtn = document.getElementById('clear-selected-layers');
@@ -6139,6 +6159,43 @@ export class StyleManager {
     this._cctvStatesAll?.addEventListener('click', () => cctvLayer.setAllStatesEnabled?.(true));
     this._cctvStatesNone?.addEventListener('click', () => cctvLayer.setAllStatesEnabled?.(false));
 
+    this._cctvEnlargeBtn?.addEventListener('click', () => this._openCctvViewer('single'));
+    this._cctvWatchAddBtn?.addEventListener('click', () => this._addActiveCctvToWatchRoute());
+    this._cctvWatchClearBtn?.addEventListener('click', () => {
+      this._stopCctvRouteTracking();
+      this._cctvWatchCameras.clear();
+      this._renderCctvWatchRoute();
+      this._refreshCctvViewer();
+    });
+    this._cctvWatchTrackBtn?.addEventListener('click', () => this._toggleCctvRouteTracking());
+    this._cctvWatchViewBtn?.addEventListener('click', () => this._openCctvViewer('multi'));
+    this._cctvWatchInterval?.addEventListener('change', () => {
+      if (!this._cctvRouteTimer) return;
+      this._stopCctvRouteTracking();
+      this._toggleCctvRouteTracking();
+    });
+    this._cctvWatchList?.addEventListener('click', (event) => {
+      const remove = event.target.closest?.('[data-cctv-watch-remove]');
+      if (remove) {
+        this._cctvWatchCameras.delete(remove.dataset.cctvWatchRemove);
+        if (!this._cctvWatchCameras.size) this._stopCctvRouteTracking();
+        this._renderCctvWatchRoute();
+        this._refreshCctvViewer();
+        return;
+      }
+      const select = event.target.closest?.('[data-cctv-watch-select]');
+      if (select) this._activateCctvWatchCamera(select.dataset.cctvWatchSelect);
+    });
+    this._cctvViewerGrid?.addEventListener('click', (event) => {
+      const select = event.target.closest?.('[data-cctv-watch-select]');
+      if (select) this._activateCctvWatchCamera(select.dataset.cctvWatchSelect);
+    });
+    this._cctvViewerModeBtn?.addEventListener('click', () => {
+      this._cctvViewerMode = this._cctvViewerMode === 'multi' ? 'single' : 'multi';
+      this._refreshCctvViewer();
+    });
+    this._cctvViewerClose?.addEventListener('click', () => this._cctvViewerDialog?.close());
+
     this._cctvNearestBtn?.addEventListener('click', async () => {
       if (!await this._toggleCctvEnabled(true)) return;
       this._runExplicitCctvFocus(
@@ -6234,6 +6291,7 @@ export class StyleManager {
     });
 
     this._renderCctvState(null);
+    this._renderCctvWatchRoute();
     this._syncCctvPanelViewport();
   }
 
@@ -6243,6 +6301,155 @@ export class StyleManager {
    */
   _activeCctvCameraId() {
     return this._cctvState?.activeCameraId || this._cctvSelect?.value || '';
+  }
+
+  /** Adds or updates the active camera in the session watch route. */
+  _addActiveCctvToWatchRoute() {
+    const camera = this._cctvState?.activeCamera;
+    if (!camera?.id) return;
+    if (!this._cctvWatchCameras.has(camera.id) && this._cctvWatchCameras.size >= 12) {
+      this._showToast('Camera watch route is limited to 12 feeds');
+      return;
+    }
+    this._cctvWatchCameras.set(camera.id, { ...camera });
+    this._renderCctvWatchRoute();
+    this._refreshCctvViewer();
+  }
+
+  /** Stops route cycling and returns its controls to idle. */
+  _stopCctvRouteTracking() {
+    if (this._cctvRouteTimer) clearInterval(this._cctvRouteTimer);
+    this._cctvRouteTimer = null;
+    this._cctvRouteIndex = -1;
+    this._cctvWatchTrackBtn?.classList.remove('active');
+    if (this._cctvWatchTrackBtn) this._cctvWatchTrackBtn.textContent = 'TRACK ROUTE';
+  }
+
+  /** Selects and focuses one route camera through the normal navigation policy. */
+  async _activateCctvWatchCamera(cameraId) {
+    if (!cameraId || !await this._toggleCctvEnabled(true)) return false;
+    return !!this._runExplicitCctvFocus(
+      () => (cctvLayer.selectCamera(cameraId) ? cameraId : null),
+      (selectedId) => cctvLayer.focusCamera(selectedId, 1.6),
+    );
+  }
+
+  /** Advances to the next camera in insertion order. */
+  async _advanceCctvWatchRoute() {
+    const ids = [...this._cctvWatchCameras.keys()];
+    if (!ids.length) {
+      this._stopCctvRouteTracking();
+      return;
+    }
+    this._cctvRouteIndex = (this._cctvRouteIndex + 1) % ids.length;
+    await this._activateCctvWatchCamera(ids[this._cctvRouteIndex]);
+    this._renderCctvWatchRoute();
+  }
+
+  /** Starts/stops timed camera cycling for the selected watch route. */
+  _toggleCctvRouteTracking() {
+    if (this._cctvRouteTimer) {
+      this._stopCctvRouteTracking();
+      return;
+    }
+    if (!this._cctvWatchCameras.size) {
+      this._showToast('Add at least one camera to the watch route');
+      return;
+    }
+    const intervalMs = Math.max(4000, Number(this._cctvWatchInterval?.value || 10) * 1000);
+    this._cctvWatchTrackBtn?.classList.add('active');
+    if (this._cctvWatchTrackBtn) this._cctvWatchTrackBtn.textContent = 'STOP TRACK';
+    this._advanceCctvWatchRoute();
+    this._cctvRouteTimer = setInterval(() => this._advanceCctvWatchRoute(), intervalMs);
+  }
+
+  /** Rebuilds the compact selected-camera route list. */
+  _renderCctvWatchRoute() {
+    if (this._cctvWatchCount) this._cctvWatchCount.textContent = `${this._cctvWatchCameras.size} / 12`;
+    if (this._cctvWatchAddBtn) {
+      const activeId = this._cctvState?.activeCameraId;
+      this._cctvWatchAddBtn.disabled = !activeId || this._cctvWatchCameras.has(activeId);
+      this._cctvWatchAddBtn.textContent = activeId && this._cctvWatchCameras.has(activeId)
+        ? 'CAMERA ADDED'
+        : 'ADD CAMERA';
+    }
+    if (this._cctvWatchClearBtn) this._cctvWatchClearBtn.disabled = !this._cctvWatchCameras.size;
+    if (this._cctvWatchTrackBtn) this._cctvWatchTrackBtn.disabled = !this._cctvWatchCameras.size;
+    if (this._cctvWatchViewBtn) this._cctvWatchViewBtn.disabled = !this._cctvWatchCameras.size;
+    if (!this._cctvWatchList) return;
+    const activeId = this._cctvState?.activeCameraId;
+    const rows = [...this._cctvWatchCameras.values()].map((camera, index) => {
+      const row = document.createElement('div');
+      row.className = `cctv-watch-item${camera.id === activeId ? ' active' : ''}`;
+      const number = document.createElement('span');
+      number.textContent = String(index + 1).padStart(2, '0');
+      const select = document.createElement('button');
+      select.type = 'button';
+      select.dataset.cctvWatchSelect = camera.id;
+      select.textContent = `${camera.city || 'UNKNOWN'} · ${camera.name || camera.id}`;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.dataset.cctvWatchRemove = camera.id;
+      remove.setAttribute('aria-label', `Remove ${camera.name || camera.id}`);
+      remove.textContent = '×';
+      row.append(number, select, remove);
+      return row;
+    });
+    this._cctvWatchList.replaceChildren(...rows);
+  }
+
+  /** Opens the full-size viewer in single-feed or selected-feed grid mode. */
+  _openCctvViewer(mode = 'single') {
+    if (!this._cctvViewerDialog) return;
+    this._cctvViewerMode = mode === 'multi' ? 'multi' : 'single';
+    this._refreshCctvViewer();
+    if (!this._cctvViewerDialog.open) {
+      try { this._cctvViewerDialog.showModal(); } catch { this._cctvViewerDialog.setAttribute('open', ''); }
+    }
+  }
+
+  /** Synchronizes the enlarged feed and multi-camera mosaic. */
+  _refreshCctvViewer() {
+    if (!this._cctvViewerDialog) return;
+    const active = this._cctvState?.activeCamera || null;
+    const multi = this._cctvViewerMode === 'multi';
+    if (this._cctvViewerSingle) this._cctvViewerSingle.hidden = multi;
+    if (this._cctvViewerGrid) this._cctvViewerGrid.hidden = !multi;
+    if (this._cctvViewerModeBtn) this._cctvViewerModeBtn.textContent = multi ? 'SINGLE VIEW' : 'MULTI VIEW';
+    if (this._cctvViewerStatus) {
+      this._cctvViewerStatus.textContent = multi
+        ? `${this._cctvWatchCameras.size} SELECTED FEEDS`
+        : (active?.sourceStatus ? `${String(active.sourceStatus).toUpperCase()} SNAPSHOT` : 'LIVE SNAPSHOT');
+    }
+    if (!multi) {
+      if (this._cctvViewerFrame) {
+        const src = this._cctvFrame?.dataset?.currentSrc || active?.frameUrl || '';
+        if (src && this._cctvViewerFrame.src !== new URL(src, window.location.href).href) {
+          this._cctvViewerFrame.src = src;
+        }
+      }
+      if (this._cctvViewerCaption) {
+        this._cctvViewerCaption.textContent = active
+          ? `${active.city || 'UNKNOWN'} · ${active.name || active.id}`
+          : 'NO CAMERA SELECTED';
+      }
+      return;
+    }
+    if (!this._cctvViewerGrid) return;
+    const tiles = [...this._cctvWatchCameras.values()].map((camera) => {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'cctv-viewer-tile';
+      tile.dataset.cctvWatchSelect = camera.id;
+      const image = document.createElement('img');
+      image.alt = `${camera.name || camera.id} camera feed`;
+      if (camera.frameUrl) image.src = camera.frameUrl;
+      const label = document.createElement('span');
+      label.textContent = `${camera.city || 'UNKNOWN'} · ${camera.name || camera.id}`;
+      tile.append(image, label);
+      return tile;
+    });
+    this._cctvViewerGrid.replaceChildren(...tiles);
   }
 
   /**
@@ -6341,6 +6548,9 @@ export class StyleManager {
     this._cctvFrame.classList.add('active');
     this._cctvFrameWrap?.classList.add('has-frame');
     syncBadge();
+    if (this._cctvViewerDialog?.open && this._cctvViewerMode === 'single') {
+      this._refreshCctvViewer();
+    }
   }
 
   /**
@@ -6533,6 +6743,11 @@ export class StyleManager {
     const enabled = !!state?.enabled && !!this._dataManager?.isEnabled('cctv');
     const activeId = state?.activeCameraId || '';
     const activeCamera = state?.activeCamera || null;
+    for (const camera of [...cameras, activeCamera].filter(Boolean)) {
+      if (camera.id && this._cctvWatchCameras.has(camera.id)) {
+        this._cctvWatchCameras.set(camera.id, { ...this._cctvWatchCameras.get(camera.id), ...camera });
+      }
+    }
 
     if (this._cctvStateToggles) {
       const filters = Array.isArray(state?.stateFilters) ? state.stateFilters : [];
@@ -6684,6 +6899,8 @@ export class StyleManager {
     }
 
     this._syncCctvSourceBadge(activeCamera, enabled);
+    this._renderCctvWatchRoute();
+    if (this._cctvViewerDialog?.open) this._refreshCctvViewer();
     this._typeCctvSummary(state?.summary || 'Enable CCTV to start camera-linked intelligence summaries.');
   }
 
@@ -10260,6 +10477,8 @@ export class StyleManager {
     }
     this._cctvUnsubscribe?.();
     this._cctvUnsubscribe = null;
+    this._stopCctvRouteTracking();
+    this._cctvViewerDialog?.close?.();
     this._commandDockTrayObserver?.disconnect?.();
     this._commandDockTrayObserver = null;
     this._draggableResizeObserver?.disconnect();
