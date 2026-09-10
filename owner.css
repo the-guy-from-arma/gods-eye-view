@@ -177,6 +177,19 @@ button,a,select { cursor:pointer; }
 .vehicle-observation-row strong { color:#c7eef3; font-size:9px; overflow-wrap:anywhere; }
 .vehicle-observation-row span,.vehicle-observation-row small { color:#63848b; font-size:7px; line-height:1.4; }
 .vehicle-confidence { color:#63e7b5!important; text-align:right; }
+.protected-archive-panel { display:grid; gap:12px; padding:15px; border:1px solid rgba(105,223,237,.19); background:linear-gradient(135deg,rgba(4,24,31,.74),rgba(4,10,15,.78)); }
+.protected-archive-panel > header { display:flex; align-items:center; justify-content:space-between; gap:18px; }
+.protected-archive-panel h3 { margin:4px 0 0; color:#c6f1f5; font:500 16px var(--sans); }
+.protected-archive-panel > p { margin:0; color:#67878e; font-size:8px; line-height:1.65; }
+.protected-archive-readouts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+.protected-archive-readouts span { display:grid; gap:6px; padding:10px; border:1px solid rgba(74,203,224,.13); color:#55787f; font-size:6px; letter-spacing:.14em; }
+.protected-archive-readouts strong { color:#9edfe7; font-size:8px; }
+.protected-frame-list { display:grid; gap:6px; max-height:280px; overflow:auto; }
+.protected-frame-row { display:grid; grid-template-columns:1fr 150px auto; align-items:center; gap:12px; padding:9px 11px; border-left:2px solid rgba(95,224,196,.55); background:rgba(5,25,29,.55); }
+.protected-frame-row div { display:grid; gap:4px; }
+.protected-frame-row strong { color:#bcebed; font-size:8px; }
+.protected-frame-row small { color:#5e8187; font-size:7px; }
+.protected-frame-row a { padding:8px 10px; border:1px solid rgba(80,211,231,.26); color:#8de0ea; font-size:7px; text-decoration:none; }
 @media (max-width:1100px) { .vehicle-status-grid{grid-template-columns:1fr 1fr}.vehicle-controls{grid-template-columns:1fr 1fr}.vehicle-observation-row{grid-template-columns:1fr 1fr} }
 .empty-state { padding:35px; border:1px dashed rgba(74,205,227,.2); color:#58777e; font-size:9px; text-align:center; }
 .owner-toast { position:fixed; right:24px; bottom:24px; z-index:60; max-width:430px; padding:13px 16px; border:1px solid rgba(100,239,187,.4); background:rgba(4,26,22,.95); color:#8ff1cc; font-size:9px; line-height:1.5; opacity:0; pointer-events:none; transform:translateY(8px); transition:.2s; }

@@ -32,8 +32,8 @@
     <div class="command-rail-footer">
       <div class="rail-os-readout">
         <small>OS</small><strong>THUNDERLINK OBLIVION</strong>
-        <small>VERSION</small><strong>0.3.26</strong>
-        <small>KERNEL</small><strong>TBSGE-KERNEL-030.027</strong>
+        <small>VERSION</small><strong>0.3.27</strong>
+        <small>KERNEL</small><strong>TBSGE-KERNEL-030.028</strong>
       </div>
       <span><i></i>OWNER SESSION</span>
       <strong data-owner-email>VERIFYING…</strong>
@@ -48,7 +48,7 @@
       <span>POSTGRES · <b data-owner-db-state>CHECKING</b></span>
       <span>SNAPSHOT · <b data-owner-snapshot-age>WAITING</b></span>
       <span>LEGAL · <b data-owner-legal-version>0.3.02</b></span>
-      <span>TBSGE-KERNEL-030.027</span>
+      <span>TBSGE-KERNEL-030.028</span>
     </div>
     <header class="command-topbar">
       <div>
@@ -167,6 +167,19 @@
           <button type="button" data-vehicle-sweep>SCAN NEXT 10 IN STATE</button>
         </div>
         <div class="security-note"><span class="material-symbols-outlined">privacy_tip</span><p>Results are probabilistic observations, not identity records. Verify against the original public camera view before relying on a make, model, or year estimate.</p></div>
+        <section class="protected-archive-panel" aria-labelledby="protected-archive-title">
+          <header>
+            <div><span class="section-kicker">STAGED · DORMANT BY DEFAULT</span><h3 id="protected-archive-title">Protected frame archive</h3></div>
+            <button type="button" class="toggle-control" data-protected-archive-enabled aria-pressed="false"><span data-protected-archive-label>OFF</span><i></i></button>
+          </header>
+          <p>Optional owner-only storage accepts only JPEGs returned by the detector-only privacy worker after verified plate-region redaction. Raw frames, plate characters, OCR results, visual embeddings, exact camera titles, and cross-camera links are not stored. A frame with no verified redaction region is discarded.</p>
+          <div class="protected-archive-readouts">
+            <span>WORKER <strong data-protected-archive-worker>NOT CONFIGURED</strong></span>
+            <span>RETENTION <strong data-protected-archive-retention>7 DAYS</strong></span>
+            <span>ARCHIVED <strong data-protected-archive-count>0</strong></span>
+          </div>
+          <div class="protected-frame-list" data-protected-frame-list><p class="empty-state">Protected Archive is staged and inactive.</p></div>
+        </section>
         <div class="account-toolbar vehicle-search-bar">
           <input type="search" data-vehicle-search placeholder="Search make, model, type, color, or jurisdiction…" aria-label="Search vehicle observations" />
           <button type="button" data-vehicle-refresh>REFRESH RECORDS</button>

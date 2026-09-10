@@ -226,6 +226,28 @@ function renderVehicleObservations() {
   if (!rows.length) vehicleHost.append(node('p', 'empty-state', 'No matching non-identifying vehicle observations.'));
 }
 
+function renderProtectedFrames() {
+  const host = document.querySelector('[data-protected-frame-list]');
+  const frames = vehicleAnalytics.protectedArchive?.frames || [];
+  const rows = frames.map((frame) => {
+    const row = node('article', 'protected-frame-row');
+    const identity = node('div');
+    identity.append(node('strong', '', frame.title), node('small', '', `${frame.stateCode} · ${frame.redactedRegions} REDACTED REGION${frame.redactedRegions === 1 ? '' : 'S'}`));
+    const details = node('div');
+    details.append(node('strong', '', formatDate(frame.capturedAt)), node('small', '', frame.redactionModel));
+    const link = node('a', '', 'VIEW REDACTED FRAME');
+    link.href = `/api/account/admin/vehicle-analytics/protected-frames/${encodeURIComponent(frame.id)}`;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    row.append(identity, details, link);
+    return row;
+  });
+  host.replaceChildren(...rows);
+  if (!rows.length) host.append(node('p', 'empty-state', vehicleAnalytics.protectedArchive?.enabled
+    ? 'No verified redacted frames have been retained.'
+    : 'Protected Archive is staged and inactive.'));
+}
+
 function paintVehicleAnalytics(payload) {
   vehicleAnalytics = { ...vehicleAnalytics, ...payload };
   const toggle = document.querySelector('[data-vehicle-enabled]');
@@ -237,7 +259,15 @@ function paintVehicleAnalytics(payload) {
   document.querySelector('[data-vehicle-retention]').textContent = `${vehicleAnalytics.retentionDays || 90} DAYS · NO FRAMES`;
   document.querySelector('[data-vehicle-analyze]').disabled = !vehicleAnalytics.enabled || !vehicleAnalytics.configured;
   document.querySelector('[data-vehicle-sweep]').disabled = !vehicleAnalytics.enabled || !vehicleAnalytics.configured;
+  const archive = vehicleAnalytics.protectedArchive || {};
+  const archiveToggle = document.querySelector('[data-protected-archive-enabled]');
+  archiveToggle.setAttribute('aria-pressed', String(Boolean(archive.enabled)));
+  document.querySelector('[data-protected-archive-label]').textContent = archive.enabled ? 'ON' : 'OFF';
+  document.querySelector('[data-protected-archive-worker]').textContent = archive.configured ? 'READY · IDLE' : 'NOT CONFIGURED';
+  document.querySelector('[data-protected-archive-retention]').textContent = `${archive.retentionDays || 7} DAYS`;
+  document.querySelector('[data-protected-archive-count]').textContent = String(archive.frames?.length || 0);
   renderVehicleObservations();
+  renderProtectedFrames();
 }
 
 async function loadVehicleAnalytics() {
@@ -286,6 +316,7 @@ async function analyzeVehicleCamera(source) {
       cameraName: source.name,
       provider: source.provider,
       jurisdiction: [source.city, source.stateCode].filter(Boolean).join(', '),
+      stateCode: source.stateCode,
       mimeType,
       imageBase64: await blobBase64(blob),
     }),
@@ -433,6 +464,20 @@ document.querySelector('[data-vehicle-enabled]').addEventListener('click', async
     vehicleAnalytics.enabled = payload.enabled;
     paintVehicleAnalytics(vehicleAnalytics);
     showStatus(`VEHICLE ANALYTICS ${payload.enabled ? 'ENABLED' : 'DISABLED'}`);
+  } catch (error) { showStatus(error.message, true); } finally { control.disabled = false; }
+});
+
+document.querySelector('[data-protected-archive-enabled]').addEventListener('click', async (event) => {
+  const control = event.currentTarget;
+  const enabled = control.getAttribute('aria-pressed') !== 'true';
+  control.disabled = true;
+  try {
+    const payload = await api('/api/account/admin/vehicle-analytics/protected-archive/settings', {
+      method: 'POST', body: JSON.stringify({ enabled }),
+    });
+    vehicleAnalytics.protectedArchive = { ...vehicleAnalytics.protectedArchive, enabled: payload.enabled };
+    paintVehicleAnalytics(vehicleAnalytics);
+    showStatus(`PROTECTED ARCHIVE ${payload.enabled ? 'ENABLED' : 'DISABLED'}`);
   } catch (error) { showStatus(error.message, true); } finally { control.disabled = false; }
 });
 

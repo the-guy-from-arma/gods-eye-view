@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.27] — 2026-09-10 — Dormant protected-frame archive
+
+- Added an optional detector-only Railway privacy worker that localizes plate
+  regions for destructive pixelation and blur without importing or executing an
+  OCR model.
+- Added a separately controlled, owner-only protected archive. It is disabled
+  by default, makes no scheduled requests, stores only verified redacted JPEGs,
+  and automatically removes archived frames after seven days.
+- Replaced exact camera titles and IDs in the archive with keyed opaque labels;
+  raw frames, plate characters, OCR output, embeddings, unique identifiers, and
+  cross-camera links are not persisted.
+- Added fail-closed validation for HTTPS worker transport, output signatures,
+  redaction verification, nonzero region counts, response size, and prohibited
+  identifying headers.
+- Advanced ThunderLink Oblivion to public build `0.3.27` and kernel
+  `TBSGE-KERNEL-030.028`; legal acceptance remains `0.3.02`.
+
 ## [0.3.26] — 2026-09-10 — Interactive CCTV viewer controls
 
 - Moved the enlarged CCTV dialog outside the non-interactive left panel stack,

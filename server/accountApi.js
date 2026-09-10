@@ -7,6 +7,7 @@ import {
   normalizeLayerAvailabilityStatus,
 } from '../src/data/layerAvailability.js';
 import { CURRENT_LEGAL_VERSION, legalAcceptanceIsCurrent } from '../src/legalPolicy.js';
+import { opaqueCameraTitle, redactFrameWithWorker } from './protectedFrameArchive.js';
 import { analyzeVehicleFrame } from './vehicleAnalytics.js';
 
 const { Pool } = pg;
@@ -162,6 +163,11 @@ export function createAccountApi(options = {}) {
   const ownerPassword = String(env.OWNER_PASSWORD || '');
   const ownerVariableLoginEnabled = Boolean(ownerEmail && ownerPassword.length >= 12 && ownerPassword.length <= 256);
   const ownerSetupToken = String(env.OWNER_SETUP_TOKEN || '');
+  const protectedArchiveConfigured = Boolean(
+    env.PRIVACY_REDACTION_WORKER_URL
+    && env.PRIVACY_REDACTION_WORKER_TOKEN
+    && String(env.PRIVACY_ARCHIVE_LABEL_KEY || '').length >= 24
+  );
   const pool = options.pool || (connectionString ? new Pool({ connectionString }) : null);
   const authLimit = createLimiter(12, 15 * 60_000);
   const activityLimit = createLimiter(180, 60_000);
@@ -221,6 +227,8 @@ export function createAccountApi(options = {}) {
       INSERT INTO gev_settings (key, value) VALUES ('site_operating_mode', 'online')
         ON CONFLICT (key) DO NOTHING;
       INSERT INTO gev_settings (key, value) VALUES ('vehicle_analytics_enabled', 'false')
+        ON CONFLICT (key) DO NOTHING;
+      INSERT INTO gev_settings (key, value) VALUES ('protected_frame_archive_enabled', 'false')
         ON CONFLICT (key) DO NOTHING;
       CREATE TABLE IF NOT EXISTS gev_layer_availability (
         layer_id TEXT PRIMARY KEY,
@@ -283,8 +291,25 @@ export function createAccountApi(options = {}) {
         model_version TEXT NOT NULL,
         PRIMARY KEY (camera_id, frame_fingerprint)
       );
+      CREATE TABLE IF NOT EXISTS gev_protected_vehicle_frames (
+        id BIGSERIAL PRIMARY KEY,
+        camera_ref TEXT NOT NULL,
+        opaque_title TEXT NOT NULL,
+        state_code TEXT NOT NULL,
+        captured_at TIMESTAMPTZ NOT NULL,
+        frame_fingerprint TEXT NOT NULL,
+        redacted_frame BYTEA NOT NULL,
+        mime_type TEXT NOT NULL DEFAULT 'image/jpeg',
+        redacted_regions INTEGER NOT NULL CHECK (redacted_regions > 0),
+        redaction_model TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (camera_ref, frame_fingerprint)
+      );
+      CREATE INDEX IF NOT EXISTS gev_protected_vehicle_frames_created_idx
+        ON gev_protected_vehicle_frames(created_at DESC);
       DELETE FROM gev_vehicle_observations WHERE captured_at < NOW() - INTERVAL '90 days';
       DELETE FROM gev_vehicle_frame_scans WHERE captured_at < NOW() - INTERVAL '90 days';
+      DELETE FROM gev_protected_vehicle_frames WHERE created_at < NOW() - INTERVAL '7 days';
     `).catch((error) => {
       schemaPromise = null;
       throw error;
@@ -627,7 +652,7 @@ export function createAccountApi(options = {}) {
           where.push(`camera_id = $${values.length}`);
         }
         values.push(Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 150)));
-        const [enabledResult, observations, totals] = await Promise.all([
+        const [enabledResult, observations, totals, archiveEnabledResult, archives] = await Promise.all([
           pool.query("SELECT value FROM gev_settings WHERE key = 'vehicle_analytics_enabled'"),
           pool.query(`
             SELECT id, camera_id AS "cameraId", camera_name AS "cameraName", provider, jurisdiction,
@@ -640,6 +665,11 @@ export function createAccountApi(options = {}) {
           `, values),
           pool.query(`SELECT COUNT(*) AS total, COUNT(DISTINCT camera_id) AS cameras,
             MAX(captured_at) AS "lastCapturedAt" FROM gev_vehicle_observations`),
+          pool.query("SELECT value FROM gev_settings WHERE key = 'protected_frame_archive_enabled'"),
+          pool.query(`SELECT id, opaque_title AS title, state_code AS "stateCode",
+            captured_at AS "capturedAt", redacted_regions AS "redactedRegions",
+            redaction_model AS "redactionModel"
+            FROM gev_protected_vehicle_frames ORDER BY captured_at DESC LIMIT 50`),
         ]);
         return json(res, 200, {
           configured: Boolean(env.GEMINI_API_KEY),
@@ -649,7 +679,31 @@ export function createAccountApi(options = {}) {
           rawImagesStored: false,
           observations: observations.rows.map((row) => ({ ...row, id: String(row.id), confidence: Number(row.confidence) })),
           totals: { ...totals.rows[0], total: Number(totals.rows[0]?.total || 0), cameras: Number(totals.rows[0]?.cameras || 0) },
+          protectedArchive: {
+            configured: protectedArchiveConfigured,
+            enabled: archiveEnabledResult.rows[0]?.value === 'true',
+            retentionDays: 7,
+            frames: archives.rows.map((row) => ({ ...row, id: String(row.id), redactedRegions: Number(row.redactedRegions) })),
+          },
         });
+      }
+
+      const protectedFrameMatch = url.pathname.match(/^\/api\/account\/admin\/vehicle-analytics\/protected-frames\/(\d+)$/);
+      if (protectedFrameMatch && req.method === 'GET') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const result = await pool.query(`SELECT id, opaque_title, redacted_frame, mime_type
+          FROM gev_protected_vehicle_frames WHERE id = $1`, [protectedFrameMatch[1]]);
+        const frame = result.rows[0];
+        if (!frame) return json(res, 404, { error: 'Protected frame not found' });
+        await record(req, 'ui_action', { action: 'protected_frame_viewed', archiveId: String(frame.id) }, user);
+        res.statusCode = 200;
+        res.setHeader('Content-Type', frame.mime_type || 'image/jpeg');
+        res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Disposition', `inline; filename="protected-frame-${frame.id}.jpg"`);
+        return res.end(frame.redacted_frame);
       }
 
       if (url.pathname === '/api/account/admin/vehicle-analytics/settings' && req.method === 'POST') {
@@ -664,6 +718,21 @@ export function createAccountApi(options = {}) {
         return json(res, 200, { ok: true, enabled: body.enabled });
       }
 
+      if (url.pathname === '/api/account/admin/vehicle-analytics/protected-archive/settings' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const body = await readJson(req);
+        if (typeof body.enabled !== 'boolean') return json(res, 400, { error: 'Enabled state must be true or false' });
+        if (body.enabled && !protectedArchiveConfigured) {
+          return json(res, 409, { error: 'Configure the private redaction worker and archive label key before enabling protected storage' });
+        }
+        await pool.query(`INSERT INTO gev_settings (key, value, updated_at)
+          VALUES ('protected_frame_archive_enabled', $1, NOW())
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [String(body.enabled)]);
+        await record(req, 'ui_action', { action: 'protected_frame_archive', enabled: body.enabled }, user);
+        return json(res, 200, { ok: true, enabled: body.enabled });
+      }
+
       if (url.pathname === '/api/account/admin/vehicle-analytics/analyze' && req.method === 'POST') {
         const user = await currentUser(req);
         if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
@@ -675,6 +744,7 @@ export function createAccountApi(options = {}) {
         const cameraName = safeText(body.cameraName, 200);
         const provider = safeText(body.provider, 120);
         const jurisdiction = safeText(body.jurisdiction, 160);
+        const stateCode = safeText(body.stateCode, 2).toUpperCase();
         const mimeType = safeText(body.mimeType, 40).toLowerCase();
         const imageBase64 = String(body.imageBase64 || '').replace(/\s/g, '');
         if (!cameraId) return json(res, 400, { error: 'Camera ID is required' });
@@ -716,8 +786,38 @@ export function createAccountApi(options = {}) {
             vehicle.yearStart, vehicle.yearEnd, vehicle.confidence, JSON.stringify(vehicle.bbox), analysis.model]);
           if (result.rows[0]) inserted.push({ ...vehicle, id: String(result.rows[0].id) });
         }
+        const archiveEnabledResult = await pool.query("SELECT value FROM gev_settings WHERE key = 'protected_frame_archive_enabled'");
+        const archive = { enabled: archiveEnabledResult.rows[0]?.value === 'true', stored: false };
+        if (archive.enabled) {
+          if (!protectedArchiveConfigured) {
+            archive.error = 'Protected archive is not configured; raw frame discarded';
+          } else {
+            try {
+              const redacted = await redactFrameWithWorker({
+                workerUrl: env.PRIVACY_REDACTION_WORKER_URL,
+                workerToken: env.PRIVACY_REDACTION_WORKER_TOKEN,
+                frameBytes,
+                mimeType,
+              });
+              const opaque = opaqueCameraTitle({ cameraId, stateCode, labelKey: env.PRIVACY_ARCHIVE_LABEL_KEY });
+              const archived = await pool.query(`INSERT INTO gev_protected_vehicle_frames
+                (camera_ref, opaque_title, state_code, captured_at, frame_fingerprint,
+                  redacted_frame, mime_type, redacted_regions, redaction_model)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                ON CONFLICT (camera_ref, frame_fingerprint) DO NOTHING RETURNING id`, [
+                opaque.cameraRef, opaque.title, stateCode || 'US', capturedAt, frameFingerprint,
+                redacted.redactedFrame, redacted.mimeType, redacted.regions, redacted.model,
+              ]);
+              archive.stored = Boolean(archived.rows[0]);
+              archive.id = archived.rows[0] ? String(archived.rows[0].id) : null;
+              archive.redactedRegions = redacted.regions;
+            } catch (error) {
+              archive.error = safeText(error?.message || 'Redaction failed; raw frame discarded', 200);
+            }
+          }
+        }
         await record(req, 'ui_action', { action: 'vehicle_frame_analyzed', cameraId, detections: inserted.length }, user);
-        return json(res, 200, { ok: true, duplicate: false, vehicles: inserted, model: analysis.model, rawImageStored: false });
+        return json(res, 200, { ok: true, duplicate: false, vehicles: inserted, model: analysis.model, rawImageStored: false, protectedArchive: archive });
       }
 
       if (url.pathname === '/api/account/admin/layers' && req.method === 'POST') {
