@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.30] — 2026-09-10 — Maryland and Delaware 511 cameras
+
+- Added Maryland CHART's official live-camera JSON catalog with strict state
+  bounds, online/operational filtering, trusted Maryland SHA stream hosts, and
+  direct HLS playback derived from the provider-published viewer contract.
+- Added Delaware's current public FirstMap traffic-camera layer with all 363
+  enabled DelDOT cameras, trusted `video.deldot.gov` HLS playback, and
+  placement-only degradation if a future row lacks a trusted stream.
+- Added Maryland and Delaware to the existing per-state camera controls,
+  provider health reporting, stale-provider isolation, and 15-minute catalog
+  cache; the latter matches DelDOT's published minimum polling interval.
+- Verified the completed live loaders against 512 operational Maryland cameras
+  and 363 Delaware cameras, for 875 newly registered live feeds.
+- Advanced ThunderLink Oblivion to public build `0.3.30` and kernel
+  `TBSGE-KERNEL-030.031`; legal acceptance remains `0.3.02`.
+
 ## [0.3.29] — 2026-09-10 — OpenSky and terrain provider resilience
 
 - Corrected OpenSky authentication to follow its current OAuth-only contract;

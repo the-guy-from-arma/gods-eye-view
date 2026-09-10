@@ -7,9 +7,9 @@ const whatsNew = readFileSync(new URL('./whatsNew.js', import.meta.url), 'utf8')
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const owner = readFileSync(new URL('../owner.html', import.meta.url), 'utf8');
 
-test('release briefing covers every build from 0.3.10 through 0.3.29', () => {
+test('release briefing covers every build from 0.3.10 through 0.3.30', () => {
   assert.deepEqual(RELEASE_ANNOUNCEMENT.releases.map(({ version }) => version),
-    Array.from({ length: 20 }, (_, index) => `0.3.${index + 10}`));
+    Array.from({ length: 21 }, (_, index) => `0.3.${index + 10}`));
   assert.ok(RELEASE_ANNOUNCEMENT.comingSoon.length >= 3);
 });
 

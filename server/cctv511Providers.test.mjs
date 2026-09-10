@@ -7,10 +7,12 @@ import {
   normalizeAlabamaCamera,
   normalizeArkansasCamera,
   normalizeColoradoCamera,
+  normalizeDelawareCamera,
   normalizeGraphql511Cameras,
   normalizeIbi511Camera,
   normalizeIndianaCamera,
   normalizeMassachusettsCamera,
+  normalizeMarylandCamera,
   normalizeMichiganCamera,
   normalizeMissouriCamera,
   normalizeKentuckyCamera,
@@ -173,11 +175,58 @@ test('Alabama placements and Ohio snapshots honor provider media rules', () => {
 
 test('legacy provider override cannot hide newly added defaults, but explicit exclusions can', () => {
   const enabled = enabledProviderKeys({ CCTV_STATE_511_PROVIDERS: 'az,fl,ga' });
-  for (const key of ['ny', 'tn', 'sc', 'al', 'oh', 'ri', 'nh', 'me', 'vt', 'ct', 'wv', 'ky', 'co', 'nm', 'ks', 'ok', 'ar', 'mo', 'ia', 'ne', 'sd', 'mn', 'wi', 'il']) assert.equal(enabled.has(key), true);
+  for (const key of ['ny', 'tn', 'sc', 'al', 'oh', 'ri', 'nh', 'me', 'vt', 'ct', 'wv', 'ky', 'co', 'nm', 'ks', 'ok', 'ar', 'mo', 'ia', 'ne', 'sd', 'mn', 'wi', 'il', 'md', 'de']) assert.equal(enabled.has(key), true);
   const excluded = enabledProviderKeys({ CCTV_STATE_511_EXCLUDE_PROVIDERS: 'ny,al' });
   assert.equal(excluded.has('ny'), false);
   assert.equal(excluded.has('al'), false);
   assert.equal(excluded.has('tn'), true);
+});
+
+test('Maryland CHART and Delaware FirstMap rows normalize public HLS cameras', () => {
+  const maryland = normalizeMarylandCamera({
+    id: '7a00a1dc01250075004d823633235daa',
+    cctvIp: 'strmr5.sha.maryland.gov',
+    commMode: 'ONLINE',
+    opStatus: 'OK',
+    description: 'I-270 & Old Hundred Rd (MD 109)',
+    cameraCategories: ['Wash. DC'],
+    lat: 39.2773,
+    lon: -77.3236,
+  });
+  assert.equal(maryland?.stateCode, 'MD');
+  assert.equal(maryland?.feedType, 'hls');
+  assert.equal(maryland?.city, 'Wash. DC, Maryland');
+  assert.match(maryland?.url || '', /^https:\/\/strmr5\.sha\.maryland\.gov\/rtplive\/.+\/playlist\.m3u8$/);
+
+  const delaware = normalizeDelawareCamera({
+    attributes: {
+      ID: 'KCAM001', ENABLED: 1, TITLE: 'DE 1 @ MILFORD NECK ROAD', COUNTY: 'Kent',
+      LATITUDE: 38.990931, LONGITUDE: -75.448625,
+      M3U8S: 'https://video.deldot.gov:443/live/KCAM001.stream/playlist.m3u8',
+    },
+    geometry: { x: -75.448625, y: 38.990931 },
+  });
+  assert.equal(delaware?.id, 'deldot-kcam001');
+  assert.equal(delaware?.stateCode, 'DE');
+  assert.equal(delaware?.city, 'Kent County, Delaware');
+  assert.equal(delaware?.feedType, 'hls');
+});
+
+test('Maryland and Delaware normalizers reject offline or untrusted media', () => {
+  assert.equal(normalizeMarylandCamera({
+    id: '7a00a1dc01250075004d823633235daa', cctvIp: 'evil.example',
+    commMode: 'ONLINE', opStatus: 'OK', lat: 39.2, lon: -77.3,
+  }), null);
+  assert.equal(normalizeMarylandCamera({
+    id: '7a00a1dc01250075004d823633235daa', cctvIp: 'strmr5.sha.maryland.gov',
+    commMode: 'OFFLINE', opStatus: 'COMM_FAILURE', lat: 39.2, lon: -77.3,
+  }), null);
+  const delaware = normalizeDelawareCamera({ attributes: {
+    ID: 'NCAM009', ENABLED: 1, TITLE: 'I-95', LATITUDE: 39.7, LONGITUDE: -75.5,
+    M3U8S: 'https://untrusted.example/live/camera.m3u8',
+  } });
+  assert.equal(delaware?.framePolicy, 'metadata-only');
+  assert.equal(delaware?.url, '');
 });
 
 test('new state schemas normalize public media and placement-only records', () => {

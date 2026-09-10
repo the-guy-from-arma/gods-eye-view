@@ -92,6 +92,8 @@ const PROVIDER_LABELS = {
   mn: 'Minnesota 511 · MnDOT',
   wi: 'Wisconsin 511 · WisDOT',
   il: 'Travel Midwest · IDOT',
+  md: 'CHART · Maryland DOT SHA',
+  de: 'DelDOT Interactive Maps',
 };
 
 const statusByProvider = new Map();
@@ -655,6 +657,101 @@ async function loadOhio() {
     .map((view, index) => normalizeOhioCamera(record, view, index)).filter(Boolean));
 }
 
+/** Normalize one camera from Maryland CHART's official JSON export. */
+export function normalizeMarylandCamera(record) {
+  const id = String(record?.id || '').trim();
+  const host = String(record?.cctvIp || '').trim().toLowerCase();
+  const lat = finite(record?.lat);
+  const lon = finite(record?.lon);
+  const commMode = String(record?.commMode || '').trim().toUpperCase();
+  const opStatus = String(record?.opStatus || '').trim().toUpperCase();
+  const failed = opStatus === 'COMM_FAILURE' || opStatus === 'HARDWARE_FAILURE';
+  if (
+    !/^[a-f0-9]{16,64}$/i.test(id)
+    || !/^[a-z0-9.-]+\.sha\.maryland\.gov$/i.test(host)
+    || commMode !== 'ONLINE'
+    || failed
+    || !inBounds(lat, lon, [37.8, 39.8, -79.6, -75.0])
+  ) return null;
+
+  const streamUrl = `https://${host}/rtplive/${encodeURIComponent(id)}/playlist.m3u8`;
+  const region = String(record?.cameraCategories?.[0] || '').trim();
+  return cameraDefaults({
+    id: `mdchart-${id}`,
+    name: String(record?.description || record?.name || `Maryland CHART camera ${id}`).trim(),
+    state: region ? `${region}, Maryland` : 'Maryland',
+    stateCode: 'md',
+    provider: PROVIDER_LABELS.md,
+    lat,
+    lon,
+    url: streamUrl,
+    snapshotUrl: '',
+    feedType: 'hls',
+    sourceKind: 'state-511-md',
+    license: 'Maryland CHART public live traffic camera',
+  });
+}
+
+async function loadMaryland() {
+  const payload = await fetchJson(
+    'https://chartexp1.sha.maryland.gov/CHARTExportClientService/getCameraMapDataJSON.do',
+    { headers: { Accept: 'application/json', Referer: 'https://chart.maryland.gov/' } },
+  );
+  if (!Array.isArray(payload?.data)) throw new Error('no camera data');
+  return payload.data.map(normalizeMarylandCamera).filter(Boolean);
+}
+
+/** Normalize one live camera from Delaware's public FirstMap traffic layer. */
+export function normalizeDelawareCamera(feature) {
+  const attributes = feature?.attributes || feature || {};
+  const id = String(attributes.ID ?? attributes.id ?? '').trim();
+  const lat = finite(feature?.geometry?.y ?? attributes.LATITUDE ?? attributes.latitude);
+  const lon = finite(feature?.geometry?.x ?? attributes.LONGITUDE ?? attributes.longitude);
+  if (!id || Number(attributes.ENABLED ?? attributes.enabled) !== 1 || !inBounds(lat, lon, [38.4, 39.9, -75.9, -74.9])) return null;
+
+  const hlsCandidate = normalizeHttpUrl(attributes.M3U8S || attributes.M3U8);
+  let streamUrl = '';
+  try {
+    const parsed = new URL(hlsCandidate);
+    if (parsed.protocol === 'https:' && parsed.hostname.toLowerCase() === 'video.deldot.gov' && /\.m3u8$/i.test(parsed.pathname)) {
+      streamUrl = parsed.toString();
+    }
+  } catch { /* malformed provider URL becomes placement-only */ }
+  const county = String(attributes.COUNTY || attributes.county || '').trim();
+  const jurisdiction = county
+    ? `${county}${/\bcounty$/i.test(county) ? '' : ' County'}, Delaware`
+    : 'Delaware';
+  return cameraDefaults({
+    id: `deldot-${id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    name: String(attributes.TITLE || attributes.title || `DelDOT camera ${id}`).trim(),
+    state: jurisdiction,
+    stateCode: 'de',
+    provider: PROVIDER_LABELS.de,
+    lat,
+    lon,
+    url: streamUrl,
+    snapshotUrl: '',
+    feedType: streamUrl ? 'hls' : 'image',
+    sourceKind: streamUrl ? 'state-511-de' : 'state-511-de-metadata',
+    framePolicy: streamUrl ? '' : 'metadata-only',
+    license: streamUrl
+      ? 'Delaware DOT public live traffic camera'
+      : 'Delaware DOT public camera placement metadata',
+  });
+}
+
+async function loadDelaware() {
+  // This FirstMap endpoint is the public camera layer currently used by the
+  // state map. The parent CCTV catalog cache refreshes at 15 minutes, matching
+  // DelDOT's published minimum polling interval for camera catalogs.
+  const payload = await fetchJson(
+    'https://enterprise.firstmaptest.delaware.gov/arcgis/rest/services/Transportation/DE_TMC_Traffic_Feeds/MapServer/1/query?where=ENABLED%3D1&outFields=*&returnGeometry=true&outSR=4326&f=json',
+    { headers: { Accept: 'application/json', Referer: 'https://deldot.gov/map/' } },
+  );
+  if (!Array.isArray(payload?.features)) throw new Error('no camera features');
+  return payload.features.map(normalizeDelawareCamera).filter(Boolean);
+}
+
 const MULTI_VIEW_QUERY = `query MapFeatures($input: MapFeaturesArgs!) {
   mapFeaturesQuery(input: $input) {
     mapFeatures { title uri features { geometry } __typename ... on Camera { active views(limit: 5) { category ... on CameraView { url } } } }
@@ -1040,7 +1137,7 @@ function buildRegional511Query(start, length, state = '') {
 
 async function createRegional511Session(base) {
   const response = await fetch(`${base}/cctv`, {
-    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.29' },
+    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.30' },
     signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`session HTTP ${response.status}`);
@@ -1180,6 +1277,8 @@ export async function loadState511Cameras(env = process.env) {
     ...(enabled.has('mo') ? [{ key: 'mo', state: 'Missouri', load: loadMissouri }] : []),
     ...(enabled.has('sd') ? [{ key: 'sd', state: 'South Dakota', load: loadSouthDakota }] : []),
     ...(enabled.has('il') ? [{ key: 'il', state: 'Illinois', load: loadIllinois }] : []),
+    ...(enabled.has('md') ? [{ key: 'md', state: 'Maryland', load: loadMaryland }] : []),
+    ...(enabled.has('de') ? [{ key: 'de', state: 'Delaware', load: loadDelaware }] : []),
     ...Object.values(GRAPHQL_511_PROVIDERS).filter((provider) => enabled.has(provider.key)).map((provider) => ({
       key: provider.key, state: provider.state, load: () => loadGraphql511({ ...provider, provider: PROVIDER_LABELS[provider.key] }),
     })),

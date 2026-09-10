@@ -1,6 +1,6 @@
 export const RELEASE_ANNOUNCEMENT = Object.freeze({
-  id: 'thunderlink-whats-new-0.3.29',
-  range: '0.3.10 — 0.3.29',
+  id: 'thunderlink-whats-new-0.3.30',
+  range: '0.3.10 — 0.3.30',
   title: 'God’s Eye evolved',
   intro: 'A field briefing on the systems, live-data layers, reliability work, and owner controls added since build 0.3.10.',
   releases: Object.freeze([
@@ -24,6 +24,7 @@ export const RELEASE_ANNOUNCEMENT = Object.freeze({
     { version: '0.3.27', title: 'Protected-frame foundation', summary: 'Dormant, owner-controlled detector-only redaction and short-lived protected frame storage.' },
     { version: '0.3.28', title: 'Release briefing', summary: 'Once-per-account What’s New briefings with an owner-controlled system-wide switch.' },
     { version: '0.3.29', title: 'Provider resilience', summary: 'Correct OpenSky OAuth refresh and failure diagnostics, plus fail-soft terrain retries and circuit breaking.' },
+    { version: '0.3.30', title: 'Maryland and Delaware 511', summary: '875 current official CHART and DelDOT cameras with state controls, provider health, and direct HLS playback.' },
   ]),
   comingSoon: Object.freeze([
     { title: 'Scene Director', summary: 'Cinematic scene controls remain staged while visual-state transitions are hardened.' },
