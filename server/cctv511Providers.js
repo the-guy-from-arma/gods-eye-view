@@ -75,6 +75,18 @@ const PROVIDER_LABELS = {
   or: 'Oregon 511 · ODOT TripCheck',
   mi: 'Michigan 511 · MDOT MiDrive',
   in: 'Indiana 511 · INDOT TrafficWise',
+  co: 'COtrip · Colorado DOT',
+  nm: 'NMRoads · New Mexico DOT',
+  ks: 'KanDrive · Kansas DOT',
+  ok: 'OK Traffic · Oklahoma DOT',
+  ar: 'IDriveArkansas · Arkansas DOT',
+  mo: 'MoDOT Traveler Information',
+  ia: 'Iowa 511 · Iowa DOT',
+  ne: 'Nebraska 511 · Nebraska DOT',
+  sd: 'South Dakota 511 · SDDOT',
+  mn: 'Minnesota 511 · MnDOT',
+  wi: 'Wisconsin 511 · WisDOT',
+  il: 'Travel Midwest · IDOT',
 };
 
 const statusByProvider = new Map();
@@ -100,7 +112,7 @@ function fallbackHeading(id) {
   return (Math.abs(hash) % 16) * 22.5;
 }
 
-function cameraDefaults({ id, name, state, provider, lat, lon, url, snapshotUrl, feedType = 'image', sourceKind, framePolicy = '', license = '' }) {
+function cameraDefaults({ id, name, state, stateCode = '', provider, lat, lon, url, snapshotUrl, feedType = 'image', sourceKind, framePolicy = '', license = '', minFrameRefreshMs = 0 }) {
   return {
     id,
     name,
@@ -120,7 +132,9 @@ function cameraDefaults({ id, name, state, provider, lat, lon, url, snapshotUrl,
     url,
     snapshotUrl: snapshotUrl || (feedType === 'image' ? url : ''),
     sourceKind,
+    stateCode: String(stateCode || sourceKind?.match(/^state-511-([a-z]{2})/)?.[1] || '').toUpperCase(),
     framePolicy,
+    minFrameRefreshMs,
     license: license || `${provider} public traveler-information camera`,
   };
 }
@@ -254,7 +268,7 @@ async function loadIbiProvider(config) {
   }
   const result = [...cameras.values()];
   if (first.total && rawRowCount < first.total * 0.9) {
-    throw new Error(`short pagination ${rawRowCount}/${first.total}`);
+    return { cameras: result, warning: `partial catalog served ${rawRowCount}/${first.total}` };
   }
   return result;
 }
@@ -636,6 +650,216 @@ async function loadOhio() {
     .map((view, index) => normalizeOhioCamera(record, view, index)).filter(Boolean));
 }
 
+const MULTI_VIEW_QUERY = `query MapFeatures($input: MapFeaturesArgs!) {
+  mapFeaturesQuery(input: $input) {
+    mapFeatures { title uri features { geometry } __typename ... on Camera { active views(limit: 5) { category ... on CameraView { url } } } }
+    error { message }
+  }
+}`;
+
+const GRAPHQL_511_PROVIDERS = {
+  ks: { key: 'ks', endpoint: 'https://www.kandrive.gov/api/graphql', base: 'https://www.kandrive.gov', state: 'Kansas', idPrefix: 'kdot', bounds: [36.9, 40.1, -102.1, -94.5] },
+  ia: { key: 'ia', endpoint: 'https://www.511ia.org/api/graphql', base: 'https://www.511ia.org', state: 'Iowa', idPrefix: 'iadot', bounds: [40.3, 43.6, -96.7, -90.0] },
+  ne: { key: 'ne', endpoint: 'https://www.511.nebraska.gov/api/graphql', base: 'https://www.511.nebraska.gov', state: 'Nebraska', idPrefix: 'ndot-ne', bounds: [39.9, 43.1, -104.2, -95.2] },
+  mn: { key: 'mn', endpoint: 'https://511mn.org/api/graphql', base: 'https://511mn.org', state: 'Minnesota', idPrefix: 'mndot', bounds: [43.4, 49.5, -97.3, -89.4] },
+};
+
+export function normalizeGraphql511Cameras(feature, config) {
+  if (feature?.__typename !== 'Camera' || feature.active === false) return [];
+  const siteId = String(feature?.uri || '').match(/camera\/([^/?#]+)/)?.[1];
+  const coords = feature?.features?.[0]?.geometry?.coordinates;
+  const lon = finite(coords?.[0]);
+  const lat = finite(coords?.[1]);
+  if (!siteId || !inBounds(lat, lon, config.bounds)) return [];
+  return (Array.isArray(feature.views) ? feature.views : []).flatMap((view, index) => {
+    const mediaUrl = String(view?.url || '').trim();
+    if (!/^https:\/\//i.test(mediaUrl)) return [];
+    const hls = /\.m3u8(?:\?|$)/i.test(mediaUrl);
+    return [cameraDefaults({
+      id: `${config.idPrefix}-${siteId}-${index}`,
+      name: `${String(feature.title || `${config.provider} camera ${siteId}`).trim()}${feature.views.length > 1 ? ` · VIEW ${index + 1}` : ''}`,
+      state: config.state,
+      stateCode: config.key,
+      provider: config.provider,
+      lat, lon,
+      url: mediaUrl,
+      snapshotUrl: hls ? '' : mediaUrl,
+      feedType: hls ? 'hls' : 'image',
+      sourceKind: `state-511-${config.key}`,
+    })];
+  });
+}
+
+async function loadGraphql511(config) {
+  const payload = await fetchJson(config.endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', Referer: `${config.base}/` },
+    body: JSON.stringify({
+      query: MULTI_VIEW_QUERY,
+      variables: { input: { north: config.bounds[1], south: config.bounds[0], east: config.bounds[3], west: config.bounds[2], zoom: 16, layerSlugs: ['normalCameras'], nonClusterableUris: null } },
+    }),
+  });
+  const features = payload?.data?.mapFeaturesQuery?.mapFeatures;
+  if (!Array.isArray(features)) throw new Error('no mapFeatures');
+  return features.flatMap((feature) => normalizeGraphql511Cameras(feature, config));
+}
+
+export function normalizeColoradoCamera(feature) {
+  const p = feature?.properties || {};
+  const coords = feature?.geometry?.coordinates;
+  const lon = finite(coords?.[0]);
+  const lat = finite(coords?.[1]);
+  const siteId = String(p.id || '').trim();
+  if (!siteId || !inBounds(lat, lon, [36.8, 41.1, -109.2, -101.9])) return [];
+  return (Array.isArray(p.views) ? p.views : []).flatMap((view, index) => {
+    const mediaUrl = String(view?.url || '').trim();
+    if (view?.broken || !/^https:\/\//i.test(mediaUrl)) return [];
+    const hls = /\.m3u8(?:\?|$)/i.test(mediaUrl);
+    return [cameraDefaults({
+      id: `cdot-${siteId}-${index}`,
+      name: `${String(p.name || p.location || `CDOT camera ${siteId}`).trim()}${p.views.length > 1 ? ` · ${view.name || `VIEW ${index + 1}`}` : ''}`,
+      state: 'Colorado', stateCode: 'co', provider: PROVIDER_LABELS.co,
+      lat, lon, url: mediaUrl, snapshotUrl: hls ? '' : mediaUrl,
+      feedType: hls ? 'hls' : 'image', sourceKind: 'state-511-co',
+    })];
+  });
+}
+
+async function loadColorado() {
+  const payload = await fetchJson('https://api-511x-co.carsprogram.org/cameras/map-features', {
+    headers: { Accept: 'application/json', Referer: 'https://www.cotrip.org/' },
+  });
+  const features = payload?.features;
+  if (!Array.isArray(features)) throw new Error('no camera features');
+  return features.flatMap(normalizeColoradoCamera);
+}
+
+export function normalizeNewMexicoCamera(record) {
+  const id = String(record?.name || '').trim();
+  const lat = finite(record?.lat);
+  const lon = finite(record?.lon);
+  if (!id || record?.enabled === false || !inBounds(lat, lon, [31.2, 37.1, -109.2, -102.8])) return null;
+  const snapshotUrl = String(record.snapshotFile || '').trim();
+  if (!/^https?:\/\//i.test(snapshotUrl)) return null;
+  return cameraDefaults({
+    id: `nmdot-${id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    name: String(record.title || id).trim(), state: record.grouping ? `${record.grouping}, New Mexico` : 'New Mexico',
+    stateCode: 'nm', provider: PROVIDER_LABELS.nm, lat, lon, url: snapshotUrl,
+    sourceKind: 'state-511-nm',
+  });
+}
+
+async function loadNewMexico() {
+  const payload = await fetchJson('https://servicev5.nmroads.com/RealMapWAR/GetCameraInfo', { headers: { Referer: 'https://nmroads.com/' } });
+  const rows = payload?.cameraInfo;
+  if (!Array.isArray(rows)) throw new Error('no camera array');
+  return rows.map(normalizeNewMexicoCamera).filter(Boolean);
+}
+
+export function normalizeArkansasCamera(feature) {
+  const p = feature?.properties || {};
+  const coords = feature?.geometry?.coordinates;
+  const lon = finite(coords?.[0]);
+  const lat = finite(coords?.[1]);
+  const id = String(p.id || '').trim();
+  if (!id || p.status === 'offline' || !inBounds(lat, lon, [33.0, 36.6, -94.7, -89.6])) return null;
+  const hls = /^https:\/\/[^\s]+\.m3u8(?:\?|$)/i.test(String(p.hls_stream_protected || '')) ? String(p.hls_stream_protected) : '';
+  const snapshot = `https://actis.idrivearkansas.com/index.php/api/cameras/image?camera=${encodeURIComponent(id)}`;
+  return cameraDefaults({
+    id: `ardot-${id}`, name: String(p.name || p.description || `ARDOT camera ${id}`).trim(), state: 'Arkansas',
+    stateCode: 'ar', provider: PROVIDER_LABELS.ar, lat, lon, url: hls || snapshot, snapshotUrl: snapshot,
+    feedType: hls ? 'hls' : 'image', sourceKind: 'state-511-ar',
+  });
+}
+
+async function loadArkansas() {
+  const payload = await fetchJson('https://layers.idrivearkansas.com/cameras.geojson', { headers: { Referer: 'https://www.idrivearkansas.com/' } });
+  if (!Array.isArray(payload?.features)) throw new Error('no camera features');
+  return payload.features.map(normalizeArkansasCamera).filter(Boolean);
+}
+
+export function normalizeOklahomaCamera(record) {
+  const id = String(record?.id || '').trim();
+  const lat = finite(record?.latitude);
+  const lon = finite(record?.longitude);
+  if (!id || String(record?.blockAtis || '') === '1' || !inBounds(lat, lon, [33.6, 37.1, -103.1, -94.3])) return null;
+  return cameraDefaults({
+    id: `odot-ok-${id}`, name: String(record.location || `ODOT camera ${id}`).trim(),
+    state: record.city ? `${record.city}, Oklahoma` : 'Oklahoma', stateCode: 'ok', provider: PROVIDER_LABELS.ok,
+    lat, lon, url: '', snapshotUrl: '', sourceKind: 'state-511-ok-metadata', framePolicy: 'metadata-only',
+    license: 'Oklahoma DOT public camera placement metadata; media is not retransmitted',
+  });
+}
+
+async function loadOklahoma() {
+  const payload = await fetchJson('https://oktraffic.org/api/MapCameras', { headers: { Referer: 'https://oktraffic.org/' } });
+  if (!Array.isArray(payload)) throw new Error('no camera array');
+  return payload.map(normalizeOklahomaCamera).filter(Boolean);
+}
+
+export function normalizeMissouriCamera(record) {
+  const id = String(record?.id || '').trim();
+  const lat = finite(record?.location?.y);
+  const lon = finite(record?.location?.x);
+  if (!id || !inBounds(lat, lon, [35.9, 40.7, -95.8, -89.0])) return null;
+  let url = '';
+  try { url = new URL(record.url, 'https://traveler.modot.org').toString(); } catch { return null; }
+  return cameraDefaults({ id: `modot-${id}`, name: String(record.caption || `MoDOT camera ${id}`).trim(), state: 'Missouri', stateCode: 'mo', provider: PROVIDER_LABELS.mo, lat, lon, url, sourceKind: 'state-511-mo' });
+}
+
+async function loadMissouri() {
+  const payload = await fetchJson('https://traveler.modot.org/map/js/snapshot.json', { headers: { Referer: 'https://traveler.modot.org/map/' } });
+  if (!Array.isArray(payload?.cameras)) throw new Error('no camera array');
+  return payload.cameras.map(normalizeMissouriCamera).filter(Boolean);
+}
+
+export function normalizeSouthDakotaCameras(feature) {
+  const p = feature?.properties || {};
+  const coords = feature?.geometry?.coordinates;
+  const lon = finite(coords?.[0]);
+  const lat = finite(coords?.[1]);
+  const siteId = String(feature?.id || p.name || '').trim();
+  if (!siteId || !inBounds(lat, lon, [42.4, 46.0, -104.1, -96.3])) return [];
+  return (Array.isArray(p.cameras) ? p.cameras : []).flatMap((view, index) => {
+    const url = String(view?.image || '').trim();
+    if (!/^https:\/\//i.test(url)) return [];
+    return [cameraDefaults({ id: `sddot-${siteId}-${view.id ?? index}`, name: String(view.description || view.name || p.name || siteId).trim(), state: 'South Dakota', stateCode: 'sd', provider: PROVIDER_LABELS.sd, lat, lon, url, sourceKind: 'state-511-sd' })];
+  });
+}
+
+async function loadSouthDakota() {
+  const payload = await fetchJson('https://sd.cdn.iteris-atis.com/geojson/icons/metadata/icons.cameras.geojson', { headers: { Referer: 'https://www.sd511.org/' } });
+  if (!Array.isArray(payload?.features)) throw new Error('no camera features');
+  return payload.features.flatMap(normalizeSouthDakotaCameras);
+}
+
+export function normalizeTravelMidwestCamera(feature) {
+  const p = feature?.properties || {};
+  const coords = feature?.geometry?.coordinates;
+  const lon = finite(coords?.[0]);
+  const lat = finite(coords?.[1]);
+  const siteId = String(p.id || '').trim();
+  if (!siteId.startsWith('IL-') || !inBounds(lat, lon, [36.8, 42.6, -91.6, -87.0])) return [];
+  return (Array.isArray(p.remUrls) ? p.remUrls : []).flatMap((media, index) => {
+    const url = String(media || '').trim();
+    if (!/^https:\/\//i.test(url)) return [];
+    return [cameraDefaults({
+      id: `idot-${siteId}-${index}`, name: `${String(p.locDesc || siteId).trim()}${p.dirs?.[index] ? ` · ${p.dirs[index]}` : ''}`,
+      state: 'Illinois', stateCode: 'il', provider: `${PROVIDER_LABELS.il} · ${p.src || 'Illinois agency'}`, lat, lon, url,
+      sourceKind: 'state-511-il', minFrameRefreshMs: 300_000,
+      license: 'Travel Midwest/IDOT public traveler-information image; displayed unmodified and refreshed no more than once every five minutes',
+    })];
+  });
+}
+
+async function loadIllinois() {
+  const payload = await fetchJson('https://travelmidwest.com/lmiga/cameraMap.json', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Referer: 'https://travelmidwest.com/' }, body: '{}',
+  });
+  if (!Array.isArray(payload?.features)) throw new Error('no camera features');
+  return payload.features.flatMap(normalizeTravelMidwestCamera);
+}
+
 function buildRegional511Query(start, length, state = '') {
   return encodeURIComponent(JSON.stringify({
     columns: [
@@ -656,7 +880,7 @@ function buildRegional511Query(start, length, state = '') {
 
 async function createRegional511Session(base) {
   const response = await fetch(`${base}/cctv`, {
-    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.19' },
+    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.20' },
     signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`session HTTP ${response.status}`);
@@ -709,8 +933,11 @@ async function loadRegional511(config) {
       ingest(result.value.rows);
     }
   }
-  if (first.total && rawRowCount < first.total * 0.9) throw new Error(`short pagination ${rawRowCount}/${first.total}`);
-  return [...cameras.values()];
+  const result = [...cameras.values()];
+  if (first.total && rawRowCount < first.total * 0.9) {
+    return { cameras: result, warning: `partial catalog served ${rawRowCount}/${first.total}` };
+  }
+  return result;
 }
 
 const REGIONAL_511_PROVIDERS = {
@@ -721,6 +948,10 @@ const REGIONAL_511_PROVIDERS = {
   ct: {
     key: 'ct', base: 'https://ctroads.org', idPrefix: 'ctdot', provider: PROVIDER_LABELS.ct,
     state: 'Connecticut', filterState: '', lang: 'en-US', bounds: [40.9, 42.1, -73.8, -71.7],
+  },
+  wi: {
+    key: 'wi', base: 'https://511wi.gov', idPrefix: 'wisdot', provider: PROVIDER_LABELS.wi,
+    state: 'Wisconsin', filterState: '', lang: 'en', bounds: [42.4, 47.4, -92.9, -86.0],
   },
 };
 
@@ -768,6 +999,17 @@ export async function loadState511Cameras(env = process.env) {
     ...(enabled.has('oh') ? [{ key: 'oh', state: 'Ohio', load: loadOhio }] : []),
     ...(enabled.has('vt') ? [{ key: 'vt', state: 'Vermont', load: () => loadRegional511(REGIONAL_511_PROVIDERS.vt) }] : []),
     ...(enabled.has('ct') ? [{ key: 'ct', state: 'Connecticut', load: () => loadRegional511(REGIONAL_511_PROVIDERS.ct) }] : []),
+    ...(enabled.has('wi') ? [{ key: 'wi', state: 'Wisconsin', load: () => loadRegional511(REGIONAL_511_PROVIDERS.wi) }] : []),
+    ...(enabled.has('co') ? [{ key: 'co', state: 'Colorado', load: loadColorado }] : []),
+    ...(enabled.has('nm') ? [{ key: 'nm', state: 'New Mexico', load: loadNewMexico }] : []),
+    ...(enabled.has('ar') ? [{ key: 'ar', state: 'Arkansas', load: loadArkansas }] : []),
+    ...(enabled.has('ok') ? [{ key: 'ok', state: 'Oklahoma', load: loadOklahoma }] : []),
+    ...(enabled.has('mo') ? [{ key: 'mo', state: 'Missouri', load: loadMissouri }] : []),
+    ...(enabled.has('sd') ? [{ key: 'sd', state: 'South Dakota', load: loadSouthDakota }] : []),
+    ...(enabled.has('il') ? [{ key: 'il', state: 'Illinois', load: loadIllinois }] : []),
+    ...Object.values(GRAPHQL_511_PROVIDERS).filter((provider) => enabled.has(provider.key)).map((provider) => ({
+      key: provider.key, state: provider.state, load: () => loadGraphql511({ ...provider, provider: PROVIDER_LABELS[provider.key] }),
+    })),
   ];
 
   const settled = await Promise.allSettled(loaders.map((entry) => entry.load()));
@@ -775,11 +1017,13 @@ export async function loadState511Cameras(env = process.env) {
   settled.forEach((result, index) => {
     const entry = loaders[index];
     if (result.status === 'fulfilled') {
-      const unique = [...new Map(result.value.map((camera) => [camera.id, camera])).values()];
+      const loaded = Array.isArray(result.value) ? result.value : result.value?.cameras;
+      const warning = Array.isArray(result.value) ? '' : String(result.value?.warning || '');
+      const unique = [...new Map((Array.isArray(loaded) ? loaded : []).map((camera) => [camera.id, camera])).values()];
       lastGoodByProvider.set(entry.key, unique);
       cameras.push(...unique);
-      recordStatus(entry.key, entry.state, unique.length);
-      console.log(`[CCTV] Loaded ${entry.provider || PROVIDER_LABELS[entry.key]}: ${unique.length}`);
+      recordStatus(entry.key, entry.state, unique.length, warning, false);
+      console.log(`[CCTV] Loaded ${entry.provider || PROVIDER_LABELS[entry.key]}: ${unique.length}${warning ? ` (${warning})` : ''}`);
     } else {
       const stale = lastGoodByProvider.get(entry.key) || [];
       cameras.push(...stale);

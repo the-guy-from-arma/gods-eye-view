@@ -224,7 +224,7 @@ test('lazy coverage inserts nothing at catalog init, then materializes only elig
   assert.equal(coverageOn.length, 14 * 5);
   assert.equal(insertCount, 15 * 5, 'COVERAGE ON builds only remaining visible/eligible sets');
   assert.equal(records.filter((record) => record.coverageEntities.length > 0).length, 15);
-  assert.match(refreshCoverageStyles.toString(), /ensureVisibleCoverageEntities\(_records, coverageVisible\)/);
+  assert.match(refreshCoverageStyles.toString(), /ensureVisibleCoverageEntities\(visibleRecords\(\), coverageVisible\)/);
   assert.equal(
     materializeCctvVisibleCoverageEntities(records, visibleIds, build).length,
     0,

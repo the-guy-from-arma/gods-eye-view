@@ -6594,6 +6594,60 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   margin-bottom: 0;
 }
 
+.cctv-state-filter-block {
+  border: 1px solid rgba(45, 216, 239, 0.24);
+  background: rgba(1, 15, 21, 0.62);
+  padding: 7px;
+  margin: 7px 0;
+}
+
+.cctv-state-filter-header {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 5px;
+  color: rgba(149, 222, 232, 0.72);
+  font: 600 8px/1.2 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.cctv-state-action,
+.cctv-state-toggle {
+  border: 1px solid rgba(45, 216, 239, 0.28);
+  background: rgba(5, 21, 28, 0.76);
+  color: rgba(151, 214, 223, 0.68);
+  font: 600 8px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.cctv-state-action { padding: 4px 6px; }
+
+.cctv-state-toggles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  max-height: 108px;
+  margin-top: 6px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.cctv-state-toggle {
+  padding: 5px 3px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cctv-state-toggle.active {
+  color: #6eeaff;
+  border-color: rgba(45, 225, 247, 0.72);
+  background: rgba(0, 128, 151, 0.2);
+  box-shadow: inset 0 0 10px rgba(0, 207, 239, 0.09);
+}
+
+.cctv-state-toggle small { opacity: 0.62; }
+
 .cctv-calibration-block {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 9px;
@@ -7279,6 +7333,7 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 #global-context-panel.collapsed > .global-context-panel-inner > .context-mode-standby,
 #radio-panel.collapsed .radio-panel-inner > :not(.panel-header),
 #cctv-panel.collapsed .cctv-controls,
+#cctv-panel.collapsed .cctv-state-filter-block,
 #cctv-panel.collapsed .cctv-calibration-block,
 #cctv-panel.collapsed .cctv-frame-wrap,
 #cctv-panel.collapsed #cctv-source-badge,

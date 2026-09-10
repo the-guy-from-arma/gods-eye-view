@@ -177,7 +177,19 @@ export const DATA_CREDITS = [
       '<a href="https://www.algotraffic.com/" target="_blank" rel="noopener">ALDOT ALGO</a> · ' +
       '<a href="https://ohgo.com/" target="_blank" rel="noopener">ODOT OHGO</a> · ' +
       '<a href="https://newengland511.org/" target="_blank" rel="noopener">VTrans</a> · ' +
-      '<a href="https://www.ctroads.org/" target="_blank" rel="noopener">CTDOT</a>',
+      '<a href="https://www.ctroads.org/" target="_blank" rel="noopener">CTDOT</a> · ' +
+      '<a href="https://www.cotrip.org/" target="_blank" rel="noopener">Colorado DOT</a> · ' +
+      '<a href="https://nmroads.com/" target="_blank" rel="noopener">New Mexico DOT</a> · ' +
+      '<a href="https://www.kandrive.gov/" target="_blank" rel="noopener">Kansas DOT</a> · ' +
+      '<a href="https://oktraffic.org/" target="_blank" rel="noopener">Oklahoma DOT</a> · ' +
+      '<a href="https://www.idrivearkansas.com/" target="_blank" rel="noopener">Arkansas DOT</a> · ' +
+      '<a href="https://traveler.modot.org/map/" target="_blank" rel="noopener">Missouri DOT</a> · ' +
+      '<a href="https://www.511ia.org/" target="_blank" rel="noopener">Iowa DOT</a> · ' +
+      '<a href="https://www.511.nebraska.gov/" target="_blank" rel="noopener">Nebraska DOT</a> · ' +
+      '<a href="https://www.sd511.org/" target="_blank" rel="noopener">South Dakota DOT</a> · ' +
+      '<a href="https://511mn.org/" target="_blank" rel="noopener">Minnesota DOT</a> · ' +
+      '<a href="https://511wi.gov/" target="_blank" rel="noopener">Wisconsin DOT</a> · ' +
+      '<a href="https://travelmidwest.com/" target="_blank" rel="noopener">Travel Midwest / IDOT</a>',
   },
   {
     key: 'gbfs',

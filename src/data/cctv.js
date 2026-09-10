@@ -157,6 +157,7 @@ const PLACEHOLDER_REPAINT_MS = 750;
 export const CCTV_CALIBRATION_STORAGE_KEY_V1 = 'godsEyeView.cctv.calibration.v1';
 /** v2 store key. Entries: { values: <7-field calibration offsets>, source: 'manual', savedAt: <epoch ms> }. */
 export const CCTV_CALIBRATION_STORAGE_KEY_V2 = 'godsEyeView.cctv.calibration.v2';
+export const CCTV_STATE_FILTER_STORAGE_KEY = 'godsEyeView.cctv.disabledStates.v1';
 // H5: throttle for double-buffered canvas texture swaps (<=1Hz; each swap is a
 // full 1080p texture re-upload because Cesium re-uploads only on a NEW image
 // object reference).
@@ -287,6 +288,7 @@ let _viewer = null;
 let _billboards = null;
 let _records = [];
 let _recordById = new Map();
+let _disabledStateCodes = new Set();
 let _coverageEntities = [];
 let _projectionEntities = [];
 let _enabled = false;
@@ -316,6 +318,43 @@ let _lastFocusStyleAt = 0;
 /** Icons whose animated emphasis remains outside the 1.0 deadband. */
 let _activeFocusStyleCount = 0;
 const _scratchFocusScreen = new Cesium.Cartesian2();
+
+function recordStateCode(record) {
+  return String(record?.camera?.stateCode || record?.camera?.sourceKind?.match(/^state-511-([a-z]{2})/)?.[1] || '').toUpperCase();
+}
+
+function isRecordStateEnabled(record) {
+  const code = recordStateCode(record);
+  return !code || !_disabledStateCodes.has(code);
+}
+
+function visibleRecords() {
+  return _records.filter(isRecordStateEnabled);
+}
+
+function loadDisabledStateCodes() {
+  if (typeof localStorage === 'undefined') return new Set();
+  try {
+    const value = JSON.parse(localStorage.getItem(CCTV_STATE_FILTER_STORAGE_KEY) || '[]');
+    return new Set((Array.isArray(value) ? value : []).map((code) => String(code).toUpperCase()).filter((code) => /^[A-Z]{2}$/.test(code)));
+  } catch { return new Set(); }
+}
+
+function saveDisabledStateCodes() {
+  if (typeof localStorage === 'undefined') return;
+  try { localStorage.setItem(CCTV_STATE_FILTER_STORAGE_KEY, JSON.stringify([..._disabledStateCodes].sort())); } catch { /* storage unavailable */ }
+}
+
+function stateFilterState() {
+  const counts = new Map();
+  for (const record of _records) {
+    const code = recordStateCode(record);
+    if (code) counts.set(code, (counts.get(code) || 0) + 1);
+  }
+  return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([code, count]) => ({
+    code, count, enabled: !_disabledStateCodes.has(code),
+  }));
+}
 // Staggered geometry-load queue state (see startGeometryLoadQueue).
 let _geoQueue = [];
 let _geoQueueTimer = 0;
@@ -1166,6 +1205,8 @@ function buildCatalogFromSources(rawSources) {
       city: String(source.city || city?.name || seed?.city || 'Global'),
       provider: String(source.provider || seed?.provider || 'Configured CCTV Source'),
       sourceKind: String(source.sourceKind || source.kind || (source.url ? 'configured' : 'seed')).toLowerCase(),
+      stateCode: String(source.stateCode || source.sourceKind?.match(/^state-511-([a-z]{2})/)?.[1] || '').toUpperCase(),
+      minFrameRefreshMs: Math.max(0, safeNumber(source.minFrameRefreshMs, 0)),
       feedType,
       feedConfigured: typeof source.url === 'string' && !!source.url.trim(),
       lat,
@@ -1486,7 +1527,7 @@ function refreshProjectionTextures(record) {
  * @returns {string} Frame URL.
  */
 function frameUrlFor(camera, refreshMs = ACTIVE_FRAME_REFRESH_MS) {
-  const cadenceMs = Math.max(1000, safeNumber(refreshMs, ACTIVE_FRAME_REFRESH_MS));
+  const cadenceMs = Math.max(1000, safeNumber(refreshMs, ACTIVE_FRAME_REFRESH_MS), safeNumber(camera?.minFrameRefreshMs, 0));
   const tick = Math.floor(Date.now() / cadenceMs);
   const params = new URLSearchParams({
     label: camera.name,
@@ -2751,7 +2792,7 @@ function refreshHorizonCulling() {
   for (const record of _records) {
     const bb = record.billboard;
     if (!bb) continue;
-    const visible = occluder.isPointVisible(bb.position);
+    const visible = isRecordStateEnabled(record) && occluder.isPointVisible(bb.position);
     if (bb.show !== visible) bb.show = visible;
   }
 }
@@ -2806,6 +2847,7 @@ function refreshAmbientCards() {
   const screenById = new Map();
   for (const record of _records) {
     const id = record.camera.id;
+    if (!isRecordStateEnabled(record)) continue;
     if (id === activeId || !record.position) continue;
     let inView = false;
     let sx = NaN;
@@ -3251,9 +3293,10 @@ export function refreshCoverageStyles() {
   const coverageOn = _coverageMode !== 'off';
   const viewshedOn = _coverageMode === 'viewshed';
   if (coverageOn) {
-    ensureVisibleCoverageEntities(_records, coverageVisible);
+    ensureVisibleCoverageEntities(visibleRecords(), coverageVisible);
   }
   for (const record of _records) {
+    const stateEnabled = isRecordStateEnabled(record);
     const isActive = record.camera.id === activeId;
     if (record.billboard) {
       record.billboard.color = isActive ? ACTIVE_CAMERA_COLOR : IDLE_CAMERA_COLOR;
@@ -3262,20 +3305,20 @@ export function refreshCoverageStyles() {
       // (set at creation) — see the field-test far-zoom submerge fix there.
     }
 
-    if (_enabled && _showProjection && isActive) {
+    if (_enabled && stateEnabled && _showProjection && isActive) {
       ensureProjectionRuntime(record);
     }
     // One live plane in the world at a time (§2c): only the active camera's
     // far cap carries the monitor plane; idle neighbors get the faint
     // wireframe only.
-    const planeShowing = !!(_enabled && _showProjection && isActive);
+    const planeShowing = !!(_enabled && stateEnabled && _showProjection && isActive);
 
     const inVisibleSet = coverageVisible.has(record.camera.id);
     for (const entity of record.coverageEntities || []) {
       // The frustum wireframe is part of the projection representation —
       // force it on for the active camera and let it read through geometry
       // via depthFailMaterial (polylines have no disableDepthTestDistance).
-      entity.show = !!(_enabled && ((coverageOn && inVisibleSet) || planeShowing));
+      entity.show = !!(_enabled && stateEnabled && ((coverageOn && inVisibleSet) || planeShowing));
       if (!entity.polyline) continue;
       // Viewshed mode swaps the cyan/green scheme for the camera's own hue so
       // adjacent cones read as distinct coverage claims (design §3b); the
@@ -3303,7 +3346,7 @@ export function refreshCoverageStyles() {
     // Viewshed volume lifecycle: exists iff enabled + viewshed mode + in the
     // visible set. Rebuild on active-tint flips (rare); otherwise leave the
     // primitive alone so idle refreshes never churn geometry.
-    const wantVolume = !!(_enabled && viewshedOn && inVisibleSet && record.frustumPositions);
+    const wantVolume = !!(_enabled && stateEnabled && viewshedOn && inVisibleSet && record.frustumPositions);
     if (wantVolume) {
       if (!record.viewshedPrimitive || record.viewshedActiveTint !== isActive) {
         rebuildViewshedVolume(record, isActive);
@@ -3333,6 +3376,7 @@ function nearestCameraIdToViewer() {
 
   let best = null;
   for (const record of _records) {
+    if (!isRecordStateEnabled(record)) continue;
     const distKm = haversineKm(lat, lon, record.camera.lat, record.camera.lon);
     if (!best || distKm < best.distKm) {
       best = { id: record.camera.id, distKm };
@@ -3419,6 +3463,7 @@ function getPublicCameraState(record, activeId = null) {
     name: camera.name,
     city: camera.city,
     provider: camera.provider,
+    stateCode: camera.stateCode || '',
     lat: camera.lat,
     lon: camera.lon,
     headingDeg: camera.headingDeg,
@@ -3482,7 +3527,9 @@ function uiState() {
     autoHop: _autoHop,
     autoHopSuspended: _autoHopSuspended,
     autoHopSec: _autoHopSec,
-    count: _count,
+    count: visibleRecords().length,
+    totalCount: _count,
+    stateFilters: stateFilterState(),
     lastUpdate: _lastUpdate,
     error: _lastError,
     loading: {
@@ -3526,14 +3573,15 @@ function notifyListeners() {
 
 /** Nearest, cached subset used only by the panel/voice camera picker. */
 function uiCameraRecords(activeId = null) {
-  if (_records.length <= CCTV_UI_CAMERA_LIMIT) return _records;
+  const available = visibleRecords();
+  if (available.length <= CCTV_UI_CAMERA_LIMIT) return available;
   const carto = _viewer?.camera?.positionCartographic;
   const refLat = carto ? Cesium.Math.toDegrees(carto.latitude) : 0;
   const refLon = carto ? Cesium.Math.toDegrees(carto.longitude) : 0;
-  const key = `${currentViewContext()}:${activeId || ''}:${_records.length}`;
+  const key = `${currentViewContext()}:${activeId || ''}:${available.length}:${[..._disabledStateCodes].sort().join(',')}`;
   if (_uiCameraCache.key === key) return _uiCameraCache.records;
 
-  const nearest = _records.map((record) => ({
+  const nearest = available.map((record) => ({
     record,
     distance: haversineKm(refLat, refLon, record.camera.lat, record.camera.lon),
   })).sort((a, b) => a.distance - b.distance)
@@ -3731,6 +3779,7 @@ export function bindCctvWorldClickGesture(handler, onClick, options = {}) {
 export function setActiveCamera(cameraId) {
   if (!cameraId || !_recordById.has(cameraId)) return CCTV_ACTIVATION_RESULT.NOT_FOUND;
   const record = _recordById.get(cameraId);
+  if (!isRecordStateEnabled(record)) return CCTV_ACTIVATION_RESULT.NOT_FOUND;
   const previousActiveRecord = getActiveRecord();
   // Re-selecting the already-active camera is a no-op: re-running the
   // activation path re-probes and rewrites the plane entity's geometry, and
@@ -4040,6 +4089,23 @@ function clearRuntimeState() {
   _lastAppliedRegime = null;
 }
 
+function setStateFilter(code, enabled) {
+  const normalized = String(code || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) return false;
+  if (enabled) _disabledStateCodes.delete(normalized);
+  else _disabledStateCodes.add(normalized);
+  saveDisabledStateCodes();
+  if (_activeCameraId && !isRecordStateEnabled(_recordById.get(_activeCameraId))) {
+    deactivateActiveCamera();
+  }
+  _uiCameraCache = { key: '', records: [] };
+  refreshHorizonCulling();
+  refreshCoverageStyles();
+  refreshAmbientCards();
+  notifyListeners();
+  return true;
+}
+
 /**
  * Primes the minimum module state needed to exercise the production coverage
  * refresh path in unit tests.
@@ -4234,6 +4300,7 @@ const cctvLayer = {
     _lastHopAt = 0;
     _lastViewContext = '';
     _calibrationById = loadCalibrationStore();
+    _disabledStateCodes = loadDisabledStateCodes();
 
     _billboards = new Cesium.BillboardCollection();
     _viewer.scene.primitives.add(_billboards);
@@ -4350,7 +4417,7 @@ const cctvLayer = {
     if (_records.length > 0) {
       // Projection runtime + first frame fetch are deferred to enable() so
       // initializing the catalog stays render-cheap.
-      _activeCameraId = _records[0].camera.id;
+      _activeCameraId = visibleRecords()[0]?.camera.id || null;
     }
 
     // Task 5: if the prior batch lost init's bounded race, apply it post-hoc
@@ -4466,7 +4533,7 @@ const cctvLayer = {
       return Boolean(coverage && _recordById.has(coverage[1]));
     });
     if (!_activeCameraId && _records.length) {
-      _activeCameraId = _records[0].camera.id;
+      _activeCameraId = visibleRecords()[0]?.camera.id || null;
       _autoHopSuspended = false;
     }
     const activeRecord = getActiveRecord();
@@ -4732,19 +4799,20 @@ const cctvLayer = {
    * @returns {{ position: Cesium.Cartesian3, id: string, type: string }[]}
    */
   getDetectableObjects(options = {}) {
-    if (!_enabled || _records.length === 0) return [];
+    const available = visibleRecords();
+    if (!_enabled || available.length === 0) return [];
     const maxCount = Number.isFinite(options.maxCount)
       ? Math.max(1, Math.floor(options.maxCount))
-      : _records.length;
+      : available.length;
     const seed = Number.isFinite(options.seed) ? Math.floor(options.seed) : 0;
-    const stride = Math.max(1, Math.ceil(_records.length / maxCount));
+    const stride = Math.max(1, Math.ceil(available.length / maxCount));
     const start = seed % stride;
 
     const objects = [];
-    for (let i = start; i < _records.length; i += stride) {
-      const camera = _records[i].camera;
+    for (let i = start; i < available.length; i += stride) {
+      const camera = available[i].camera;
       objects.push({
-        position: _records[i].position,
+        position: available[i].position,
         sourceId: camera.id,
         id: `CAM-${camera.id}`,
         type: 'CAM',
@@ -4791,6 +4859,24 @@ const cctvLayer = {
    */
   getUIState() {
     return uiState();
+  },
+
+  setStateEnabled(code, enabled) {
+    return setStateFilter(code, enabled !== false);
+  },
+
+  setAllStatesEnabled(enabled) {
+    for (const state of stateFilterState()) {
+      if (enabled) _disabledStateCodes.delete(state.code);
+      else _disabledStateCodes.add(state.code);
+    }
+    saveDisabledStateCodes();
+    if (_activeCameraId && !isRecordStateEnabled(_recordById.get(_activeCameraId))) deactivateActiveCamera();
+    _uiCameraCache = { key: '', records: [] };
+    refreshHorizonCulling();
+    refreshCoverageStyles();
+    refreshAmbientCards();
+    notifyListeners();
   },
 
   /**
@@ -4841,14 +4927,15 @@ const cctvLayer = {
    * @returns {string|null} The newly active camera ID, or null if catalog is empty.
    */
   cycleCamera(step = 1, options = {}) {
-    if (!_records.length) return null;
+    const available = visibleRecords();
+    if (!available.length) return null;
     const current = getActiveRecord();
     const nextIdx = cctvCycleIndex(
-      _records.findIndex((record) => record === current),
+      available.findIndex((record) => record === current),
       step,
-      _records.length,
+      available.length,
     );
-    const nextId = _records[nextIdx].camera.id;
+    const nextId = available[nextIdx].camera.id;
     setActiveCamera(nextId);
     if (options.focus) {
       focusCamera(nextId, options.durationSec || 1.8);

@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.20] — 2026-09-10 — Central U.S. 511 expansion and state controls
+
+- Added current public 511/DOT camera catalogs for Colorado, New Mexico,
+  Kansas, Oklahoma, Arkansas, Missouri, Iowa, Nebraska, South Dakota,
+  Minnesota, Wisconsin, and Illinois. The release audit accepted more than
+  11,800 additional views/placements across those twelve providers.
+- Added compact, scrollable per-state camera controls to the CCTV panel. Every
+  loaded state can be independently shown or hidden, with ALL/NONE actions and
+  browser-local persistence; hidden states are excluded from camera selection,
+  cycling, nearest-camera focus, ambient cards, coverage, and detection.
+- New York and other paginated catalogs now preserve and serve valid partial
+  refreshes with an accurate degraded status instead of discarding visible
+  cameras when a provider omits one or more pages.
+- Added provider-native images or HLS where publicly exposed. Oklahoma remains
+  placement-only; Illinois follows Travel Midwest's attribution requirement and
+  five-minute minimum image-refresh cadence. Raised the safe aggregate catalog
+  cap to 60,000 so the expanded catalog is not truncated.
+- Advanced ThunderLink Oblivion to public build `0.3.20` and kernel
+  `TBSGE-KERNEL-030.021`; legal acceptance remains `0.3.02`.
+
 ## [0.3.19] — 2026-09-10 — Southeast and New England 511 expansion
 
 - Added complete current camera catalogs for Tennessee SmartWay, South Carolina

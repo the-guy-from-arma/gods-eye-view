@@ -5,15 +5,23 @@ import {
   enabledProviderKeys,
   encryptNewJersey511Payload,
   normalizeAlabamaCamera,
+  normalizeArkansasCamera,
+  normalizeColoradoCamera,
+  normalizeGraphql511Cameras,
   normalizeIbi511Camera,
   normalizeIndianaCamera,
   normalizeMassachusettsCamera,
   normalizeMichiganCamera,
+  normalizeMissouriCamera,
   normalizeNewJerseyCamera,
+  normalizeNewMexicoCamera,
+  normalizeOklahomaCamera,
   normalizeOhioCamera,
   normalizeOregonCamera,
   normalizeSouthCarolinaCamera,
+  normalizeSouthDakotaCameras,
   normalizeTennesseeCamera,
+  normalizeTravelMidwestCamera,
   normalizeVirginiaCamera,
   parseIbi511Wkt,
 } from './cctv511Providers.js';
@@ -161,9 +169,42 @@ test('Alabama placements and Ohio snapshots honor provider media rules', () => {
 
 test('legacy provider override cannot hide newly added defaults, but explicit exclusions can', () => {
   const enabled = enabledProviderKeys({ CCTV_STATE_511_PROVIDERS: 'az,fl,ga' });
-  for (const key of ['ny', 'tn', 'sc', 'al', 'oh', 'vt', 'ct']) assert.equal(enabled.has(key), true);
+  for (const key of ['ny', 'tn', 'sc', 'al', 'oh', 'vt', 'ct', 'co', 'nm', 'ks', 'ok', 'ar', 'mo', 'ia', 'ne', 'sd', 'mn', 'wi', 'il']) assert.equal(enabled.has(key), true);
   const excluded = enabledProviderKeys({ CCTV_STATE_511_EXCLUDE_PROVIDERS: 'ny,al' });
   assert.equal(excluded.has('ny'), false);
   assert.equal(excluded.has('al'), false);
   assert.equal(excluded.has('tn'), true);
+});
+
+test('new state schemas normalize public media and placement-only records', () => {
+  const graphql = normalizeGraphql511Cameras({
+    __typename: 'Camera', active: true, title: 'I-80 at MM 60', uri: 'camera/42',
+    features: [{ geometry: { coordinates: [-94.94, 41.49] } }],
+    views: [{ category: 'IMAGE', url: 'https://example.gov/camera.jpg' }],
+  }, { key: 'ia', idPrefix: 'iadot', state: 'Iowa', provider: 'Iowa 511', bounds: [40.3, 43.6, -96.7, -90] });
+  assert.equal(graphql[0]?.id, 'iadot-42-0');
+  assert.equal(graphql[0]?.stateCode, 'IA');
+
+  const colorado = normalizeColoradoCamera({ geometry: { coordinates: [-105, 39.7] }, properties: {
+    id: 7, name: 'I-70 at Denver', views: [{ name: 'WEST', url: 'https://example.gov/co.jpg' }],
+  } });
+  assert.equal(colorado[0]?.stateCode, 'CO');
+
+  const newMexico = normalizeNewMexicoCamera({ name: 'I25_Test', title: 'I-25 Test', lat: 35.5, lon: -106.2, enabled: true, snapshotFile: 'http://ss.nmroads.com/snapshots/test.jpg' });
+  assert.match(newMexico?.url || '', /^http:\/\//);
+
+  const arkansas = normalizeArkansasCamera({ geometry: { coordinates: [-92.2, 34.7] }, properties: { id: 9, status: 'online', name: 'I-40', hls_stream_protected: 'https://example.gov/feed.m3u8' } });
+  assert.equal(arkansas?.feedType, 'hls');
+
+  const oklahoma = normalizeOklahomaCamera({ id: 2, latitude: 36.1, longitude: -95.8, location: 'I-244', blockAtis: '0' });
+  assert.equal(oklahoma?.framePolicy, 'metadata-only');
+
+  const missouri = normalizeMissouriCamera({ id: 1, caption: 'US-60', url: '/camera.jpg', location: { x: -90.4, y: 36.7 } });
+  assert.equal(missouri?.stateCode, 'MO');
+
+  const southDakota = normalizeSouthDakotaCameras({ id: 'SITE', geometry: { coordinates: [-97.06, 44.95] }, properties: { cameras: [{ id: 1, description: 'I-29 south', image: 'https://example.gov/sd.jpg' }] } });
+  assert.equal(southDakota[0]?.stateCode, 'SD');
+
+  const illinois = normalizeTravelMidwestCamera({ geometry: { coordinates: [-88.1, 42.2] }, properties: { id: 'IL-IDOT-1', locDesc: 'I-90', remUrls: ['https://example.gov/il.jpg'], dirs: ['W'] } });
+  assert.equal(illinois[0]?.minFrameRefreshMs, 300000);
 });

@@ -2350,6 +2350,9 @@ export class StyleManager {
     this._cctvFramePreloader = null;
     this._cctvSourceBadge = document.getElementById('cctv-source-badge');
     this._cctvMeta = document.getElementById('cctv-meta');
+    this._cctvStateToggles = document.getElementById('cctv-state-toggles');
+    this._cctvStatesAll = document.getElementById('cctv-states-all');
+    this._cctvStatesNone = document.getElementById('cctv-states-none');
     this._cctvSummary = document.getElementById('cctv-summary');
     this._shareBtn = document.getElementById('share-btn');
     this._clearSelectedLayersBtn = document.getElementById('clear-selected-layers');
@@ -6128,6 +6131,14 @@ export class StyleManager {
       await this._toggleCctvEnabled();
     });
 
+    this._cctvStateToggles?.addEventListener('click', (event) => {
+      const button = event.target.closest?.('[data-cctv-state]');
+      if (!button) return;
+      cctvLayer.setStateEnabled?.(button.dataset.cctvState, button.getAttribute('aria-pressed') !== 'true');
+    });
+    this._cctvStatesAll?.addEventListener('click', () => cctvLayer.setAllStatesEnabled?.(true));
+    this._cctvStatesNone?.addEventListener('click', () => cctvLayer.setAllStatesEnabled?.(false));
+
     this._cctvNearestBtn?.addEventListener('click', async () => {
       if (!await this._toggleCctvEnabled(true)) return;
       this._runExplicitCctvFocus(
@@ -6522,6 +6533,24 @@ export class StyleManager {
     const enabled = !!state?.enabled && !!this._dataManager?.isEnabled('cctv');
     const activeId = state?.activeCameraId || '';
     const activeCamera = state?.activeCamera || null;
+
+    if (this._cctvStateToggles) {
+      const filters = Array.isArray(state?.stateFilters) ? state.stateFilters : [];
+      const signature = filters.map((item) => `${item.code}:${item.count}:${item.enabled ? 1 : 0}`).join('|');
+      if (this._cctvStateToggles.dataset.signature !== signature) {
+        this._cctvStateToggles.dataset.signature = signature;
+        this._cctvStateToggles.replaceChildren(...filters.map((item) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `cctv-state-toggle${item.enabled ? ' active' : ''}`;
+          button.dataset.cctvState = item.code;
+          button.setAttribute('aria-pressed', item.enabled ? 'true' : 'false');
+          button.title = `${item.enabled ? 'Hide' : 'Show'} ${item.code} cameras`;
+          button.innerHTML = `${item.code} <small>${Number(item.count).toLocaleString()}</small>`;
+          return button;
+        }));
+      }
+    }
 
     // Auto-expand the panel when the active camera CHANGES to a new non-null
     // id while the layer is enabled. Covers click-on-globe, panel controls,

@@ -37,8 +37,8 @@
   <div id="cesiumContainer"></div>
   <aside id="thunderlink-system-identity" aria-label="ThunderLink software identity">
     <span>OS <strong>THUNDERLINK OBLIVION</strong></span>
-    <span>VERSION <strong>0.3.19</strong></span>
-    <span>KERNEL <strong>TBSGE-KERNEL-030.020</strong></span>
+    <span>VERSION <strong>0.3.20</strong></span>
+    <span>KERNEL <strong>TBSGE-KERNEL-030.021</strong></span>
     <button id="credits-footer-button" type="button">CREDITS &amp; OPEN SOURCES</button>
   </aside>
   <footer id="platform-legal-footer" aria-label="Legal and privacy policies">
@@ -639,6 +639,14 @@
       </div>
       <div id="cctv-source-badge" role="status" aria-live="polite">SOURCE · UNKNOWN</div>
       <div id="cctv-meta">Enable CCTV to load camera intersections</div>
+      <div class="cctv-state-filter-block">
+        <div class="cctv-state-filter-header">
+          <span>STATE CAMERA LAYERS</span>
+          <button id="cctv-states-all" class="cctv-state-action" type="button">ALL</button>
+          <button id="cctv-states-none" class="cctv-state-action" type="button">NONE</button>
+        </div>
+        <div id="cctv-state-toggles" class="cctv-state-toggles" aria-label="State camera layer filters"></div>
+      </div>
       <div class="cctv-controls">
         <button id="cctv-enable-btn" class="scene-btn">CCTV OFF</button>
         <button id="cctv-nearest-btn" class="scene-btn">NEAREST</button>

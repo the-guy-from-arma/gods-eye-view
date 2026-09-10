@@ -3692,7 +3692,7 @@ const DEFAULT_AUSTIN_ROWS_URL = 'https://data.austintexas.gov/api/views/b4k4-adk
 /** Default cap on Austin cameras after distance-based prioritization. */
 const DEFAULT_AUSTIN_MAX_SOURCES = 250;
 /** Global cap for the complete U.S. state 511/DOT catalogs plus city packs. */
-const DEFAULT_CCTV_MAX_SOURCES = 40000;
+const DEFAULT_CCTV_MAX_SOURCES = 60000;
 /** Reference point for Austin camera prioritization (Congress & 6th). */
 const AUSTIN_DOWNTOWN = { lat: 30.2672, lon: -97.7431 };
 /** Caltrans CCTV: one JSON feed per district, identical schema statewide. */
@@ -4145,6 +4145,7 @@ async function loadAustinSourcesFromOpenData() {
         url: `https://cctv.austinmobility.io/image/${encodeURIComponent(cameraId)}.jpg`,
         snapshotUrl: `https://cctv.austinmobility.io/image/${encodeURIComponent(cameraId)}.jpg`,
         sourceKind: 'austin-open-data',
+        stateCode: 'TX',
         license: 'Public city traffic camera frame',
       });
     }
@@ -4255,6 +4256,7 @@ async function loadCaltransSourcesFromOpenData() {
         url: imageUrl,
         snapshotUrl: imageUrl,
         sourceKind: 'caltrans-open-data',
+        stateCode: 'CA',
         license: 'Public Caltrans highway camera frame',
       });
     }
@@ -4386,6 +4388,7 @@ export function normalizeWsdot511Camera(feature) {
     url: imageUrl,
     snapshotUrl: imageUrl,
     sourceKind: 'wsdot-511-open-data',
+    stateCode: 'WA',
     license: 'Washington State Department of Transportation public traveler-information camera',
   };
 }
@@ -4447,6 +4450,8 @@ function normalizeSourceItem(item) {
     license: String(item.license || item.licenseNote || ''),
     sourceKind: String(item.sourceKind || item.kind || 'configured'),
     framePolicy: String(item.framePolicy || ''),
+    stateCode: String(item.stateCode || '').trim().toUpperCase(),
+    minFrameRefreshMs: Math.max(0, Number(item.minFrameRefreshMs) || 0),
     // Optional CAL badge input (cctv-v2 design §3b/§9.2, additive-only per the
     // global constraints — nothing else in this file changes): hand-authored
     // file/env catalog entries may declare poseSource:'curated' so the panel
@@ -4531,7 +4536,7 @@ async function refreshCctvSources() {
 
   const mergedSources = Array.from(byId.values());
   const maxRaw = Number(process.env.CCTV_MAX_SOURCES || DEFAULT_CCTV_MAX_SOURCES);
-  const maxCount = Number.isFinite(maxRaw) ? Math.max(8, Math.min(40000, Math.floor(maxRaw))) : DEFAULT_CCTV_MAX_SOURCES;
+  const maxCount = Number.isFinite(maxRaw) ? Math.max(8, Math.min(60000, Math.floor(maxRaw))) : DEFAULT_CCTV_MAX_SOURCES;
   if (mergedSources.length > maxCount) {
     console.warn(`[CCTV] source catalog ${mergedSources.length} exceeds cap ${maxCount}; keeping the first ${maxCount} (raise CCTV_MAX_SOURCES or lower a per-pack cap to change which).`);
   }
@@ -4961,6 +4966,8 @@ function cctvProxy() {
                 feedType: normalizeFeedType(source.feedType),
                 sourceKind: source.sourceKind || (source.url ? 'configured' : 'fallback'),
                 framePolicy: source.framePolicy || '',
+                stateCode: source.stateCode || '',
+                minFrameRefreshMs: source.minFrameRefreshMs || 0,
                 poseSource: source.poseSource,
                 license: source.license,
               })),
