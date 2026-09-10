@@ -151,7 +151,7 @@ export function createSteamGamingProvider(options = {}) {
     let response;
     try {
       response = await requestQueue(() => fetchImpl(url, {
-        headers: { Accept: 'application/json', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.17' },
+        headers: { Accept: 'application/json', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.18' },
         signal: AbortSignal.timeout(15_000),
       }));
     } catch (cause) {

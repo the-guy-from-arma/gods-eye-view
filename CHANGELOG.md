@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.18] — 2026-09-10 — Mid-Atlantic and Northeast 511 expansion
+
+- Added complete official 511 camera catalogs for Virginia, Pennsylvania,
+  New Jersey, New York, and Massachusetts, including provider-native HLS or
+  snapshot media where authorized, state/local jurisdiction labels, and
+  isolated health status. Massachusetts is placement-only pending the
+  provider-authorized developer image feed required by MassDOT. The release
+  audit loaded 5,978 new state records and 28,034 merged CCTV sources.
+- Added adapters for VDOT's current map service, 511NJ's explicit public-role
+  service, and Massachusetts 511's CARS map schema while reusing verified IBI
+  pagination for 511PA and 511NY.
+- Reduced paged-catalog concurrency with bounded retries to prevent upstream
+  throttling, validated raw pagination independently of disabled camera rows,
+  and raised the merged camera ceiling to 40,000 so no state is truncated.
+- Added opaque HLS manifest rewriting for provider-relative child playlists,
+  segments, encryption keys, and init maps so Virginia and New Jersey streams
+  remain playable through the bounded server proxy without exposing an SSRF URL.
+- Advanced ThunderLink Oblivion to public build `0.3.18` and kernel
+  `TBSGE-KERNEL-030.019`; legal acceptance remains `0.3.02`.
+
 ## [0.3.17] — 2026-09-10 — Complete supported U.S. 511 camera network
 
 - Added complete live state 511/DOT camera catalogs for Arizona, Florida,

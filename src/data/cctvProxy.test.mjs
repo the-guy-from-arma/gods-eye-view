@@ -4,6 +4,7 @@ import {
   CCTV_FRAME_FETCH_TIMEOUT_MS,
   fetchCctvImageFromUpstream,
   normalizeWsdot511Camera,
+  rewriteCctvHlsManifest,
 } from '../../vite.config.js';
 
 test('CCTV upstream frame fetch supplies a bounded abort signal', async () => {
@@ -78,4 +79,30 @@ test('Washington 511 normalization rejects unsafe or out-of-area rows', () => {
   };
   assert.equal(normalizeWsdot511Camera({ ...base, properties: { ...base.properties, ImageURL: 'http://example.test/cam.jpg' } }), null);
   assert.equal(normalizeWsdot511Camera({ ...base, geometry: { type: 'Point', coordinates: [-80, 35] } }), null);
+});
+
+test('HLS proxy rewrites child playlists, segments, keys, and init maps to opaque routes', () => {
+  const registered = [];
+  const manifest = rewriteCctvHlsManifest([
+    '#EXTM3U',
+    '#EXT-X-KEY:METHOD=AES-128,URI="keys/live.key"',
+    '#EXT-X-MAP:URI="init.mp4"',
+    'video1_stream.m3u8?otp=123',
+    'https://cdn.example.test/segment-1.ts',
+  ].join('\n'), 'https://camera.example.test/live/index.m3u8', (url) => {
+    registered.push(url);
+    return `/opaque/${registered.length}`;
+  });
+
+  assert.deepEqual(registered, [
+    'https://camera.example.test/live/keys/live.key',
+    'https://camera.example.test/live/init.mp4',
+    'https://camera.example.test/live/video1_stream.m3u8?otp=123',
+    'https://cdn.example.test/segment-1.ts',
+  ]);
+  assert.match(manifest, /URI="\/opaque\/1"/);
+  assert.match(manifest, /URI="\/opaque\/2"/);
+  assert.match(manifest, /\/opaque\/3/);
+  assert.match(manifest, /\/opaque\/4/);
+  assert.doesNotMatch(manifest, /camera\.example\.test|cdn\.example\.test/);
 });

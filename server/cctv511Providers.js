@@ -1,3 +1,5 @@
+import { createCipheriv } from 'node:crypto';
+
 /**
  * Keyless public U.S. state 511/DOT camera catalogs.
  *
@@ -7,7 +9,8 @@
  */
 
 const PAGE_SIZE = 100;
-const PAGE_CONCURRENCY = 10;
+const PAGE_CONCURRENCY = 4;
+const RETRY_CONCURRENCY = 2;
 const MAX_IBI_PAGES = 60;
 const CATALOG_TIMEOUT_MS = 20_000;
 
@@ -40,6 +43,14 @@ const IBI_PROVIDERS = [
     key: 'la', base: 'https://511la.org', idPrefix: 'ladotd', provider: 'Louisiana 511 · LADOTD',
     state: 'Louisiana', bounds: [28.8, 33.1, -94.2, -88.6],
   },
+  {
+    key: 'pa', base: 'https://www.511pa.com', idPrefix: 'penndot', provider: '511PA · PennDOT',
+    state: 'Pennsylvania', bounds: [39.7, 42.6, -80.6, -74.5],
+  },
+  {
+    key: 'ny', base: 'https://www.511ny.org', idPrefix: 'nysdot', provider: '511NY · NYSDOT',
+    state: 'New York', bounds: [40.4, 45.1, -79.9, -71.7],
+  },
 ];
 
 const PROVIDER_LABELS = {
@@ -50,6 +61,11 @@ const PROVIDER_LABELS = {
   ut: 'UDOT Traffic · Utah 511',
   nv: 'Nevada 511 · NDOT',
   la: 'Louisiana 511 · LADOTD',
+  pa: '511PA · PennDOT',
+  ny: '511NY · NYSDOT',
+  va: 'Virginia 511 · VDOT',
+  nj: '511NJ · NJDOT',
+  ma: 'Massachusetts 511 · MassDOT',
   or: 'Oregon 511 · ODOT TripCheck',
   mi: 'Michigan 511 · MDOT MiDrive',
   in: 'Indiana 511 · INDOT TrafficWise',
@@ -78,7 +94,7 @@ function fallbackHeading(id) {
   return (Math.abs(hash) % 16) * 22.5;
 }
 
-function cameraDefaults({ id, name, state, provider, lat, lon, url, snapshotUrl, feedType = 'image', sourceKind }) {
+function cameraDefaults({ id, name, state, provider, lat, lon, url, snapshotUrl, feedType = 'image', sourceKind, framePolicy = '', license = '' }) {
   return {
     id,
     name,
@@ -98,7 +114,8 @@ function cameraDefaults({ id, name, state, provider, lat, lon, url, snapshotUrl,
     url,
     snapshotUrl: snapshotUrl || (feedType === 'image' ? url : ''),
     sourceKind,
-    license: `${provider} public traveler-information camera`,
+    framePolicy,
+    license: license || `${provider} public traveler-information camera`,
   };
 }
 
@@ -194,6 +211,7 @@ async function fetchIbiPage(config, start) {
 async function loadIbiProvider(config) {
   const first = await fetchIbiPage(config, 0);
   const cameras = new Map();
+  let rawRowCount = first.rows.length;
   const ingest = (rows) => {
     for (const row of rows) {
       const camera = normalizeIbi511Camera(row, config);
@@ -209,17 +227,28 @@ async function loadIbiProvider(config) {
     const batch = starts.slice(index, index + PAGE_CONCURRENCY);
     const settled = await Promise.allSettled(batch.map((start) => fetchIbiPage(config, start)));
     settled.forEach((result, offset) => {
-      if (result.status === 'fulfilled') ingest(result.value.rows);
+      if (result.status === 'fulfilled') {
+        rawRowCount += result.value.rows.length;
+        ingest(result.value.rows);
+      }
       else failed.push(batch[offset]);
     });
   }
   if (failed.length) {
-    const retried = await Promise.allSettled(failed.map((start) => fetchIbiPage(config, start)));
-    for (const result of retried) if (result.status === 'fulfilled') ingest(result.value.rows);
+    for (let index = 0; index < failed.length; index += RETRY_CONCURRENCY) {
+      const batch = failed.slice(index, index + RETRY_CONCURRENCY);
+      const retried = await Promise.allSettled(batch.map((start) => fetchIbiPage(config, start)));
+      for (const result of retried) {
+        if (result.status === 'fulfilled') {
+          rawRowCount += result.value.rows.length;
+          ingest(result.value.rows);
+        }
+      }
+    }
   }
   const result = [...cameras.values()];
-  if (first.total && result.length < first.total * 0.9) {
-    throw new Error(`short catalog ${result.length}/${first.total}`);
+  if (first.total && rawRowCount < first.total * 0.9) {
+    throw new Error(`short pagination ${rawRowCount}/${first.total}`);
   }
   return result;
 }
@@ -328,8 +357,144 @@ async function loadIndiana() {
   return features.map(normalizeIndianaCamera).filter(Boolean);
 }
 
+export function normalizeVirginiaCamera(feature) {
+  const properties = feature?.properties || {};
+  if (properties.active === false) return null;
+  const id = String(properties.id || '').trim();
+  const coords = feature?.geometry?.coordinates;
+  const lon = finite(coords?.[0]);
+  const lat = finite(coords?.[1]);
+  if (!id || !inBounds(lat, lon, [36.4, 39.6, -83.8, -75.1])) return null;
+
+  const snapshotUrl = /^https?:\/\//i.test(String(properties.image_url || '')) ? String(properties.image_url) : '';
+  const streamUrl = /^https:\/\/[^\s]+\.m3u8(?:\?|$)/i.test(String(properties.https_url || ''))
+    ? String(properties.https_url) : '';
+  if (!snapshotUrl && !streamUrl) return null;
+  const jurisdiction = String(properties.jurisdiction || '').trim();
+  const route = String(properties.route || '').trim();
+  const direction = String(properties.direction || '').trim();
+  const description = String(properties.description || '').trim();
+  return cameraDefaults({
+    id: `vdot-${id}`,
+    name: description || [route, direction].filter(Boolean).join(' ') || `VDOT camera ${id}`,
+    state: jurisdiction ? `${jurisdiction}, Virginia` : 'Virginia',
+    provider: PROVIDER_LABELS.va,
+    lat,
+    lon,
+    url: streamUrl || snapshotUrl,
+    snapshotUrl,
+    feedType: streamUrl ? 'hls' : 'image',
+    sourceKind: 'state-511-va',
+  });
+}
+
+async function loadVirginia() {
+  const payload = await fetchJson('https://511.vdot.virginia.gov/services/map/array/cameras', {
+    headers: { Accept: 'application/json', Referer: 'https://511.vdot.virginia.gov/' },
+  });
+  const features = payload?.data;
+  if (!Array.isArray(features)) throw new Error('no camera array');
+  return features.map(normalizeVirginiaCamera).filter(Boolean);
+}
+
+const NEW_JERSEY_BASE = 'https://511nj.org';
+const NEW_JERSEY_PUBLIC_KEY = Buffer.from('lIo3M)_83,ALC0Wz');
+const NEW_JERSEY_PUBLIC_IV = Buffer.from('.%A}8Qvqm23jYVc9');
+
+/** Encode the public-role request envelope used by the official 511NJ client. */
+export function encryptNewJersey511Payload(value) {
+  const cipher = createCipheriv('aes-128-cbc', NEW_JERSEY_PUBLIC_KEY, NEW_JERSEY_PUBLIC_IV);
+  return Buffer.concat([cipher.update(JSON.stringify(value), 'utf8'), cipher.final()]).toString('hex');
+}
+
+export function normalizeNewJerseyCamera(record) {
+  const id = String(record?.id || record?.cameraId || '').trim();
+  const lat = finite(record?.latitude);
+  const lon = finite(record?.longitude);
+  if (!id || !inBounds(lat, lon, [38.9, 41.4, -75.7, -73.8])) return null;
+  const media = (Array.isArray(record?.cameraMainDetail) ? record.cameraMainDetail : [])
+    .find((item) => /^https?:\/\//i.test(String(item?.url || '')));
+  const mediaUrl = String(media?.url || '');
+  if (!mediaUrl) return null;
+  const isHls = String(media?.camera_use_flag || '').toLowerCase() === 'hls' || /\.m3u8(?:\?|$)/i.test(mediaUrl);
+  const locality = String(record?.deviceDescription || '').trim();
+  return cameraDefaults({
+    id: `njdot-${id}`,
+    name: String(record?.name || `NJDOT camera ${id}`).trim(),
+    state: locality ? `${locality}, New Jersey` : 'New Jersey',
+    provider: PROVIDER_LABELS.nj,
+    lat,
+    lon,
+    url: mediaUrl,
+    snapshotUrl: isHls ? '' : mediaUrl,
+    feedType: isHls ? 'hls' : 'image',
+    sourceKind: 'state-511-nj',
+  });
+}
+
+async function loadNewJersey() {
+  const commonHeaders = {
+    'Content-Type': 'application/json', Accept: 'application/json',
+    Origin: NEW_JERSEY_BASE, Referer: `${NEW_JERSEY_BASE}/`,
+  };
+  const login = await fetchJson(`${NEW_JERSEY_BASE}/account/login`, {
+    method: 'POST',
+    headers: commonHeaders,
+    body: JSON.stringify({
+      encryptedData: encryptNewJersey511Payload({ username: 'public', password: '', role: 'public' }),
+    }),
+  });
+  const token = String(login?.data?.accessToken || login?.accessToken || '').trim();
+  if (!token) throw new Error('public role token unavailable');
+  const payload = await fetchJson(`${NEW_JERSEY_BASE}/client/trafficMap/getCamera`, {
+    method: 'POST',
+    headers: { ...commonHeaders, Token: `Bearer ${token}` },
+    body: 'null',
+  });
+  const cameras = payload?.data;
+  if (!Array.isArray(cameras)) throw new Error('no camera array');
+  return cameras.map(normalizeNewJerseyCamera).filter(Boolean);
+}
+
+export function normalizeMassachusettsCamera(feature) {
+  if (feature?.__typename !== 'Camera' || feature.active === false) return null;
+  const id = String(feature?.uri || '').match(/camera\/(\d+)/)?.[1];
+  const coords = feature?.features?.[0]?.geometry?.coordinates;
+  const lon = finite(coords?.[0]);
+  const lat = finite(coords?.[1]);
+  const snapshotUrl = String(feature?.views?.find((view) => /^https?:\/\//i.test(String(view?.url || '')))?.url || '');
+  if (!id || !snapshotUrl || !inBounds(lat, lon, [41.1, 42.9, -73.6, -69.8])) return null;
+  return cameraDefaults({
+    id: `massdot-${id}`,
+    name: String(feature?.title || `MassDOT camera ${id}`).trim(),
+    state: 'Massachusetts',
+    provider: PROVIDER_LABELS.ma,
+    lat,
+    lon,
+    url: '',
+    snapshotUrl: '',
+    sourceKind: 'state-511-ma-metadata',
+    framePolicy: 'metadata-only',
+    license: 'MassDOT camera placement metadata; live imagery requires TrafficLand developer access',
+  });
+}
+
+async function loadMassachusetts() {
+  const payload = await fetchJson('https://mass511.com/api/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', Referer: 'https://mass511.com/' },
+    body: JSON.stringify({
+      query: INDIANA_QUERY,
+      variables: { input: { north: 42.9, south: 41.1, east: -69.8, west: -73.6, zoom: 16, layerSlugs: ['normalCameras'], nonClusterableUris: null } },
+    }),
+  });
+  const features = payload?.data?.mapFeaturesQuery?.mapFeatures;
+  if (!Array.isArray(features)) throw new Error('no mapFeatures');
+  return features.map(normalizeMassachusettsCamera).filter(Boolean);
+}
+
 function enabledProviderKeys(env) {
-  const configured = String(env.CCTV_STATE_511_PROVIDERS || 'az,fl,ga,nc,ut,nv,la,or,mi,in')
+  const configured = String(env.CCTV_STATE_511_PROVIDERS || 'az,fl,ga,nc,ut,nv,la,or,mi,in,pa,ny,va,nj,ma')
     .split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
   return new Set(configured.filter((key) => Object.hasOwn(PROVIDER_LABELS, key)));
 }
@@ -358,6 +523,9 @@ export async function loadState511Cameras(env = process.env) {
     ...(enabled.has('or') ? [{ key: 'or', state: 'Oregon', load: loadOregon }] : []),
     ...(enabled.has('mi') ? [{ key: 'mi', state: 'Michigan', load: loadMichigan }] : []),
     ...(enabled.has('in') ? [{ key: 'in', state: 'Indiana', load: loadIndiana }] : []),
+    ...(enabled.has('va') ? [{ key: 'va', state: 'Virginia', load: loadVirginia }] : []),
+    ...(enabled.has('nj') ? [{ key: 'nj', state: 'New Jersey', load: loadNewJersey }] : []),
+    ...(enabled.has('ma') ? [{ key: 'ma', state: 'Massachusetts', load: loadMassachusetts }] : []),
   ];
 
   const settled = await Promise.allSettled(loaders.map((entry) => entry.load()));

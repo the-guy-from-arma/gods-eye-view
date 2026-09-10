@@ -2,10 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildIbi511Query,
+  encryptNewJersey511Payload,
   normalizeIbi511Camera,
   normalizeIndianaCamera,
+  normalizeMassachusettsCamera,
   normalizeMichiganCamera,
+  normalizeNewJerseyCamera,
   normalizeOregonCamera,
+  normalizeVirginiaCamera,
   parseIbi511Wkt,
 } from './cctv511Providers.js';
 
@@ -69,3 +73,42 @@ test('state normalizers reject out-of-bounds or malformed records', () => {
   assert.equal(normalizeIndianaCamera({ __typename: 'Camera', active: true }), null);
 });
 
+test('Virginia, New Jersey, and Massachusetts rows normalize their official schemas', () => {
+  const virginia = normalizeVirginiaCamera({
+    properties: {
+      id: '3958', active: true, description: 'University Drive and Sager Avenue',
+      jurisdiction: 'City of Fairfax',
+      image_url: 'https://snapshot.vdotcameras.com/thumbs/sample.flv.png',
+      https_url: 'https://media-sfs7.vdotcameras.com/rtplive/sample/playlist.m3u8',
+    },
+    geometry: { coordinates: [-77.3055, 38.84519] },
+  });
+  assert.equal(virginia?.id, 'vdot-3958');
+  assert.equal(virginia?.feedType, 'hls');
+  assert.match(virginia?.city || '', /Fairfax, Virginia/);
+
+  const newJersey = normalizeNewJerseyCamera({
+    id: 4, name: 'NJ-35 @ Cliffwood Avenue', latitude: '40.43880048', longitude: '-74.22426624',
+    deviceDescription: 'Aberdeen Township',
+    cameraMainDetail: [{ camera_use_flag: 'HLS', url: 'https://nj-511.wink.co/hls/public/sample/index.m3u8' }],
+  });
+  assert.equal(newJersey?.id, 'njdot-4');
+  assert.equal(newJersey?.feedType, 'hls');
+
+  const massachusetts = normalizeMassachusettsCamera({
+    __typename: 'Camera', active: true, title: 'US 1 at Walnut Street', uri: 'camera/12292',
+    features: [{ geometry: { coordinates: [-71.01348, 42.50653] } }],
+    views: [{ category: 'VIDEO', url: 'https://public.carsprogram.org/cameras/MA/435429-fullJpeg.jpg' }],
+  });
+  assert.equal(massachusetts?.id, 'massdot-12292');
+  assert.equal(massachusetts?.feedType, 'image');
+  assert.equal(massachusetts?.url, '');
+  assert.equal(massachusetts?.framePolicy, 'metadata-only');
+});
+
+test('511NJ public-role request envelope is deterministic AES hex', () => {
+  const encrypted = encryptNewJersey511Payload({ username: 'public', password: '', role: 'public' });
+  assert.match(encrypted, /^[0-9a-f]+$/);
+  assert.equal(encrypted.length % 32, 0);
+  assert.equal(encrypted, encryptNewJersey511Payload({ username: 'public', password: '', role: 'public' }));
+});

@@ -3692,7 +3692,7 @@ const DEFAULT_AUSTIN_ROWS_URL = 'https://data.austintexas.gov/api/views/b4k4-adk
 /** Default cap on Austin cameras after distance-based prioritization. */
 const DEFAULT_AUSTIN_MAX_SOURCES = 250;
 /** Global cap for the complete U.S. state 511/DOT catalogs plus city packs. */
-const DEFAULT_CCTV_MAX_SOURCES = 30000;
+const DEFAULT_CCTV_MAX_SOURCES = 40000;
 /** Reference point for Austin camera prioritization (Congress & 6th). */
 const AUSTIN_DOWNTOWN = { lat: 30.2672, lon: -97.7431 };
 /** Caltrans CCTV: one JSON feed per district, identical schema statewide. */
@@ -4446,6 +4446,7 @@ function normalizeSourceItem(item) {
     snapshotUrl: typeof item.snapshotUrl === 'string' ? item.snapshotUrl : '',
     license: String(item.license || item.licenseNote || ''),
     sourceKind: String(item.sourceKind || item.kind || 'configured'),
+    framePolicy: String(item.framePolicy || ''),
     // Optional CAL badge input (cctv-v2 design §3b/§9.2, additive-only per the
     // global constraints — nothing else in this file changes): hand-authored
     // file/env catalog entries may declare poseSource:'curated' so the panel
@@ -4678,6 +4679,32 @@ async function readCappedResponseText(upstream, maxBytes) {
   return { tooLarge: false, text };
 }
 
+/**
+ * Rewrite every media, child-playlist, key, and init-segment URI in an HLS
+ * manifest to an opaque server-registered proxy route. The browser never gets
+ * an arbitrary upstream URL and therefore cannot turn this proxy into SSRF.
+ */
+export function rewriteCctvHlsManifest(manifest, upstreamUrl, registerTarget) {
+  const rewriteUri = (value) => {
+    try {
+      const target = new URL(String(value || '').trim(), upstreamUrl);
+      if (target.protocol !== 'https:' && target.protocol !== 'http:') return value;
+      return registerTarget(target.toString());
+    } catch {
+      return value;
+    }
+  };
+  return String(manifest || '').split(/\r?\n/).map((line) => {
+    if (!line.trim()) return line;
+    if (line.startsWith('#')) {
+      return line.replace(/URI="([^"]+)"/g, (_match, uri) => `URI="${rewriteUri(uri)}"`);
+    }
+    const leading = line.match(/^\s*/)?.[0] || '';
+    const trailing = line.match(/\s*$/)?.[0] || '';
+    return `${leading}${rewriteUri(line.trim())}${trailing}`;
+  }).join('\n');
+}
+
 async function proxyMediaResponse(res, upstream, { sourceHeader = 'upstream' } = {}) {
   const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
   const cacheControl = upstream.headers.get('cache-control') || 'no-store';
@@ -4779,6 +4806,54 @@ function cctvProxy() {
   /** Cap on health map entries to prevent unbounded growth. Matches the CCTV
    * catalog hard bound so statewide 511 records retain honest health state. */
   const HEALTH_MAX_ENTRIES = 40000;
+  const HLS_TARGET_MAX_ENTRIES = 50000;
+  const HLS_TARGET_TTL_MS = 10 * 60 * 1000;
+  const hlsTargetSalt = randomUUID();
+  /** @type {Map<string,{cameraId:string,url:string,expiresAt:number}>} */
+  const hlsTargets = new Map();
+
+  const cameraFetchHeaders = (source) => ({
+    'User-Agent': 'thunderlink-gods-eye-cctv-proxy/1.0',
+    ...(source?.sourceKind === 'state-511-nj'
+      ? { Origin: 'https://511nj.org', Referer: 'https://511nj.org/' }
+      : {}),
+  });
+
+  const registerHlsTarget = (cameraId, targetUrl) => {
+    const now = Date.now();
+    for (const [token, entry] of hlsTargets) {
+      if (entry.expiresAt <= now) hlsTargets.delete(token);
+    }
+    while (hlsTargets.size >= HLS_TARGET_MAX_ENTRIES) {
+      hlsTargets.delete(hlsTargets.keys().next().value);
+    }
+    const token = createHash('sha256')
+      .update(`${hlsTargetSalt}\0${cameraId}\0${targetUrl}`)
+      .digest('hex')
+      .slice(0, 24);
+    hlsTargets.set(token, { cameraId, url: targetUrl, expiresAt: now + HLS_TARGET_TTL_MS });
+    return `/api/cctv/hls/${encodeURIComponent(cameraId)}/${token}`;
+  };
+
+  const proxyHlsManifest = async (res, upstream, cameraId, upstreamUrl) => {
+    const body = await readCappedResponseText(upstream, 2 * 1024 * 1024);
+    if (body.tooLarge) {
+      res.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: 'HLS manifest exceeds size cap' }));
+      return;
+    }
+    const manifest = rewriteCctvHlsManifest(
+      body.text,
+      upstream.url || upstreamUrl,
+      (targetUrl) => registerHlsTarget(cameraId, targetUrl),
+    );
+    res.writeHead(200, {
+      'Content-Type': 'application/vnd.apple.mpegurl',
+      'Cache-Control': 'no-store',
+      'X-CCTV-Source': 'hls-manifest',
+    });
+    res.end(manifest);
+  };
 
   /** Update the health entry for a camera, evicting the oldest entry if at capacity. */
   const setHealth = (cameraId, patch) => {
@@ -4876,6 +4951,7 @@ function cctvProxy() {
                 groundElevationM: source.groundElevationM,
                 feedType: normalizeFeedType(source.feedType),
                 sourceKind: source.sourceKind || (source.url ? 'configured' : 'fallback'),
+                framePolicy: source.framePolicy || '',
                 poseSource: source.poseSource,
                 license: source.license,
               })),
@@ -4901,6 +4977,35 @@ function cctvProxy() {
             return;
           }
 
+          if (url.pathname.startsWith('/hls/')) {
+            const parts = url.pathname.split('/').filter(Boolean);
+            const cameraId = decodeURIComponent(parts[1] || '');
+            const token = parts[2] || '';
+            const target = hlsTargets.get(token);
+            if (!target || target.cameraId !== cameraId || target.expiresAt <= Date.now()) {
+              hlsTargets.delete(token);
+              res.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+              res.end(JSON.stringify({ error: 'HLS target expired or unknown' }));
+              return;
+            }
+            const source = sourceById.get(cameraId);
+            const upstreamHeaders = cameraFetchHeaders(source);
+            if (req.headers?.range) upstreamHeaders.Range = req.headers.range;
+            const upstream = await fetch(target.url, { headers: upstreamHeaders });
+            const contentType = upstream.headers.get('content-type') || '';
+            if (!upstream.ok) {
+              res.writeHead(upstream.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+              res.end(JSON.stringify({ error: `HLS upstream returned ${upstream.status}` }));
+              return;
+            }
+            if (contentType.includes('mpegurl') || /\.m3u8(?:\?|$)/i.test(target.url)) {
+              await proxyHlsManifest(res, upstream, cameraId, target.url);
+            } else {
+              await proxyMediaResponse(res, upstream, { sourceHeader: 'hls-media' });
+            }
+            return;
+          }
+
           if (url.pathname.startsWith('/media/')) {
             const cameraId = decodeURIComponent(url.pathname.replace('/media/', '').trim()) || 'camera';
             const source = sourceById.get(cameraId);
@@ -4920,7 +5025,7 @@ function cctvProxy() {
             }
 
             try {
-              const upstreamHeaders = { 'User-Agent': 'thunderlink-gods-eye-cctv-proxy/1.0' };
+              const upstreamHeaders = cameraFetchHeaders(source);
               const requestRange = req.headers?.range;
               if (requestRange) upstreamHeaders.Range = requestRange;
               const upstream = await fetch(mediaUrl, {
@@ -4955,9 +5060,13 @@ function cctvProxy() {
                 });
               }
 
-              await proxyMediaResponse(res, upstream, {
-                sourceHeader: isVideoFeedType(feedType) ? 'live-media' : 'upstream-image',
-              });
+              if (feedType === 'hls' && (contentType.includes('mpegurl') || /\.m3u8(?:\?|$)/i.test(mediaUrl))) {
+                await proxyHlsManifest(res, upstream, cameraId, mediaUrl);
+              } else {
+                await proxyMediaResponse(res, upstream, {
+                  sourceHeader: isVideoFeedType(feedType) ? 'live-media' : 'upstream-image',
+                });
+              }
               return;
             } catch (error) {
               setHealth(cameraId, {
@@ -4987,6 +5096,28 @@ function cctvProxy() {
           const heading = Number(url.searchParams.get('heading') || source?.headingDeg);
           const fov = Number(url.searchParams.get('fov') || source?.fovDeg);
           const pitch = Number(url.searchParams.get('pitch') || source?.pitchDeg);
+
+          if (source?.framePolicy === 'metadata-only') {
+            const svg = buildSyntheticCctvSvg({
+              cameraId,
+              label,
+              city,
+              status: 'PLACEMENT ONLY · LIVE IMAGE ACCESS REQUIRES PROVIDER AUTHORIZATION',
+            });
+            setHealth(cameraId, {
+              status: 'restricted',
+              sourceKind: source.sourceKind || 'metadata',
+              label: source.provider || 'Placement metadata',
+              message: 'Live imagery requires provider-authorized developer access',
+            });
+            res.writeHead(200, {
+              'Content-Type': 'image/svg+xml',
+              'Cache-Control': 'private, max-age=120',
+              'X-CCTV-Source': 'metadata-only',
+            });
+            res.end(svg);
+            return;
+          }
 
           // Only use server-registered upstream URLs — never accept client-supplied URLs
           // (prevents SSRF via ?upstream= query parameter)
