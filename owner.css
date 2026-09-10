@@ -136,7 +136,7 @@ button,a,select { cursor:pointer; }
 .account-toolbar { display:grid; grid-template-columns:minmax(280px,1fr) 220px; gap:8px; }
 .account-toolbar input,.account-toolbar select,.owner-layer-row select { min-height:37px; padding:0 11px; border:1px solid rgba(76,210,232,.23); outline:none; background:#041017; color:#a9d8de; font-size:8px; letter-spacing:.06em; }
 .account-toolbar input:focus { border-color:var(--cyan); }
-.owner-accounts,.owner-layers,.owner-activity { display:grid; gap:7px; max-height:520px; overflow:auto; padding-right:4px; scrollbar-color:rgba(75,220,241,.35) #061017; }
+.owner-accounts,.owner-layers,.owner-activity,.vehicle-observations { display:grid; gap:7px; max-height:520px; overflow:auto; padding-right:4px; scrollbar-color:rgba(75,220,241,.35) #061017; }
 .owner-account-row { display:grid; grid-template-columns:minmax(250px,1fr) auto; align-items:center; gap:15px; min-height:70px; padding:12px 14px; border:1px solid rgba(71,196,217,.14); border-left:2px solid var(--amber); background:rgba(8,28,36,.5); }
 .owner-account-row[data-status="approved"] { border-left-color:var(--green); }
 .owner-account-row[data-status="rejected"] { border-left-color:#d87167; opacity:.78; }
@@ -162,6 +162,22 @@ button,a,select { cursor:pointer; }
 .activity-row { display:grid; grid-template-columns:190px minmax(180px,.65fr) 1.5fr; gap:14px; padding:10px 12px; border-bottom:1px solid rgba(73,193,212,.1); color:#75949b; font-size:8px; line-height:1.45; }
 .activity-row strong { color:#a8d8df; overflow-wrap:anywhere; }
 .activity-row code { color:#5c8189; white-space:normal; }
+.vehicle-status-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+.vehicle-status-grid div { display:grid; gap:8px; min-height:76px; align-content:center; padding:13px; border:1px solid rgba(73,208,230,.17); background:rgba(5,25,33,.58); }
+.vehicle-status-grid small,.vehicle-controls label span { color:#557c84; font-size:6px; letter-spacing:.13em; }
+.vehicle-status-grid strong { color:#bfeef4; font-size:12px; letter-spacing:.06em; }
+.vehicle-controls { display:grid; grid-template-columns:minmax(180px,.8fr) minmax(260px,1.35fr) auto auto; gap:8px; align-items:end; }
+.vehicle-controls label { display:grid; gap:7px; }
+.vehicle-controls select,.vehicle-controls button,.vehicle-search-bar button { min-height:39px; padding:0 11px; border:1px solid rgba(76,210,232,.28); background:#041017; color:#9ddde6; font:500 7px var(--mono); letter-spacing:.08em; }
+.vehicle-controls button:hover,.vehicle-search-bar button:hover { border-color:var(--cyan); color:#e0fbff; }
+.vehicle-controls button:disabled { cursor:not-allowed; opacity:.38; }
+.vehicle-search-bar { grid-template-columns:1fr auto; }
+.vehicle-observation-row { display:grid; grid-template-columns:minmax(210px,1fr) 1fr 130px 110px; align-items:center; gap:14px; min-height:64px; padding:11px 13px; border:1px solid rgba(71,196,217,.14); border-left:2px solid rgba(75,224,245,.55); background:rgba(8,28,36,.48); }
+.vehicle-observation-row > div { display:grid; gap:5px; min-width:0; }
+.vehicle-observation-row strong { color:#c7eef3; font-size:9px; overflow-wrap:anywhere; }
+.vehicle-observation-row span,.vehicle-observation-row small { color:#63848b; font-size:7px; line-height:1.4; }
+.vehicle-confidence { color:#63e7b5!important; text-align:right; }
+@media (max-width:1100px) { .vehicle-status-grid{grid-template-columns:1fr 1fr}.vehicle-controls{grid-template-columns:1fr 1fr}.vehicle-observation-row{grid-template-columns:1fr 1fr} }
 .empty-state { padding:35px; border:1px dashed rgba(74,205,227,.2); color:#58777e; font-size:9px; text-align:center; }
 .owner-toast { position:fixed; right:24px; bottom:24px; z-index:60; max-width:430px; padding:13px 16px; border:1px solid rgba(100,239,187,.4); background:rgba(4,26,22,.95); color:#8ff1cc; font-size:9px; line-height:1.5; opacity:0; pointer-events:none; transform:translateY(8px); transition:.2s; }
 .owner-toast.visible { opacity:1; transform:none; }

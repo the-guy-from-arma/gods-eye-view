@@ -16,7 +16,13 @@ const modeControls = document.querySelector('[data-mode-controls]');
 const confirmBar = document.querySelector('[data-system-confirm]');
 const accountSearch = document.querySelector('[data-account-search]');
 const accountFilter = document.querySelector('[data-account-filter]');
+const vehicleHost = document.querySelector('[data-vehicle-observations]');
+const vehicleState = document.querySelector('[data-vehicle-state]');
+const vehicleCamera = document.querySelector('[data-vehicle-camera]');
+const vehicleSearch = document.querySelector('[data-vehicle-search]');
 let dashboard = { accounts: [], layers: [], autopilot: false, siteMode: { mode: 'online' }, telemetry: {} };
+let vehicleAnalytics = { configured: false, enabled: false, observations: [], totals: {}, sources: [] };
+let vehicleSearchTimer;
 let pendingMode = null;
 let toastTimer;
 
@@ -201,6 +207,91 @@ function renderActivity(events = []) {
   if (!rows.length) activityHost.append(node('p', 'empty-state', 'No activity has been recorded yet.'));
 }
 
+function renderVehicleObservations() {
+  const rows = vehicleAnalytics.observations.map((observation) => {
+    const row = node('article', 'vehicle-observation-row');
+    const identity = node('div');
+    const year = observation.yearStart && observation.yearEnd
+      ? `${observation.yearStart}–${observation.yearEnd}`
+      : 'YEAR UNKNOWN';
+    identity.append(node('strong', '', `${observation.make} ${observation.model}`), node('span', '', `${year} · ${String(observation.color).toUpperCase()} · ${String(observation.vehicleType).replaceAll('_', ' ').toUpperCase()}`));
+    const camera = node('div');
+    camera.append(node('strong', '', observation.cameraName || observation.cameraId), node('small', '', `${observation.jurisdiction || 'JURISDICTION UNKNOWN'} · ${observation.provider || 'PROVIDER UNKNOWN'}`));
+    const captured = node('div');
+    captured.append(node('strong', '', formatDate(observation.capturedAt)), node('small', '', observation.modelVersion));
+    row.append(identity, camera, captured, node('strong', 'vehicle-confidence', `${Math.round(Number(observation.confidence || 0) * 100)}% CONF.`));
+    return row;
+  });
+  vehicleHost.replaceChildren(...rows);
+  if (!rows.length) vehicleHost.append(node('p', 'empty-state', 'No matching non-identifying vehicle observations.'));
+}
+
+function paintVehicleAnalytics(payload) {
+  vehicleAnalytics = { ...vehicleAnalytics, ...payload };
+  const toggle = document.querySelector('[data-vehicle-enabled]');
+  toggle.setAttribute('aria-pressed', String(Boolean(vehicleAnalytics.enabled)));
+  document.querySelector('[data-vehicle-enabled-label]').textContent = vehicleAnalytics.enabled ? 'ON' : 'OFF';
+  document.querySelector('[data-vehicle-provider]').textContent = vehicleAnalytics.configured ? `GEMINI · ${vehicleAnalytics.model}` : 'KEY REQUIRED';
+  document.querySelector('[data-vehicle-total]').textContent = String(vehicleAnalytics.totals?.total || 0);
+  document.querySelector('[data-vehicle-cameras]').textContent = String(vehicleAnalytics.totals?.cameras || 0);
+  document.querySelector('[data-vehicle-retention]').textContent = `${vehicleAnalytics.retentionDays || 90} DAYS · NO FRAMES`;
+  document.querySelector('[data-vehicle-analyze]').disabled = !vehicleAnalytics.enabled || !vehicleAnalytics.configured;
+  document.querySelector('[data-vehicle-sweep]').disabled = !vehicleAnalytics.enabled || !vehicleAnalytics.configured;
+  renderVehicleObservations();
+}
+
+async function loadVehicleAnalytics() {
+  const q = vehicleSearch.value.trim();
+  const payload = await api(`/api/account/admin/vehicle-analytics?limit=250${q ? `&q=${encodeURIComponent(q)}` : ''}`);
+  paintVehicleAnalytics(payload);
+}
+
+function refreshVehicleCameraOptions() {
+  const state = vehicleState.value;
+  const sources = vehicleAnalytics.sources.filter((source) => !state || source.stateCode === state);
+  const options = [new Option('SELECT CAMERA', '')];
+  for (const source of sources) options.push(new Option(`${source.name} · ${source.city || source.stateCode || source.provider}`, source.id));
+  vehicleCamera.replaceChildren(...options);
+}
+
+async function loadVehicleSources() {
+  const response = await fetch('/api/cctv/sources', { cache: 'no-store' });
+  if (!response.ok) throw new Error('CCTV catalog unavailable');
+  const payload = await response.json();
+  vehicleAnalytics.sources = Array.isArray(payload.sources) ? payload.sources : [];
+  const states = [...new Set(vehicleAnalytics.sources.map((source) => source.stateCode).filter(Boolean))].sort();
+  vehicleState.replaceChildren(new Option('ALL AVAILABLE STATES', ''), ...states.map((state) => new Option(state, state)));
+  refreshVehicleCameraOptions();
+}
+
+async function blobBase64(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  return btoa(binary);
+}
+
+async function analyzeVehicleCamera(source) {
+  if (!source) throw new Error('Select a camera first');
+  const frame = await fetch(`${source.frameUrl || `/api/cctv/frame/${encodeURIComponent(source.id)}`}?vehicleAnalysis=1`, { cache: 'no-store' });
+  const mimeType = String(frame.headers.get('content-type') || '').split(';')[0].toLowerCase();
+  if (!frame.ok) throw new Error(`Camera frame failed (${frame.status})`);
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) throw new Error('This camera does not currently provide an analyzable raster frame');
+  const blob = await frame.blob();
+  if (blob.size > 4_800_000) throw new Error('Camera frame exceeds the 4.8 MB analysis limit');
+  return api('/api/account/admin/vehicle-analytics/analyze', {
+    method: 'POST',
+    body: JSON.stringify({
+      cameraId: source.id,
+      cameraName: source.name,
+      provider: source.provider,
+      jurisdiction: [source.city, source.stateCode].filter(Boolean).join(', '),
+      mimeType,
+      imageBase64: await blobBase64(blob),
+    }),
+  });
+}
+
 function paintAutopilot(enabled) {
   const control = document.querySelector('[data-owner-autopilot]');
   control.setAttribute('aria-pressed', String(enabled));
@@ -238,6 +329,7 @@ async function loadDashboard(quiet = false) {
   paintAutopilot(Boolean(admin.autopilot));
   paintSiteMode(admin.siteMode);
   paintOperationalMetrics(admin.telemetry);
+  await loadVehicleAnalytics();
   if (!quiet) showStatus(`SYNC COMPLETE · ${admin.accounts.length} ACCOUNTS`);
 }
 
@@ -332,6 +424,58 @@ layersHost.addEventListener('change', async (event) => {
   }
 });
 
+document.querySelector('[data-vehicle-enabled]').addEventListener('click', async (event) => {
+  const control = event.currentTarget;
+  const enabled = control.getAttribute('aria-pressed') !== 'true';
+  control.disabled = true;
+  try {
+    const payload = await api('/api/account/admin/vehicle-analytics/settings', { method: 'POST', body: JSON.stringify({ enabled }) });
+    vehicleAnalytics.enabled = payload.enabled;
+    paintVehicleAnalytics(vehicleAnalytics);
+    showStatus(`VEHICLE ANALYTICS ${payload.enabled ? 'ENABLED' : 'DISABLED'}`);
+  } catch (error) { showStatus(error.message, true); } finally { control.disabled = false; }
+});
+
+vehicleState.addEventListener('change', refreshVehicleCameraOptions);
+document.querySelector('[data-vehicle-analyze]').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const source = vehicleAnalytics.sources.find((item) => item.id === vehicleCamera.value);
+  button.disabled = true;
+  try {
+    showStatus(`ANALYZING ${source?.name || 'CAMERA FRAME'} · NO IMAGE WILL BE STORED`);
+    const result = await analyzeVehicleCamera(source);
+    await loadVehicleAnalytics();
+    showStatus(result.duplicate ? 'FRAME ALREADY ANALYZED' : `${result.vehicles.length} VEHICLE OBSERVATIONS RECORDED`);
+  } catch (error) { showStatus(error.message, true); } finally { button.disabled = !vehicleAnalytics.enabled || !vehicleAnalytics.configured; }
+});
+
+document.querySelector('[data-vehicle-sweep]').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const sources = vehicleAnalytics.sources.filter((source) => !vehicleState.value || source.stateCode === vehicleState.value).slice(0, 10);
+  if (!sources.length) return showStatus('NO CAMERAS AVAILABLE IN THIS GROUP', true);
+  button.disabled = true;
+  let completed = 0;
+  let detections = 0;
+  try {
+    for (const source of sources) {
+      showStatus(`VEHICLE SWEEP ${completed + 1}/${sources.length} · ${source.name}`);
+      try {
+        const result = await analyzeVehicleCamera(source);
+        detections += result.vehicles?.length || 0;
+      } catch { /* A stale or non-raster source must not stop the bounded sweep. */ }
+      completed += 1;
+    }
+    await loadVehicleAnalytics();
+    showStatus(`SWEEP COMPLETE · ${completed} FRAMES · ${detections} OBSERVATIONS`);
+  } finally { button.disabled = !vehicleAnalytics.enabled || !vehicleAnalytics.configured; }
+});
+
+document.querySelector('[data-vehicle-refresh]').addEventListener('click', () => loadVehicleAnalytics().catch((error) => showStatus(error.message, true)));
+vehicleSearch.addEventListener('input', () => {
+  clearTimeout(vehicleSearchTimer);
+  vehicleSearchTimer = setTimeout(() => loadVehicleAnalytics().catch((error) => showStatus(error.message, true)), 280);
+});
+
 accountSearch.addEventListener('input', renderAccounts);
 accountFilter.addEventListener('change', renderAccounts);
 document.querySelector('[data-owner-refresh]').addEventListener('click', () => loadDashboard().catch((error) => showStatus(error.message, true)));
@@ -354,6 +498,7 @@ api('/api/account/session').then(async ({ user }) => {
   }
   document.querySelector('[data-owner-email]').textContent = user.email;
   document.body.classList.remove('owner-loading');
+  await loadVehicleSources();
   await loadDashboard();
   window.setInterval(() => loadDashboard(true).catch((error) => showStatus(error.message, true)), 10_000);
 }).catch((error) => {

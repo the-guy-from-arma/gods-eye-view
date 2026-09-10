@@ -7,6 +7,7 @@ import {
   normalizeLayerAvailabilityStatus,
 } from '../src/data/layerAvailability.js';
 import { CURRENT_LEGAL_VERSION, legalAcceptanceIsCurrent } from '../src/legalPolicy.js';
+import { analyzeVehicleFrame } from './vehicleAnalytics.js';
 
 const { Pool } = pg;
 const scrypt = promisify(crypto.scrypt);
@@ -91,10 +92,14 @@ async function passwordMatches(password, stored) {
 }
 
 async function readJson(req) {
+  return readJsonLimited(req, BODY_LIMIT);
+}
+
+async function readJsonLimited(req, limit) {
   let body = '';
   for await (const chunk of req) {
     body += chunk;
-    if (body.length > BODY_LIMIT) {
+    if (body.length > limit) {
       const error = new Error('Request too large');
       error.status = 413;
       throw error;
@@ -160,6 +165,7 @@ export function createAccountApi(options = {}) {
   const pool = options.pool || (connectionString ? new Pool({ connectionString }) : null);
   const authLimit = createLimiter(12, 15 * 60_000);
   const activityLimit = createLimiter(180, 60_000);
+  const vehicleAnalysisLimit = createLimiter(30, 60_000);
   let schemaPromise;
 
   const ensureSchema = () => {
@@ -214,6 +220,8 @@ export function createAccountApi(options = {}) {
         ON CONFLICT (key) DO NOTHING;
       INSERT INTO gev_settings (key, value) VALUES ('site_operating_mode', 'online')
         ON CONFLICT (key) DO NOTHING;
+      INSERT INTO gev_settings (key, value) VALUES ('vehicle_analytics_enabled', 'false')
+        ON CONFLICT (key) DO NOTHING;
       CREATE TABLE IF NOT EXISTS gev_layer_availability (
         layer_id TEXT PRIMARY KEY,
         status TEXT NOT NULL DEFAULT 'live'
@@ -241,6 +249,42 @@ export function createAccountApi(options = {}) {
       );
       CREATE INDEX IF NOT EXISTS gev_public_safety_jurisdiction_idx
         ON gev_public_safety_sources(country_code, region_name, county_name, city_name, agency_name);
+      CREATE TABLE IF NOT EXISTS gev_vehicle_observations (
+        id BIGSERIAL PRIMARY KEY,
+        camera_id TEXT NOT NULL,
+        camera_name TEXT,
+        provider TEXT,
+        jurisdiction TEXT,
+        captured_at TIMESTAMPTZ NOT NULL,
+        frame_fingerprint TEXT NOT NULL,
+        vehicle_type TEXT NOT NULL,
+        color TEXT NOT NULL,
+        make TEXT NOT NULL,
+        model TEXT NOT NULL,
+        year_start INTEGER,
+        year_end INTEGER,
+        confidence REAL NOT NULL,
+        bbox JSONB NOT NULL,
+        ai_provider TEXT NOT NULL DEFAULT 'gemini',
+        model_version TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS gev_vehicle_observation_dedupe_idx
+        ON gev_vehicle_observations(frame_fingerprint, camera_id, vehicle_type, make, model, bbox);
+      CREATE INDEX IF NOT EXISTS gev_vehicle_observation_search_idx
+        ON gev_vehicle_observations(captured_at DESC, make, model);
+      CREATE INDEX IF NOT EXISTS gev_vehicle_observation_camera_idx
+        ON gev_vehicle_observations(camera_id, captured_at DESC);
+      CREATE TABLE IF NOT EXISTS gev_vehicle_frame_scans (
+        camera_id TEXT NOT NULL,
+        frame_fingerprint TEXT NOT NULL,
+        captured_at TIMESTAMPTZ NOT NULL,
+        detection_count INTEGER NOT NULL,
+        model_version TEXT NOT NULL,
+        PRIMARY KEY (camera_id, frame_fingerprint)
+      );
+      DELETE FROM gev_vehicle_observations WHERE captured_at < NOW() - INTERVAL '90 days';
+      DELETE FROM gev_vehicle_frame_scans WHERE captured_at < NOW() - INTERVAL '90 days';
     `).catch((error) => {
       schemaPromise = null;
       throw error;
@@ -565,6 +609,115 @@ export function createAccountApi(options = {}) {
             layerCounts,
           },
         });
+      }
+
+      if (url.pathname === '/api/account/admin/vehicle-analytics' && req.method === 'GET') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const query = safeText(url.searchParams.get('q'), 100);
+        const cameraId = safeText(url.searchParams.get('cameraId'), 160);
+        const values = [];
+        const where = [];
+        if (query) {
+          values.push(`%${query}%`);
+          where.push(`(make ILIKE $${values.length} OR model ILIKE $${values.length} OR vehicle_type ILIKE $${values.length} OR color ILIKE $${values.length} OR jurisdiction ILIKE $${values.length})`);
+        }
+        if (cameraId) {
+          values.push(cameraId);
+          where.push(`camera_id = $${values.length}`);
+        }
+        values.push(Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 150)));
+        const [enabledResult, observations, totals] = await Promise.all([
+          pool.query("SELECT value FROM gev_settings WHERE key = 'vehicle_analytics_enabled'"),
+          pool.query(`
+            SELECT id, camera_id AS "cameraId", camera_name AS "cameraName", provider, jurisdiction,
+              captured_at AS "capturedAt", vehicle_type AS "vehicleType", color, make, model,
+              year_start AS "yearStart", year_end AS "yearEnd", confidence, bbox,
+              ai_provider AS "aiProvider", model_version AS "modelVersion"
+            FROM gev_vehicle_observations
+            ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+            ORDER BY captured_at DESC LIMIT $${values.length}
+          `, values),
+          pool.query(`SELECT COUNT(*) AS total, COUNT(DISTINCT camera_id) AS cameras,
+            MAX(captured_at) AS "lastCapturedAt" FROM gev_vehicle_observations`),
+        ]);
+        return json(res, 200, {
+          configured: Boolean(env.GEMINI_API_KEY),
+          enabled: enabledResult.rows[0]?.value === 'true',
+          model: safeText(env.GEMINI_VEHICLE_MODEL || 'gemini-3.8-flash', 80),
+          retentionDays: 90,
+          rawImagesStored: false,
+          observations: observations.rows.map((row) => ({ ...row, id: String(row.id), confidence: Number(row.confidence) })),
+          totals: { ...totals.rows[0], total: Number(totals.rows[0]?.total || 0), cameras: Number(totals.rows[0]?.cameras || 0) },
+        });
+      }
+
+      if (url.pathname === '/api/account/admin/vehicle-analytics/settings' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const body = await readJson(req);
+        if (typeof body.enabled !== 'boolean') return json(res, 400, { error: 'Enabled state must be true or false' });
+        await pool.query(`INSERT INTO gev_settings (key, value, updated_at)
+          VALUES ('vehicle_analytics_enabled', $1, NOW())
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [String(body.enabled)]);
+        await record(req, 'ui_action', { action: 'vehicle_analytics', enabled: body.enabled }, user);
+        return json(res, 200, { ok: true, enabled: body.enabled });
+      }
+
+      if (url.pathname === '/api/account/admin/vehicle-analytics/analyze' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        if (!vehicleAnalysisLimit(`vehicle:${user.id}`)) return json(res, 429, { error: 'Vehicle analysis is limited to 30 frames per minute' });
+        const enabledResult = await pool.query("SELECT value FROM gev_settings WHERE key = 'vehicle_analytics_enabled'");
+        if (enabledResult.rows[0]?.value !== 'true') return json(res, 409, { error: 'Enable vehicle analytics in Owner Command first' });
+        const body = await readJsonLimited(req, 7 * 1024 * 1024);
+        const cameraId = safeText(body.cameraId, 160);
+        const cameraName = safeText(body.cameraName, 200);
+        const provider = safeText(body.provider, 120);
+        const jurisdiction = safeText(body.jurisdiction, 160);
+        const mimeType = safeText(body.mimeType, 40).toLowerCase();
+        const imageBase64 = String(body.imageBase64 || '').replace(/\s/g, '');
+        if (!cameraId) return json(res, 400, { error: 'Camera ID is required' });
+        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64) || imageBase64.length < 100 || imageBase64.length > 6_500_000) {
+          return json(res, 400, { error: 'Camera frame is missing or too large' });
+        }
+        const frameBytes = Buffer.from(imageBase64, 'base64');
+        if (frameBytes.length > 4_800_000) return json(res, 413, { error: 'Camera frame exceeds 4.8 MB' });
+        const validSignature = mimeType === 'image/jpeg'
+          ? frameBytes[0] === 0xff && frameBytes[1] === 0xd8
+          : mimeType === 'image/png'
+            ? frameBytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+            : mimeType === 'image/webp'
+              ? frameBytes.subarray(0, 4).toString('ascii') === 'RIFF' && frameBytes.subarray(8, 12).toString('ascii') === 'WEBP'
+              : false;
+        if (!validSignature) return json(res, 415, { error: 'Camera frame bytes do not match the declared image type' });
+        const frameFingerprint = crypto.createHash('sha256').update(frameBytes).digest('hex');
+        const duplicate = await pool.query('SELECT 1 FROM gev_vehicle_frame_scans WHERE camera_id = $1 AND frame_fingerprint = $2', [cameraId, frameFingerprint]);
+        if (duplicate.rows[0]) return json(res, 200, { ok: true, duplicate: true, vehicles: [] });
+        const analysis = await analyzeVehicleFrame({
+          apiKey: env.GEMINI_API_KEY,
+          model: env.GEMINI_VEHICLE_MODEL,
+          mimeType,
+          imageBase64,
+        });
+        const capturedAt = new Date().toISOString();
+        const inserted = [];
+        await pool.query(`INSERT INTO gev_vehicle_frame_scans
+          (camera_id, frame_fingerprint, captured_at, detection_count, model_version)
+          VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+        [cameraId, frameFingerprint, capturedAt, analysis.vehicles.length, analysis.model]);
+        for (const vehicle of analysis.vehicles) {
+          const result = await pool.query(`INSERT INTO gev_vehicle_observations
+            (camera_id, camera_name, provider, jurisdiction, captured_at, frame_fingerprint,
+              vehicle_type, color, make, model, year_start, year_end, confidence, bbox, model_version)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15)
+            ON CONFLICT DO NOTHING RETURNING id`, [cameraId, cameraName, provider, jurisdiction, capturedAt,
+            frameFingerprint, vehicle.vehicleType, vehicle.color, vehicle.make, vehicle.model,
+            vehicle.yearStart, vehicle.yearEnd, vehicle.confidence, JSON.stringify(vehicle.bbox), analysis.model]);
+          if (result.rows[0]) inserted.push({ ...vehicle, id: String(result.rows[0].id) });
+        }
+        await record(req, 'ui_action', { action: 'vehicle_frame_analyzed', cameraId, detections: inserted.length }, user);
+        return json(res, 200, { ok: true, duplicate: false, vehicles: inserted, model: analysis.model, rawImageStored: false });
       }
 
       if (url.pathname === '/api/account/admin/layers' && req.method === 'POST') {

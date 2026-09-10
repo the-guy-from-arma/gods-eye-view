@@ -25,14 +25,15 @@
       <a href="#system-control"><span class="material-symbols-outlined">satellite_alt</span>System control</a>
       <a href="#accounts"><span class="material-symbols-outlined">shield_person</span>Account security</a>
       <a href="#layers"><span class="material-symbols-outlined">layers</span>Data layers</a>
+      <a href="#vehicle-analytics"><span class="material-symbols-outlined">directions_car</span>Vehicle analytics</a>
       <a href="#activity"><span class="material-symbols-outlined">history</span>Activity</a>
       <a href="/intelligence.html"><span class="material-symbols-outlined">hub</span>Intelligence console</a>
     </nav>
     <div class="command-rail-footer">
       <div class="rail-os-readout">
         <small>OS</small><strong>THUNDERLINK OBLIVION</strong>
-        <small>VERSION</small><strong>0.3.23</strong>
-        <small>KERNEL</small><strong>TBSGE-KERNEL-030.024</strong>
+        <small>VERSION</small><strong>0.3.24</strong>
+        <small>KERNEL</small><strong>TBSGE-KERNEL-030.025</strong>
       </div>
       <span><i></i>OWNER SESSION</span>
       <strong data-owner-email>VERIFYING…</strong>
@@ -47,7 +48,7 @@
       <span>POSTGRES · <b data-owner-db-state>CHECKING</b></span>
       <span>SNAPSHOT · <b data-owner-snapshot-age>WAITING</b></span>
       <span>LEGAL · <b data-owner-legal-version>0.3.02</b></span>
-      <span>TBSGE-KERNEL-030.024</span>
+      <span>TBSGE-KERNEL-030.025</span>
     </div>
     <header class="command-topbar">
       <div>
@@ -145,6 +146,32 @@
         <header><div><span class="section-kicker">DATA GOVERNANCE</span><h2>Public layer availability</h2></div><span class="panel-readout" data-owner-layer-count>0 LAYERS</span></header>
         <p class="panel-intro">Controls include data layers, Law Enforcement Radio, Scenes, and the Display, CCTV, and Context interface modules. Coming Soon and Disabled / Maintenance remain visible but inactive. Hidden removes the feature from the public interface entirely.</p>
         <div class="owner-layers" data-owner-layers><p class="empty-state">Synchronizing layer registry…</p></div>
+      </section>
+
+      <section id="vehicle-analytics" class="command-panel vehicle-analytics-panel">
+        <header>
+          <div><span class="section-kicker">OWNER-ONLY · NON-IDENTIFYING</span><h2>Vehicle classification</h2></div>
+          <button type="button" class="toggle-control" data-vehicle-enabled aria-pressed="false"><span data-vehicle-enabled-label>OFF</span><i></i></button>
+        </header>
+        <p class="panel-intro">Classifies visible vehicle type, color, likely make/model, and a broad possible year range. Camera frames are processed transiently and are not archived. License plates, faces, occupants, unique vehicle identifiers, and cross-camera movement histories are neither requested nor stored.</p>
+        <div class="vehicle-status-grid">
+          <div><small>AI PROVIDER</small><strong data-vehicle-provider>CHECKING</strong></div>
+          <div><small>OBSERVATIONS</small><strong data-vehicle-total>0</strong></div>
+          <div><small>CAMERAS SAMPLED</small><strong data-vehicle-cameras>0</strong></div>
+          <div><small>METADATA RETENTION</small><strong data-vehicle-retention>90 DAYS</strong></div>
+        </div>
+        <div class="vehicle-controls">
+          <label><span>STATE / CAMERA GROUP</span><select data-vehicle-state><option value="">ALL AVAILABLE STATES</option></select></label>
+          <label><span>CAMERA</span><select data-vehicle-camera><option value="">SELECT CAMERA</option></select></label>
+          <button type="button" data-vehicle-analyze>ANALYZE SELECTED FRAME</button>
+          <button type="button" data-vehicle-sweep>SCAN NEXT 10 IN STATE</button>
+        </div>
+        <div class="security-note"><span class="material-symbols-outlined">privacy_tip</span><p>Results are probabilistic observations, not identity records. Verify against the original public camera view before relying on a make, model, or year estimate.</p></div>
+        <div class="account-toolbar vehicle-search-bar">
+          <input type="search" data-vehicle-search placeholder="Search make, model, type, color, or jurisdiction…" aria-label="Search vehicle observations" />
+          <button type="button" data-vehicle-refresh>REFRESH RECORDS</button>
+        </div>
+        <div class="vehicle-observations" data-vehicle-observations><p class="empty-state">Vehicle analytics is synchronizing…</p></div>
       </section>
 
       <section id="activity" class="command-panel activity-panel">

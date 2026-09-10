@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.24] — 2026-09-10 — Owner-only vehicle classification
+
+- Added an owner-only vehicle analytics workspace with state/camera selection,
+  single-frame analysis, bounded ten-camera sweeps, confidence readouts, and
+  searchable Railway Postgres observations.
+- Added optional server-side Gemini image classification for vehicle type,
+  exterior color, likely make/model, and a broad possible model-year range.
+  Frames are processed transiently and never written to the database; license
+  plates, faces, occupants, unique vehicle identifiers, and cross-camera
+  movement histories are explicitly excluded from prompts and stored records.
+- Added duplicate-frame suppression, a 30-frame/minute owner rate limit,
+  4.8 MB frame cap, 90-day metadata retention, and a default-off owner control.
+- Advanced ThunderLink Oblivion to public build `0.3.24` and kernel
+  `TBSGE-KERNEL-030.025`; legal acceptance remains `0.3.02`.
+
 ## [0.3.23] — 2026-09-10 — Native-resolution CCTV viewing
 
 - Stopped the enlarged CCTV viewer from stretching low-resolution provider
