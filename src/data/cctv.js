@@ -137,6 +137,16 @@ const GEO_TRACKING_BATCH_SIZE = 2;
 const GEO_TRACKING_BATCH_DELAY_MS = 250;
 const GEO_PROGRESS_NOTIFY_INTERVAL_MS = 300;
 const GEO_PROGRESS_NOTIFY_BATCH_LIMIT = 10;
+// Statewide catalogs contain tens of thousands of markers. Keep every
+// published placement on the globe, but only warm detailed terrain/frustum
+// geometry for the nearest cohort; an explicitly selected camera is always
+// resolved on demand by the existing activation path.
+const CCTV_GEOMETRY_WARM_LIMIT = 3000;
+const CCTV_GROUND_PRIOR_LIMIT = 3000;
+// A native <select> with 20K+ options stalls layout and screen readers. The
+// panel follows the operator by exposing the nearest cohort while count keeps
+// the complete catalog total. All globe billboards remain present/selectable.
+const CCTV_UI_CAMERA_LIMIT = 800;
 // Throttle for placeholder repaints — the projection RAF loop must not
 // re-fill a 1080p canvas on every frame while a feed image is still loading.
 const PLACEHOLDER_REPAINT_MS = 750;
@@ -299,6 +309,7 @@ let _lastError = null;
 let _healthById = new Map();
 let _calibrationById = new Map();
 let _listeners = new Set();
+let _uiCameraCache = { key: '', records: [] };
 let _projectionRaf = 0;
 let _removeFocusAppearListener = null;
 let _lastFocusStyleAt = 0;
@@ -2225,7 +2236,17 @@ function resolveCommittedGroundAnchor(record) {
  */
 async function resolveGroundPriors(catalog) {
   try {
-    const coords = catalog.map((camera) => {
+    const carto = _viewer?.camera?.positionCartographic;
+    const refLat = carto ? Cesium.Math.toDegrees(carto.latitude) : 0;
+    const refLon = carto ? Cesium.Math.toDegrees(carto.longitude) : 0;
+    const indices = catalog.map((camera, index) => ({
+      index,
+      distance: haversineKm(refLat, refLon, camera.lat, camera.lon),
+    })).sort((a, b) => a.distance - b.distance)
+      .slice(0, CCTV_GROUND_PRIOR_LIMIT)
+      .map((entry) => entry.index);
+    const coords = indices.map((index) => {
+      const camera = catalog[index];
       const ortho = Number(camera.groundElevationM);
       return {
         lat: camera.lat,
@@ -2233,7 +2254,11 @@ async function resolveGroundPriors(catalog) {
         ...(Number.isFinite(ortho) ? { sourceOrthometricM: ortho } : {}),
       };
     });
-    return await resolveEllipsoidalGround(coords);
+    const resolved = await resolveEllipsoidalGround(coords);
+    if (!Array.isArray(resolved)) return null;
+    const aligned = Array(catalog.length).fill(null);
+    indices.forEach((catalogIndex, resultIndex) => { aligned[catalogIndex] = resolved[resultIndex] || null; });
+    return aligned;
   } catch (error) {
     console.warn('[Data:CCTV] ground-prior batch failed (keeping catalog fallbacks):', error?.message || error);
     return null;
@@ -2589,6 +2614,7 @@ function startGeometryLoadQueue() {
       distKm: haversineKm(refLat, refLon, record.camera.lat, record.camera.lon),
     }))
     .sort((a, b) => a.distKm - b.distKm)
+    .slice(0, Math.max(0, CCTV_GEOMETRY_WARM_LIMIT - (active ? 1 : 0)))
     .map((entry) => entry.record);
   _geoQueue = active ? [active, ...pending] : pending;
   _geoLoadTotal = _geoQueue.length;
@@ -3445,6 +3471,7 @@ function getPublicCameraState(record, activeId = null) {
 function uiState() {
   const active = getActiveRecord();
   const activeId = active?.camera.id || null;
+  const menuRecords = uiCameraRecords(activeId);
   const payload = {
     enabled: _enabled,
     // Compat boolean + the full tri-state (viewshed design §3b).
@@ -3478,7 +3505,8 @@ function uiState() {
     },
     activeCameraId: activeId,
     activeCamera: active ? getPublicCameraState(active, activeId) : null,
-    cameras: _records.map((record) => getPublicCameraState(record, activeId)),
+    cameras: menuRecords.map((record) => getPublicCameraState(record, activeId)),
+    cameraMenuCount: menuRecords.length,
     summary: buildSummaryText(),
   };
   return payload;
@@ -3494,6 +3522,27 @@ function notifyListeners() {
       console.warn('[Data:CCTV] listener error:', error);
     }
   }
+}
+
+/** Nearest, cached subset used only by the panel/voice camera picker. */
+function uiCameraRecords(activeId = null) {
+  if (_records.length <= CCTV_UI_CAMERA_LIMIT) return _records;
+  const carto = _viewer?.camera?.positionCartographic;
+  const refLat = carto ? Cesium.Math.toDegrees(carto.latitude) : 0;
+  const refLon = carto ? Cesium.Math.toDegrees(carto.longitude) : 0;
+  const key = `${currentViewContext()}:${activeId || ''}:${_records.length}`;
+  if (_uiCameraCache.key === key) return _uiCameraCache.records;
+
+  const nearest = _records.map((record) => ({
+    record,
+    distance: haversineKm(refLat, refLon, record.camera.lat, record.camera.lon),
+  })).sort((a, b) => a.distance - b.distance)
+    .slice(0, CCTV_UI_CAMERA_LIMIT)
+    .map((entry) => entry.record);
+  const active = activeId ? _recordById.get(activeId) : null;
+  if (active && !nearest.includes(active)) nearest.unshift(active);
+  _uiCameraCache = { key, records: nearest };
+  return nearest;
 }
 
 /**
@@ -3975,6 +4024,7 @@ function clearRuntimeState() {
   clearProjectionOverlay();
   _records = [];
   _recordById = new Map();
+  _uiCameraCache = { key: '', records: [] };
   _healthById = new Map();
   _count = 0;
   _lastUpdate = null;
@@ -4333,8 +4383,10 @@ const cctvLayer = {
       // the layer is disabled).
       _horizonCullListener = () => {
         _cameraMoving = false;
+        _uiCameraCache.key = '';
         refreshHorizonCulling();
         refreshAmbientCards();
+        notifyListeners();
       };
       _viewer.camera.moveEnd.addEventListener(_horizonCullListener);
     }

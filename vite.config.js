@@ -53,6 +53,7 @@ import { locationSearchApiPlugin } from './server/locationSearchApi.js';
 import { newsEventsApiPlugin } from './server/newsEventsApi.js';
 import { gamingDataApiPlugin } from './server/gamingDataApi.js';
 import { ttsForFreeApiPlugin } from './server/ttsForFreeApi.js';
+import { getState511ProviderStatus, loadState511Cameras } from './server/cctv511Providers.js';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { defineConfig, loadEnv } from 'vite';
@@ -3690,17 +3691,16 @@ const DEFAULT_CCTV_SOURCE_FILE = 'config/cctv_sources.austin.json';
 const DEFAULT_AUSTIN_ROWS_URL = 'https://data.austintexas.gov/api/views/b4k4-adkb/rows.json?accessType=DOWNLOAD';
 /** Default cap on Austin cameras after distance-based prioritization. */
 const DEFAULT_AUSTIN_MAX_SOURCES = 250;
-/** Global cap on total CCTV sources served by the proxy. Sized for the
- * existing city packs plus the complete Washington 511/WSDOT catalog. */
-const DEFAULT_CCTV_MAX_SOURCES = 3000;
+/** Global cap for the complete U.S. state 511/DOT catalogs plus city packs. */
+const DEFAULT_CCTV_MAX_SOURCES = 30000;
 /** Reference point for Austin camera prioritization (Congress & 6th). */
 const AUSTIN_DOWNTOWN = { lat: 30.2672, lon: -97.7431 };
 /** Caltrans CCTV: one JSON feed per district, identical schema statewide. */
 const CALTRANS_CCTV_URL = (district) =>
   `https://cwwp2.dot.ca.gov/data/d${district}/cctv/cctvStatusD${String(district).padStart(2, '0')}.json`;
-/** Districts fetched by default: SF Bay (4), LA (7), San Diego (11), Sacramento (3). */
-const DEFAULT_CALTRANS_DISTRICTS = '4,7,11,3';
-const DEFAULT_CALTRANS_MAX_SOURCES = 300;
+/** All 12 Caltrans districts are part of the statewide 511/DOT catalog. */
+const DEFAULT_CALTRANS_DISTRICTS = '1,2,3,4,5,6,7,8,9,10,11,12';
+const DEFAULT_CALTRANS_MAX_SOURCES = 4000;
 /** Prioritization anchors: downtown cores of the four default metros. */
 const CALTRANS_ANCHORS = [
   { lat: 37.7793, lon: -122.4193 }, // San Francisco
@@ -3718,7 +3718,7 @@ const LONDON_CENTER = { lat: 51.5074, lon: -0.1278 };
  * data.wsdot.wa.gov/log/public/cameras.json endpoint. */
 const WSDOT_511_CAMERA_URL = 'https://data.wsdot.wa.gov/arcgis/rest/services/TravelInformation/TravelInfoCamerasWeather/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=geojson';
 const DEFAULT_WSDOT_511_MAX_SOURCES = 2000;
-/** Camera CATALOGS change rarely; 15 min keeps multi-megabyte upstream list refetches (Austin rows.json + 4 Caltrans districts + TfL) infrequent. Frames are fetched per-request and are unaffected. */
+/** Camera catalogs change rarely; 15 min keeps the statewide multi-provider refresh infrequent. Frames are fetched per-request and are unaffected. */
 const CCTV_SOURCE_CACHE_MS = 15 * 60 * 1000;
 /** Per-provider catalog-fetch timeout. Bounds the worst-case refresh so one
  * stalled upstream can't leave getCctvSources (and thus every CCTV route)
@@ -4261,7 +4261,7 @@ async function loadCaltransSourcesFromOpenData() {
   }
 
   const maxRaw = Number(process.env.CCTV_CALTRANS_MAX_SOURCES || DEFAULT_CALTRANS_MAX_SOURCES);
-  const maxCount = Number.isFinite(maxRaw) ? Math.max(8, Math.min(600, Math.floor(maxRaw))) : DEFAULT_CALTRANS_MAX_SOURCES;
+  const maxCount = Number.isFinite(maxRaw) ? Math.max(8, Math.min(4000, Math.floor(maxRaw))) : DEFAULT_CALTRANS_MAX_SOURCES;
   const prioritized = prioritizeSources(cameras, maxCount, CALTRANS_ANCHORS);
   console.log(`[CCTV] Loaded Caltrans camera sources: ${cameras.length} inService (using nearest ${prioritized.length})`);
   return prioritized;
@@ -4458,9 +4458,9 @@ function normalizeSourceItem(item) {
 /**
  * Assemble and cache the merged CCTV source list.
  *
- * Merges sources from three origins (Austin Open Data, local file,
- * env variable), deduplicates by ID, applies the global max cap, and
- * caches for CCTV_SOURCE_CACHE_MS.
+ * Merges city, state 511/DOT, local-file, and environment sources,
+ * deduplicates by ID, applies the global max cap, and caches for
+ * CCTV_SOURCE_CACHE_MS.
  *
  * @returns {Promise<Array<object>>} Deduplicated, capped source list.
  */
@@ -4490,7 +4490,7 @@ async function refreshCctvSources() {
 
   const forceAustin = String(process.env.CCTV_FORCE_AUSTIN || '').trim() === '1';
   const preferAustin = String(process.env.CCTV_PREFER_AUSTIN || '1').trim() !== '0';
-  // Live open-data packs (Austin + Caltrans + TfL) load unless a file/env pack
+  // Live open-data packs (city + state 511/DOT) load unless a file/env pack
   // is configured and live packs aren't forced — same gate that governed the
   // Austin-only fetch, now governing all three. Each pack fails independently.
   const needsLiveSources = forceAustin || ((fromFile.length + fromEnv.length) === 0 && preferAustin);
@@ -4501,20 +4501,23 @@ async function refreshCctvSources() {
   let fromCaltrans = [];
   let fromTfl = [];
   let fromWsdot511 = [];
+  let fromState511 = [];
   if (needsLiveSources) {
-    const [austinResult, caltransResult, tflResult, wsdot511Result] = await Promise.allSettled([
+    const [austinResult, caltransResult, tflResult, wsdot511Result, state511Result] = await Promise.allSettled([
       loadAustinSourcesFromOpenData(),
       loadCaltransSourcesFromOpenData(),
       tflEnabled ? loadTflSourcesFromOpenData() : Promise.resolve([]),
       wsdot511Enabled ? loadWsdot511SourcesFromOpenData() : Promise.resolve([]),
+      loadState511Cameras(process.env),
     ]);
     fromAustin = austinResult.status === 'fulfilled' ? austinResult.value : [];
     fromCaltrans = caltransResult.status === 'fulfilled' ? caltransResult.value : [];
     fromTfl = tflResult.status === 'fulfilled' ? tflResult.value : [];
     fromWsdot511 = wsdot511Result.status === 'fulfilled' ? wsdot511Result.value : [];
+    fromState511 = state511Result.status === 'fulfilled' ? state511Result.value : [];
   }
   // Live sources first so file/env overrides win on duplicate IDs (Map last-write).
-  const merged = [...fromAustin, ...fromCaltrans, ...fromTfl, ...fromWsdot511, ...fromFile, ...fromEnv];
+  const merged = [...fromAustin, ...fromCaltrans, ...fromTfl, ...fromWsdot511, ...fromState511, ...fromFile, ...fromEnv];
 
   // Deduplicate by camera ID (last-write wins because of Map.set)
   const byId = new Map();
@@ -4527,7 +4530,7 @@ async function refreshCctvSources() {
 
   const mergedSources = Array.from(byId.values());
   const maxRaw = Number(process.env.CCTV_MAX_SOURCES || DEFAULT_CCTV_MAX_SOURCES);
-  const maxCount = Number.isFinite(maxRaw) ? Math.max(8, Math.min(5000, Math.floor(maxRaw))) : DEFAULT_CCTV_MAX_SOURCES;
+  const maxCount = Number.isFinite(maxRaw) ? Math.max(8, Math.min(40000, Math.floor(maxRaw))) : DEFAULT_CCTV_MAX_SOURCES;
   if (mergedSources.length > maxCount) {
     console.warn(`[CCTV] source catalog ${mergedSources.length} exceeds cap ${maxCount}; keeping the first ${maxCount} (raise CCTV_MAX_SOURCES or lower a per-pack cap to change which).`);
   }
@@ -4774,8 +4777,8 @@ function cctvProxy() {
   /** @type {Map<string,{id:string,status:string,sourceKind:string,label:string,message:string,updatedAt:number}>} */
   const health = new Map();
   /** Cap on health map entries to prevent unbounded growth. Matches the CCTV
-   * catalog hard bound so Washington 511 records retain honest health state. */
-  const HEALTH_MAX_ENTRIES = 5000;
+   * catalog hard bound so statewide 511 records retain honest health state. */
+  const HEALTH_MAX_ENTRIES = 40000;
 
   /** Update the health entry for a camera, evicting the oldest entry if at capacity. */
   const setHealth = (cameraId, patch) => {
@@ -4876,6 +4879,7 @@ function cctvProxy() {
                 poseSource: source.poseSource,
                 license: source.license,
               })),
+              catalogs: getState511ProviderStatus(),
             };
             res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
             res.end(JSON.stringify(body));

@@ -154,6 +154,21 @@ export const DATA_CREDITS = [
       '<a href="https://data.wsdot.wa.gov/arcgis/rest/services/TravelInformation/TravelInfoCamerasWeather/FeatureServer/0" target="_blank" rel="noopener">Washington 511 · Washington State Department of Transportation</a>',
   },
   {
+    key: 'us-state-511-cctv',
+    html:
+      'State 511/DOT traffic cameras &amp; frames: ' +
+      '<a href="https://az511.gov/" target="_blank" rel="noopener">ADOT</a> · ' +
+      '<a href="https://fl511.com/" target="_blank" rel="noopener">FDOT</a> · ' +
+      '<a href="https://511ga.org/" target="_blank" rel="noopener">GDOT</a> · ' +
+      '<a href="https://drivenc.gov/" target="_blank" rel="noopener">NCDOT</a> · ' +
+      '<a href="https://udottraffic.utah.gov/" target="_blank" rel="noopener">UDOT</a> · ' +
+      '<a href="https://www.nvroads.com/" target="_blank" rel="noopener">NDOT</a> · ' +
+      '<a href="https://511la.org/" target="_blank" rel="noopener">LADOTD</a> · ' +
+      '<a href="https://www.tripcheck.com/" target="_blank" rel="noopener">ODOT</a> · ' +
+      '<a href="https://mdotjboss.state.mi.us/MiDrive/" target="_blank" rel="noopener">MDOT</a> · ' +
+      '<a href="https://511in.org/" target="_blank" rel="noopener">INDOT</a>',
+  },
+  {
     key: 'gbfs',
     html: 'Bikeshare availability: GBFS operator feeds (e.g. Austin BCycle)',
   },

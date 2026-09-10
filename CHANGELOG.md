@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.17] — 2026-09-10 — Complete supported U.S. 511 camera network
+
+- Added complete live state 511/DOT camera catalogs for Arizona, Florida,
+  Georgia, North Carolina, Utah, Nevada, Louisiana, Oregon, Michigan, and
+  Indiana, totaling 16,485 verified camera placements at release time.
+- Expanded Caltrans from four metro-focused districts to all 12 districts and
+  retained the complete Washington 511 catalog, bringing the CCTV layer above
+  20,000 public placements while preserving provider-specific attribution.
+- Added provider-isolated catalog health reporting, gated-stream detection,
+  bounded catalog requests, and a nearest-camera UI/terrain warm cohort so the
+  complete map does not create a 20,000-option dropdown or terrain workload.
+- Advanced ThunderLink Oblivion to public build `0.3.17` and kernel
+  `TBSGE-KERNEL-030.018`; legal acceptance remains `0.3.02`.
+
 ## [0.3.16] — 2026-09-09 — Live fusion schematic + Washington 511 cameras
 
 - Rebuilt the Intelligence Console overview around a ThunderLink-style live

@@ -6625,9 +6625,13 @@ export class StyleManager {
         const projLabel = state?.showProjection !== false ? 'MONITOR' : 'OFF';
         this._cctvMeta.textContent = `${activeCamera.city} · HDG ${Math.round(activeCamera.headingDeg)}° · FOV ${Math.round(activeCamera.fovDeg)}° · RANGE ${Math.round(activeCamera.rangeM)}m · ${projLabel}${calBadge ? ` · ${calBadge}` : ''} · ${provider}${statusMsg}`;
       } else if (cameras.length > 0) {
+        const catalogCount = Number(state?.count) || cameras.length;
+        const scope = catalogCount > cameras.length
+          ? `${catalogCount.toLocaleString()} cameras loaded · showing ${cameras.length.toLocaleString()} nearest`
+          : `${cameras.length.toLocaleString()} cameras loaded`;
         this._cctvMeta.textContent = enabled
-          ? `${cameras.length} cameras loaded · click a camera to activate`
-          : `${cameras.length} cameras loaded · enable CCTV to activate`;
+          ? `${scope} · click a camera to activate`
+          : `${scope} · enable CCTV to activate`;
       } else {
         this._cctvMeta.textContent = 'Enable CCTV to load camera intersections';
       }
