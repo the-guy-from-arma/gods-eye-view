@@ -49,7 +49,9 @@ try {
       request.respond({
         contentType: 'application/json',
         body: JSON.stringify({
-          configured: true,
+          configured: false,
+          motionConfigured: true,
+          motionProvider: 'local_frame_differencing',
           enabled: true,
           model: 'qa-vehicle-model',
           retentionDays: 90,
@@ -76,6 +78,15 @@ try {
   });
   await page.goto(process.env.OWNER_QA_URL || 'http://127.0.0.1:4173/owner.html', { waitUntil: 'networkidle0' });
   await page.waitForFunction(() => !document.body.classList.contains('owner-loading'));
+  await page.select('[data-vehicle-camera]', 'qa-camera-1');
+  const controls = await page.evaluate(() => ({
+    motionDisabled: document.querySelector('[data-motion-toggle]').disabled,
+    optionalClassifierDisabled: document.querySelector('[data-vehicle-analyze]').disabled,
+    provider: document.querySelector('[data-vehicle-provider]').textContent,
+  }));
+  if (controls.motionDisabled || !controls.optionalClassifierDisabled || !controls.provider.includes('LOCAL PIXEL PARSER')) {
+    throw new Error(`Keyless motion QA failed: ${JSON.stringify(controls)}`);
+  }
   await page.screenshot({ path: 'qa-owner-dashboard.png', fullPage: true });
 } finally {
   await browser.close();

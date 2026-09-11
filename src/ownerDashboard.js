@@ -1,3 +1,5 @@
+import { detectMotionRegions, rgbaToLuma } from './vehicleMotionParser.js';
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -314,7 +316,7 @@ function syncMotionControl() {
   const button = document.querySelector('[data-motion-toggle]');
   button.dataset.running = String(Boolean(motionSession));
   button.textContent = motionSession ? 'STOP MOTION SESSION' : 'START MOTION SESSION';
-  button.disabled = motionSampleActive || (!motionSession && (!vehicleAnalytics.enabled || !vehicleAnalytics.configured || !vehicleCamera.value));
+  button.disabled = motionSampleActive || (!motionSession && (!vehicleAnalytics.enabled || vehicleAnalytics.motionConfigured === false || !vehicleCamera.value));
   vehicleCamera.disabled = Boolean(motionSession);
   vehicleState.disabled = Boolean(motionSession);
   document.querySelector('[data-motion-interval]').disabled = Boolean(motionSession);
@@ -325,7 +327,9 @@ function paintVehicleAnalytics(payload) {
   const toggle = document.querySelector('[data-vehicle-enabled]');
   toggle.setAttribute('aria-pressed', String(Boolean(vehicleAnalytics.enabled)));
   document.querySelector('[data-vehicle-enabled-label]').textContent = vehicleAnalytics.enabled ? 'ON' : 'OFF';
-  document.querySelector('[data-vehicle-provider]').textContent = vehicleAnalytics.configured ? `GEMINI · ${vehicleAnalytics.model}` : 'KEY REQUIRED';
+  document.querySelector('[data-vehicle-provider]').textContent = vehicleAnalytics.configured
+    ? `LOCAL MOTION · OPTIONAL ${vehicleAnalytics.model}`
+    : 'LOCAL PIXEL PARSER · READY';
   document.querySelector('[data-vehicle-total]').textContent = String(vehicleAnalytics.totals?.total || 0);
   document.querySelector('[data-vehicle-cameras]').textContent = String(vehicleAnalytics.totals?.cameras || 0);
   document.querySelector('[data-vehicle-retention]').textContent = `${vehicleAnalytics.retentionDays || 90} DAYS · NO FRAMES`;
@@ -375,7 +379,46 @@ async function blobBase64(blob) {
   return btoa(binary);
 }
 
-async function analyzeVehicleCamera(source, options = {}) {
+async function blobLuma(blob, width = 192, height = 108) {
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+    if (!context) throw new Error('Local image parser is unavailable in this browser');
+    context.drawImage(bitmap, 0, 0, width, height);
+    const rgba = context.getImageData(0, 0, width, height).data;
+    return { width, height, luma: rgbaToLuma(rgba, width, height) };
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function sampleLocalMotion(source) {
+  const frameUrl = source.frameUrl || `/api/cctv/frame/${encodeURIComponent(source.id)}`;
+  const separator = frameUrl.includes('?') ? '&' : '?';
+  const frame = await fetch(`${frameUrl}${separator}motionAnalysis=1`, { cache: 'no-store' });
+  const mimeType = String(frame.headers.get('content-type') || '').split(';')[0].toLowerCase();
+  if (!frame.ok) throw new Error(`Camera frame failed (${frame.status})`);
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) throw new Error('This camera does not currently provide a locally parsable raster frame');
+  const parsed = await blobLuma(await frame.blob());
+  const regions = motionSession.previousLuma
+    ? detectMotionRegions(motionSession.previousLuma, parsed.luma, parsed.width, parsed.height)
+    : [];
+  motionSession.previousLuma = parsed.luma;
+  return api('/api/account/admin/vehicle-analytics/motion/sample', {
+    method: 'POST',
+    body: JSON.stringify({
+      sessionId: motionSession.id,
+      cameraId: source.id,
+      jurisdiction: [source.city, source.stateCode].filter(Boolean).join(', '),
+      regions: regions.map(({ bbox, confidence }) => ({ bbox, confidence })),
+    }),
+  });
+}
+
+async function analyzeVehicleCamera(source) {
   if (!source) throw new Error('Select a camera first');
   const frame = await fetch(`${source.frameUrl || `/api/cctv/frame/${encodeURIComponent(source.id)}`}?vehicleAnalysis=1`, { cache: 'no-store' });
   const mimeType = String(frame.headers.get('content-type') || '').split(';')[0].toLowerCase();
@@ -391,7 +434,6 @@ async function analyzeVehicleCamera(source, options = {}) {
       provider: source.provider,
       jurisdiction: [source.city, source.stateCode].filter(Boolean).join(', '),
       stateCode: source.stateCode,
-      motionSessionId: options.motionSessionId || undefined,
       mimeType,
       imageBase64: await blobBase64(blob),
     }),
@@ -419,14 +461,12 @@ async function runMotionSample() {
   motionSampleActive = true;
   syncMotionControl();
   try {
-    const result = await analyzeVehicleCamera(source, { motionSessionId: motionSession.id });
+    const result = await sampleLocalMotion(source);
     if (result.motion) {
       motionSession.frames = result.motion.frames;
       paintMotionTracklets(result.motion);
     }
-    showStatus(result.duplicate
-      ? 'MOTION SAMPLE UNCHANGED · WAITING FOR A NEW FRAME'
-      : `${result.motion?.activeTracklets?.length || 0} ANONYMOUS TRACKLETS · SINGLE CAMERA`);
+    showStatus(`${result.motion?.activeTracklets?.length || 0} ANONYMOUS TRACKLETS · LOCAL PIXEL PARSER`);
   } catch (error) {
     showStatus(`MOTION SAMPLE FAILED · ${error.message}`, true);
   } finally {
@@ -636,6 +676,7 @@ document.querySelector('[data-motion-toggle]').addEventListener('click', async (
     cameraId: source.id,
     intervalMs: Number(document.querySelector('[data-motion-interval]').value || 15) * 1000,
     frames: 0,
+    previousLuma: null,
   };
   paintMotionTracklets({ frames: 0, activeTracklets: [] });
   syncMotionControl();

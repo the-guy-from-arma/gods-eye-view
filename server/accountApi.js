@@ -406,6 +406,23 @@ export function createAccountApi(options = {}) {
     );
   };
 
+  const recordAggregateVehicleFlow = async ({ cameraId, jurisdiction, capturedAt, vehicles }) => {
+    const bucketStart = vehicleFlowBucketStart(capturedAt);
+    for (const group of groupVehicleFlowDetections(vehicles)) {
+      await pool.query(`INSERT INTO gev_vehicle_flow_buckets
+        (bucket_start, camera_id, jurisdiction, vehicle_type, frame_samples,
+          detection_observations, confidence_total, updated_at)
+        VALUES ($1,$2,$3,$4,1,$5,$6,NOW())
+        ON CONFLICT (bucket_start, camera_id, vehicle_type) DO UPDATE SET
+          jurisdiction = EXCLUDED.jurisdiction,
+          frame_samples = gev_vehicle_flow_buckets.frame_samples + 1,
+          detection_observations = gev_vehicle_flow_buckets.detection_observations + EXCLUDED.detection_observations,
+          confidence_total = gev_vehicle_flow_buckets.confidence_total + EXCLUDED.confidence_total,
+          updated_at = NOW()`, [bucketStart, cameraId, jurisdiction, group.vehicleType,
+        group.detections, group.confidenceTotal]);
+    }
+  };
+
   return async function accountMiddleware(req, res, next) {
     const url = new URL(req.url || '/', 'http://local');
     if (!url.pathname.startsWith('/api/account') && url.pathname !== '/api/activity' && url.pathname !== '/api/public-safety/jurisdictions') return next();
@@ -760,6 +777,8 @@ export function createAccountApi(options = {}) {
         ]);
         return json(res, 200, {
           configured: Boolean(env.GEMINI_API_KEY),
+          motionConfigured: true,
+          motionProvider: 'local_frame_differencing',
           enabled: enabledResult.rows[0]?.value === 'true',
           model: safeText(env.GEMINI_VEHICLE_MODEL || 'gemini-3.8-flash', 80),
           retentionDays: 90,
@@ -835,6 +854,43 @@ export function createAccountApi(options = {}) {
         return json(res, 200, { ok: true, enabled: body.enabled });
       }
 
+      if (url.pathname === '/api/account/admin/vehicle-analytics/motion/sample' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        if (!vehicleAnalysisLimit(`motion:${user.id}`)) return json(res, 429, { error: 'Motion parsing is limited to 30 samples per minute' });
+        const enabledResult = await pool.query("SELECT value FROM gev_settings WHERE key = 'vehicle_analytics_enabled'");
+        if (enabledResult.rows[0]?.value !== 'true') return json(res, 409, { error: 'Enable vehicle analytics in Owner Command first' });
+        const body = await readJsonLimited(req, 64 * 1024);
+        const cameraId = safeText(body.cameraId, 160);
+        const jurisdiction = safeText(body.jurisdiction, 160);
+        const sessionId = safeText(body.sessionId, 80);
+        if (!cameraId) return json(res, 400, { error: 'Camera ID is required' });
+        if (!Array.isArray(body.regions) || body.regions.length > 48) return json(res, 400, { error: 'Motion regions are invalid' });
+        const regions = body.regions.map((region) => ({
+          vehicleType: 'moving_object',
+          confidence: Math.min(1, Math.max(0, Number(region?.confidence) || 0)),
+          bbox: Array.isArray(region?.bbox) ? region.bbox.slice(0, 4).map(Number) : null,
+        })).filter((region) => region.bbox?.length === 4 && region.bbox.every(Number.isFinite));
+        const capturedAt = new Date().toISOString();
+        const motion = transientVehicleMotion.update({
+          ownerId: user.id,
+          sessionId,
+          cameraId,
+          capturedAt,
+          vehicles: regions,
+        });
+        await recordAggregateVehicleFlow({ cameraId, jurisdiction, capturedAt, vehicles: regions });
+        await record(req, 'ui_action', {
+          action: 'local_vehicle_motion_sample', cameraId, regions: regions.length,
+        }, user);
+        return json(res, 200, {
+          ok: true,
+          mechanism: 'local_frame_differencing',
+          rawImageReceived: false,
+          motion,
+        });
+      }
+
       if (url.pathname === '/api/account/admin/vehicle-analytics/motion/stop' && req.method === 'POST') {
         const user = await currentUser(req);
         if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
@@ -860,7 +916,6 @@ export function createAccountApi(options = {}) {
         const provider = safeText(body.provider, 120);
         const jurisdiction = safeText(body.jurisdiction, 160);
         const stateCode = safeText(body.stateCode, 2).toUpperCase();
-        const motionSessionId = safeText(body.motionSessionId, 80);
         const mimeType = safeText(body.mimeType, 40).toLowerCase();
         const imageBase64 = String(body.imageBase64 || '').replace(/\s/g, '');
         if (!cameraId) return json(res, 400, { error: 'Camera ID is required' });
@@ -902,27 +957,7 @@ export function createAccountApi(options = {}) {
             vehicle.yearStart, vehicle.yearEnd, vehicle.confidence, JSON.stringify(vehicle.bbox), analysis.model]);
           if (result.rows[0]) inserted.push({ ...vehicle, id: String(result.rows[0].id) });
         }
-        const bucketStart = vehicleFlowBucketStart(capturedAt);
-        for (const group of groupVehicleFlowDetections(analysis.vehicles)) {
-          await pool.query(`INSERT INTO gev_vehicle_flow_buckets
-            (bucket_start, camera_id, jurisdiction, vehicle_type, frame_samples,
-              detection_observations, confidence_total, updated_at)
-            VALUES ($1,$2,$3,$4,1,$5,$6,NOW())
-            ON CONFLICT (bucket_start, camera_id, vehicle_type) DO UPDATE SET
-              jurisdiction = EXCLUDED.jurisdiction,
-              frame_samples = gev_vehicle_flow_buckets.frame_samples + 1,
-              detection_observations = gev_vehicle_flow_buckets.detection_observations + EXCLUDED.detection_observations,
-              confidence_total = gev_vehicle_flow_buckets.confidence_total + EXCLUDED.confidence_total,
-              updated_at = NOW()`, [bucketStart, cameraId, jurisdiction, group.vehicleType,
-            group.detections, group.confidenceTotal]);
-        }
-        const motion = motionSessionId ? transientVehicleMotion.update({
-          ownerId: user.id,
-          sessionId: motionSessionId,
-          cameraId,
-          capturedAt,
-          vehicles: analysis.vehicles,
-        }) : null;
+        await recordAggregateVehicleFlow({ cameraId, jurisdiction, capturedAt, vehicles: analysis.vehicles });
         const archiveEnabledResult = await pool.query("SELECT value FROM gev_settings WHERE key = 'protected_frame_archive_enabled'");
         const archive = { enabled: archiveEnabledResult.rows[0]?.value === 'true', stored: false };
         if (archive.enabled) {
@@ -953,10 +988,7 @@ export function createAccountApi(options = {}) {
             }
           }
         }
-        await record(req, 'ui_action', {
-          action: 'vehicle_frame_analyzed', cameraId, detections: inserted.length,
-          anonymousMotion: Boolean(motionSessionId),
-        }, user);
+        await record(req, 'ui_action', { action: 'vehicle_frame_analyzed', cameraId, detections: inserted.length }, user);
         return json(res, 200, {
           ok: true,
           duplicate: false,
@@ -964,7 +996,6 @@ export function createAccountApi(options = {}) {
           model: analysis.model,
           rawImageStored: false,
           protectedArchive: archive,
-          motion,
         });
       }
 

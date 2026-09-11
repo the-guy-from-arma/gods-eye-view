@@ -198,7 +198,7 @@ test('What’s New acknowledgement is scoped to the authenticated account and cu
   const briefing = JSON.parse(getRes.body);
   assert.equal(briefing.enabled, true);
   assert.equal(briefing.acknowledged, false);
-  assert.equal(briefing.announcementId, 'thunderlink-whats-new-0.3.31');
+  assert.equal(briefing.announcementId, 'thunderlink-whats-new-0.3.32');
 
   const postReq = request('POST', '/api/account/whats-new/acknowledge', { announcementId: briefing.announcementId });
   postReq.headers.cookie = 'gev_session=member-session';
@@ -448,6 +448,35 @@ test('Railway owner login rejects an incorrect variable password before creating
   assert.equal(res.statusCode, 401);
   assert.equal(JSON.parse(res.body).error, 'Invalid email or password');
   assert.equal(calls.some(({ sql }) => /INSERT INTO gev_sessions/.test(sql)), false);
+});
+
+test('owner motion samples use local region mechanics without an AI key or raw image upload', async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM gev_sessions s JOIN gev_users/.test(sql)) return { rows: [{ id: 1, email: 'owner@example.com', email_verified_at: new Date() }] };
+      if (/key = 'vehicle_analytics_enabled'/.test(sql)) return { rows: [{ value: 'true' }] };
+      return { rows: [] };
+    },
+  };
+  const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
+  const req = request('POST', '/api/account/admin/vehicle-analytics/motion/sample', {
+    sessionId: 'motion-local-parser-session-001',
+    cameraId: 'public-camera-1',
+    jurisdiction: 'Albany, NY',
+    regions: [{ bbox: [.2, .25, .5, .55], confidence: .82 }],
+  });
+  req.headers.cookie = 'gev_session=owner-session';
+  const res = response();
+  await middleware(req, res, () => assert.fail('account path must not fall through'));
+  const payload = JSON.parse(res.body);
+  assert.equal(res.statusCode, 200);
+  assert.equal(payload.mechanism, 'local_frame_differencing');
+  assert.equal(payload.rawImageReceived, false);
+  assert.equal(payload.motion.activeTracklets.length, 1);
+  assert.equal(payload.motion.activeTracklets[0].vehicleType, 'moving_object');
+  assert.equal(JSON.stringify(calls).includes('GEMINI'), false);
 });
 
 test('non-account paths fall through', async () => {

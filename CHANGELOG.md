@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.32] — 2026-09-11 — Keyless local motion parsing
+
+- Replaced the anonymous motion session's Gemini dependency with deterministic
+  processing in the owner's browser: raster decode, grayscale conversion,
+  global-brightness compensation, pixel differencing, cell thresholding, and
+  connected-region extraction.
+- Camera pixels and raw images no longer enter the motion API. The server
+  receives only bounded anonymous region boxes and confidence values, then
+  applies the existing memory-only single-camera tracklet logic.
+- Motion sessions can now start with no `GEMINI_API_KEY`. The optional deep
+  make/model/year classification buttons remain separate and clearly labeled;
+  their absence cannot disable local motion parsing or aggregate flow.
+- Added parser regression tests for region detection, uniform-lighting
+  compensation, and exclusion of camera timestamp bands, plus an account API
+  test proving local motion works without an AI key or raw-image upload.
+- Advanced ThunderLink Oblivion to public build `0.3.32` and kernel
+  `TBSGE-KERNEL-030.033`; legal acceptance remains `0.3.02`.
+
 ## [0.3.31] — 2026-09-10 — Anonymous vehicle motion and aggregate flow
 
 - Added owner-only, memory-only vehicle motion tracklets for one selected camera

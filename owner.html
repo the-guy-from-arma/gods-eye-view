@@ -32,8 +32,8 @@
     <div class="command-rail-footer">
       <div class="rail-os-readout">
         <small>OS</small><strong>THUNDERLINK OBLIVION</strong>
-        <small>VERSION</small><strong>0.3.31</strong>
-        <small>KERNEL</small><strong>TBSGE-KERNEL-030.032</strong>
+        <small>VERSION</small><strong>0.3.32</strong>
+        <small>KERNEL</small><strong>TBSGE-KERNEL-030.033</strong>
       </div>
       <span><i></i>OWNER SESSION</span>
       <strong data-owner-email>VERIFYING…</strong>
@@ -48,7 +48,7 @@
       <span>POSTGRES · <b data-owner-db-state>CHECKING</b></span>
       <span>SNAPSHOT · <b data-owner-snapshot-age>WAITING</b></span>
       <span>LEGAL · <b data-owner-legal-version>0.3.02</b></span>
-      <span>TBSGE-KERNEL-030.032</span>
+      <span>TBSGE-KERNEL-030.033</span>
     </div>
     <header class="command-topbar">
       <div>
@@ -126,7 +126,7 @@
           <div>
             <span class="section-kicker">LOGIN EXPERIENCE</span>
             <h3>New features added &amp; Coming Soon</h3>
-            <p>Show the 0.3.10–0.3.31 release briefing once per account after login. Users can reopen it later from their Account panel.</p>
+            <p>Show the 0.3.10–0.3.32 release briefing once per account after login. Users can reopen it later from their Account panel.</p>
           </div>
           <div class="announcement-control-actions">
             <span data-whats-new-readout>CHECKING</span>
@@ -161,21 +161,21 @@
 
       <section id="vehicle-analytics" class="command-panel vehicle-analytics-panel">
         <header>
-          <div><span class="section-kicker">OWNER-ONLY · NON-IDENTIFYING</span><h2>Vehicle classification</h2></div>
+          <div><span class="section-kicker">OWNER-ONLY · LOCAL COMPUTER VISION</span><h2>Vehicle motion analytics</h2></div>
           <button type="button" class="toggle-control" data-vehicle-enabled aria-pressed="false"><span data-vehicle-enabled-label>OFF</span><i></i></button>
         </header>
-        <p class="panel-intro">Classifies visible vehicle type, color, likely make/model, and a broad possible year range. Camera frames are processed transiently and are not archived. License plates, faces, occupants, unique vehicle identifiers, and cross-camera movement histories are neither requested nor stored.</p>
+        <p class="panel-intro">The motion system parses camera frames locally using grayscale conversion, brightness compensation, pixel differencing, and connected-region mechanics. It requires no generative-AI service or API key. Frames are transient and are not archived; plates, faces, occupants, unique identifiers, and cross-camera histories are neither requested nor stored.</p>
         <div class="vehicle-status-grid">
-          <div><small>AI PROVIDER</small><strong data-vehicle-provider>CHECKING</strong></div>
-          <div><small>OBSERVATIONS</small><strong data-vehicle-total>0</strong></div>
+          <div><small>MOTION ENGINE</small><strong data-vehicle-provider>CHECKING</strong></div>
+          <div><small>OPTIONAL CLASSIFIED RECORDS</small><strong data-vehicle-total>0</strong></div>
           <div><small>CAMERAS SAMPLED</small><strong data-vehicle-cameras>0</strong></div>
           <div><small>METADATA RETENTION</small><strong data-vehicle-retention>90 DAYS</strong></div>
         </div>
         <div class="vehicle-controls">
           <label><span>STATE / CAMERA GROUP</span><select data-vehicle-state><option value="">ALL AVAILABLE STATES</option></select></label>
           <label><span>CAMERA</span><select data-vehicle-camera><option value="">SELECT CAMERA</option></select></label>
-          <button type="button" data-vehicle-analyze>ANALYZE SELECTED FRAME</button>
-          <button type="button" data-vehicle-sweep>SCAN NEXT 10 IN STATE</button>
+          <button type="button" data-vehicle-analyze>OPTIONAL DEEP CLASSIFY FRAME</button>
+          <button type="button" data-vehicle-sweep>OPTIONAL CLASSIFY NEXT 10</button>
         </div>
         <section class="anonymous-motion-panel" aria-labelledby="anonymous-motion-title">
           <header>

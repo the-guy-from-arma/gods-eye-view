@@ -60,10 +60,13 @@ test('owner access opens a dedicated full-page command center', () => {
   assert.match(ownerJs, /paintOperationalMetrics/);
   assert.match(ownerJs, /10_000/);
   assert.match(owner, /THUNDERLINK OBLIVION/);
-  assert.match(owner, /TBSGE-KERNEL-030\.032/);
+  assert.match(owner, /TBSGE-KERNEL-030\.033/);
   assert.match(owner, /id="vehicle-analytics"/);
-  assert.match(owner, /License plates, faces, occupants, unique vehicle identifiers/);
+  assert.match(owner, /plates, faces, occupants, unique identifiers/i);
   assert.match(ownerJs, /api\/account\/admin\/vehicle-analytics\/analyze/);
+  assert.match(owner, /LOCAL COMPUTER VISION/);
+  assert.match(ownerJs, /vehicleMotionParser/);
+  assert.match(ownerJs, /vehicle-analytics\/motion\/sample/);
   assert.match(owner, /data-protected-archive-enabled/);
   assert.match(ownerJs, /protected-archive\/settings/);
   assert.match(ownerJs, /api\/account\/admin\/autopilot/);
@@ -76,8 +79,8 @@ test('owner access opens a dedicated full-page command center', () => {
 test('public console exposes ThunderLink OS identity without removing map attribution', () => {
   assert.match(index, /id="thunderlink-system-identity"/);
   assert.match(index, /OS <strong>THUNDERLINK OBLIVION<\/strong>/);
-  assert.match(index, /VERSION <strong>0\.3\.31<\/strong>/);
-  assert.match(index, /KERNEL <strong>TBSGE-KERNEL-030\.032<\/strong>/);
+  assert.match(index, /VERSION <strong>0\.3\.32<\/strong>/);
+  assert.match(index, /KERNEL <strong>TBSGE-KERNEL-030\.033<\/strong>/);
   assert.match(index, /id="credits-footer-button"[^>]*>CREDITS &amp; OPEN SOURCES<\/button>/);
   assert.match(css, /#thunderlink-system-identity/);
   assert.match(css, /#cesium-credits/);
