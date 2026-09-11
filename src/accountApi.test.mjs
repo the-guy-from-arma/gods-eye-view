@@ -198,7 +198,7 @@ test('What’s New acknowledgement is scoped to the authenticated account and cu
   const briefing = JSON.parse(getRes.body);
   assert.equal(briefing.enabled, true);
   assert.equal(briefing.acknowledged, false);
-  assert.equal(briefing.announcementId, 'thunderlink-whats-new-0.3.30');
+  assert.equal(briefing.announcementId, 'thunderlink-whats-new-0.3.31');
 
   const postReq = request('POST', '/api/account/whats-new/acknowledge', { announcementId: briefing.announcementId });
   postReq.headers.cookie = 'gev_session=member-session';

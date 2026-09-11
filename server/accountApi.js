@@ -10,6 +10,11 @@ import { CURRENT_LEGAL_VERSION, legalAcceptanceIsCurrent } from '../src/legalPol
 import { RELEASE_ANNOUNCEMENT } from '../src/releaseAnnouncement.js';
 import { opaqueCameraTitle, redactFrameWithWorker } from './protectedFrameArchive.js';
 import { analyzeVehicleFrame } from './vehicleAnalytics.js';
+import {
+  createTransientVehicleMotionTracker,
+  groupVehicleFlowDetections,
+  vehicleFlowBucketStart,
+} from './transientVehicleMotion.js';
 
 const { Pool } = pg;
 const scrypt = promisify(crypto.scrypt);
@@ -173,6 +178,7 @@ export function createAccountApi(options = {}) {
   const authLimit = createLimiter(12, 15 * 60_000);
   const activityLimit = createLimiter(180, 60_000);
   const vehicleAnalysisLimit = createLimiter(30, 60_000);
+  const transientVehicleMotion = createTransientVehicleMotionTracker();
   let schemaPromise;
 
   const ensureSchema = () => {
@@ -294,6 +300,19 @@ export function createAccountApi(options = {}) {
         model_version TEXT NOT NULL,
         PRIMARY KEY (camera_id, frame_fingerprint)
       );
+      CREATE TABLE IF NOT EXISTS gev_vehicle_flow_buckets (
+        bucket_start TIMESTAMPTZ NOT NULL,
+        camera_id TEXT NOT NULL,
+        jurisdiction TEXT,
+        vehicle_type TEXT NOT NULL,
+        frame_samples INTEGER NOT NULL DEFAULT 0,
+        detection_observations INTEGER NOT NULL DEFAULT 0,
+        confidence_total REAL NOT NULL DEFAULT 0,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (bucket_start, camera_id, vehicle_type)
+      );
+      CREATE INDEX IF NOT EXISTS gev_vehicle_flow_camera_idx
+        ON gev_vehicle_flow_buckets(camera_id, bucket_start DESC);
       CREATE TABLE IF NOT EXISTS gev_protected_vehicle_frames (
         id BIGSERIAL PRIMARY KEY,
         camera_ref TEXT NOT NULL,
@@ -318,6 +337,7 @@ export function createAccountApi(options = {}) {
       );
       DELETE FROM gev_vehicle_observations WHERE captured_at < NOW() - INTERVAL '90 days';
       DELETE FROM gev_vehicle_frame_scans WHERE captured_at < NOW() - INTERVAL '90 days';
+      DELETE FROM gev_vehicle_flow_buckets WHERE bucket_start < NOW() - INTERVAL '30 days';
       DELETE FROM gev_protected_vehicle_frames WHERE created_at < NOW() - INTERVAL '7 days';
     `).catch((error) => {
       schemaPromise = null;
@@ -704,7 +724,7 @@ export function createAccountApi(options = {}) {
           where.push(`camera_id = $${values.length}`);
         }
         values.push(Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 150)));
-        const [enabledResult, observations, totals, archiveEnabledResult, archives] = await Promise.all([
+        const [enabledResult, observations, totals, archiveEnabledResult, archives, flowBuckets, flowTotals] = await Promise.all([
           pool.query("SELECT value FROM gev_settings WHERE key = 'vehicle_analytics_enabled'"),
           pool.query(`
             SELECT id, camera_id AS "cameraId", camera_name AS "cameraName", provider, jurisdiction,
@@ -722,6 +742,21 @@ export function createAccountApi(options = {}) {
             captured_at AS "capturedAt", redacted_regions AS "redactedRegions",
             redaction_model AS "redactionModel"
             FROM gev_protected_vehicle_frames ORDER BY captured_at DESC LIMIT 50`),
+          pool.query(`SELECT bucket_start AS "bucketStart", camera_id AS "cameraId",
+            MAX(jurisdiction) AS jurisdiction, vehicle_type AS "vehicleType",
+            SUM(frame_samples)::integer AS "frameSamples",
+            SUM(detection_observations)::integer AS detections,
+            CASE WHEN SUM(detection_observations) > 0
+              THEN SUM(confidence_total) / SUM(detection_observations) ELSE 0 END AS "averageConfidence"
+            FROM gev_vehicle_flow_buckets
+            WHERE bucket_start >= NOW() - INTERVAL '24 hours'
+            GROUP BY bucket_start, camera_id, vehicle_type
+            ORDER BY bucket_start DESC LIMIT 1200`),
+          pool.query(`SELECT COUNT(DISTINCT camera_id)::integer AS cameras,
+            COALESCE(SUM(detection_observations), 0)::integer AS detections,
+            MAX(bucket_start) AS "lastBucketAt"
+            FROM gev_vehicle_flow_buckets
+            WHERE bucket_start >= NOW() - INTERVAL '24 hours'`),
         ]);
         return json(res, 200, {
           configured: Boolean(env.GEMINI_API_KEY),
@@ -731,6 +766,21 @@ export function createAccountApi(options = {}) {
           rawImagesStored: false,
           observations: observations.rows.map((row) => ({ ...row, id: String(row.id), confidence: Number(row.confidence) })),
           totals: { ...totals.rows[0], total: Number(totals.rows[0]?.total || 0), cameras: Number(totals.rows[0]?.cameras || 0) },
+          aggregateFlow: {
+            windowHours: 24,
+            retentionDays: 30,
+            bucketMinutes: 15,
+            identityLinks: false,
+            cameras: Number(flowTotals.rows[0]?.cameras || 0),
+            detections: Number(flowTotals.rows[0]?.detections || 0),
+            lastBucketAt: flowTotals.rows[0]?.lastBucketAt || null,
+            buckets: flowBuckets.rows.map((row) => ({
+              ...row,
+              frameSamples: Number(row.frameSamples || 0),
+              detections: Number(row.detections || 0),
+              averageConfidence: Number(row.averageConfidence || 0),
+            })),
+          },
           protectedArchive: {
             configured: protectedArchiveConfigured,
             enabled: archiveEnabledResult.rows[0]?.value === 'true',
@@ -785,6 +835,19 @@ export function createAccountApi(options = {}) {
         return json(res, 200, { ok: true, enabled: body.enabled });
       }
 
+      if (url.pathname === '/api/account/admin/vehicle-analytics/motion/stop' && req.method === 'POST') {
+        const user = await currentUser(req);
+        if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
+        const body = await readJson(req);
+        const stopped = transientVehicleMotion.stop({
+          ownerId: user.id,
+          sessionId: safeText(body.sessionId, 80),
+          cameraId: safeText(body.cameraId, 160),
+        });
+        await record(req, 'ui_action', { action: 'anonymous_vehicle_motion_stopped', stopped }, user);
+        return json(res, 200, { ok: true, stopped });
+      }
+
       if (url.pathname === '/api/account/admin/vehicle-analytics/analyze' && req.method === 'POST') {
         const user = await currentUser(req);
         if (user?.role !== 'owner') return json(res, 403, { error: 'Owner access required' });
@@ -797,6 +860,7 @@ export function createAccountApi(options = {}) {
         const provider = safeText(body.provider, 120);
         const jurisdiction = safeText(body.jurisdiction, 160);
         const stateCode = safeText(body.stateCode, 2).toUpperCase();
+        const motionSessionId = safeText(body.motionSessionId, 80);
         const mimeType = safeText(body.mimeType, 40).toLowerCase();
         const imageBase64 = String(body.imageBase64 || '').replace(/\s/g, '');
         if (!cameraId) return json(res, 400, { error: 'Camera ID is required' });
@@ -838,6 +902,27 @@ export function createAccountApi(options = {}) {
             vehicle.yearStart, vehicle.yearEnd, vehicle.confidence, JSON.stringify(vehicle.bbox), analysis.model]);
           if (result.rows[0]) inserted.push({ ...vehicle, id: String(result.rows[0].id) });
         }
+        const bucketStart = vehicleFlowBucketStart(capturedAt);
+        for (const group of groupVehicleFlowDetections(analysis.vehicles)) {
+          await pool.query(`INSERT INTO gev_vehicle_flow_buckets
+            (bucket_start, camera_id, jurisdiction, vehicle_type, frame_samples,
+              detection_observations, confidence_total, updated_at)
+            VALUES ($1,$2,$3,$4,1,$5,$6,NOW())
+            ON CONFLICT (bucket_start, camera_id, vehicle_type) DO UPDATE SET
+              jurisdiction = EXCLUDED.jurisdiction,
+              frame_samples = gev_vehicle_flow_buckets.frame_samples + 1,
+              detection_observations = gev_vehicle_flow_buckets.detection_observations + EXCLUDED.detection_observations,
+              confidence_total = gev_vehicle_flow_buckets.confidence_total + EXCLUDED.confidence_total,
+              updated_at = NOW()`, [bucketStart, cameraId, jurisdiction, group.vehicleType,
+            group.detections, group.confidenceTotal]);
+        }
+        const motion = motionSessionId ? transientVehicleMotion.update({
+          ownerId: user.id,
+          sessionId: motionSessionId,
+          cameraId,
+          capturedAt,
+          vehicles: analysis.vehicles,
+        }) : null;
         const archiveEnabledResult = await pool.query("SELECT value FROM gev_settings WHERE key = 'protected_frame_archive_enabled'");
         const archive = { enabled: archiveEnabledResult.rows[0]?.value === 'true', stored: false };
         if (archive.enabled) {
@@ -868,8 +953,19 @@ export function createAccountApi(options = {}) {
             }
           }
         }
-        await record(req, 'ui_action', { action: 'vehicle_frame_analyzed', cameraId, detections: inserted.length }, user);
-        return json(res, 200, { ok: true, duplicate: false, vehicles: inserted, model: analysis.model, rawImageStored: false, protectedArchive: archive });
+        await record(req, 'ui_action', {
+          action: 'vehicle_frame_analyzed', cameraId, detections: inserted.length,
+          anonymousMotion: Boolean(motionSessionId),
+        }, user);
+        return json(res, 200, {
+          ok: true,
+          duplicate: false,
+          vehicles: inserted,
+          model: analysis.model,
+          rawImageStored: false,
+          protectedArchive: archive,
+          motion,
+        });
       }
 
       if (url.pathname === '/api/account/admin/layers' && req.method === 'POST') {

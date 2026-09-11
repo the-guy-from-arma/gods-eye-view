@@ -32,8 +32,8 @@
     <div class="command-rail-footer">
       <div class="rail-os-readout">
         <small>OS</small><strong>THUNDERLINK OBLIVION</strong>
-        <small>VERSION</small><strong>0.3.30</strong>
-        <small>KERNEL</small><strong>TBSGE-KERNEL-030.031</strong>
+        <small>VERSION</small><strong>0.3.31</strong>
+        <small>KERNEL</small><strong>TBSGE-KERNEL-030.032</strong>
       </div>
       <span><i></i>OWNER SESSION</span>
       <strong data-owner-email>VERIFYING…</strong>
@@ -48,7 +48,7 @@
       <span>POSTGRES · <b data-owner-db-state>CHECKING</b></span>
       <span>SNAPSHOT · <b data-owner-snapshot-age>WAITING</b></span>
       <span>LEGAL · <b data-owner-legal-version>0.3.02</b></span>
-      <span>TBSGE-KERNEL-030.031</span>
+      <span>TBSGE-KERNEL-030.032</span>
     </div>
     <header class="command-topbar">
       <div>
@@ -126,7 +126,7 @@
           <div>
             <span class="section-kicker">LOGIN EXPERIENCE</span>
             <h3>New features added &amp; Coming Soon</h3>
-            <p>Show the 0.3.10–0.3.30 release briefing once per account after login. Users can reopen it later from their Account panel.</p>
+            <p>Show the 0.3.10–0.3.31 release briefing once per account after login. Users can reopen it later from their Account panel.</p>
           </div>
           <div class="announcement-control-actions">
             <span data-whats-new-readout>CHECKING</span>
@@ -177,6 +177,34 @@
           <button type="button" data-vehicle-analyze>ANALYZE SELECTED FRAME</button>
           <button type="button" data-vehicle-sweep>SCAN NEXT 10 IN STATE</button>
         </div>
+        <section class="anonymous-motion-panel" aria-labelledby="anonymous-motion-title">
+          <header>
+            <div><span class="section-kicker">TRANSIENT · SINGLE CAMERA</span><h3 id="anonymous-motion-title">Anonymous motion tracklets</h3></div>
+            <span class="motion-scope-badge">MEMORY ONLY · 10 MIN TTL</span>
+          </header>
+          <p>Follows anonymous bounding boxes only while one selected camera is being sampled. Random tracklet IDs expire from server memory, never transfer between cameras, and are not written to PostgreSQL. This is motion telemetry—not vehicle identification.</p>
+          <div class="motion-controls">
+            <label><span>SAMPLE INTERVAL</span><select data-motion-interval><option value="15">15 SECONDS</option><option value="30">30 SECONDS</option><option value="60">60 SECONDS</option></select></label>
+            <button type="button" data-motion-toggle>START MOTION SESSION</button>
+            <span>SESSION <strong data-motion-session>INACTIVE</strong></span>
+            <span>FRAMES <strong data-motion-frames>0</strong></span>
+            <span>ACTIVE <strong data-motion-active>0</strong></span>
+          </div>
+          <div class="motion-tracklet-list" data-motion-tracklets><p class="empty-state">Select one camera and start a bounded motion session.</p></div>
+        </section>
+        <section class="aggregate-flow-panel" aria-labelledby="aggregate-flow-title">
+          <header>
+            <div><span class="section-kicker">NETWORK VOLUME · NO IDENTITY LINKS</span><h3 id="aggregate-flow-title">Aggregate traffic-flow picture</h3></div>
+            <span class="panel-readout" data-flow-window>24 HOURS</span>
+          </header>
+          <p>Compares anonymous detection volume by camera and vehicle class in 15-minute buckets. It can show where activity is rising or falling, but it never claims that observations at different cameras belong to the same vehicle.</p>
+          <div class="aggregate-flow-readouts">
+            <span>CAMERAS <strong data-flow-cameras>0</strong></span>
+            <span>DETECTIONS <strong data-flow-detections>0</strong></span>
+            <span>LAST BUCKET <strong data-flow-updated>NO DATA</strong></span>
+          </div>
+          <div class="aggregate-flow-list" data-flow-list><p class="empty-state">Aggregate flow builds as owner-requested frames are analyzed.</p></div>
+        </section>
         <div class="security-note"><span class="material-symbols-outlined">privacy_tip</span><p>Results are probabilistic observations, not identity records. Verify against the original public camera view before relying on a make, model, or year estimate.</p></div>
         <section class="protected-archive-panel" aria-labelledby="protected-archive-title">
           <header>

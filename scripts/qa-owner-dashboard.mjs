@@ -35,6 +35,39 @@ try {
       });
       return;
     }
+    if (path === '/api/cctv/sources') {
+      request.respond({
+        contentType: 'application/json',
+        body: JSON.stringify({ sources: [{
+          id: 'qa-camera-1', name: 'I-90 QA CAMERA', provider: 'QA 511', stateCode: 'NY', city: 'Albany',
+          frameUrl: '/api/cctv/frame/qa-camera-1',
+        }] }),
+      });
+      return;
+    }
+    if (path === '/api/account/admin/vehicle-analytics') {
+      request.respond({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          configured: true,
+          enabled: true,
+          model: 'qa-vehicle-model',
+          retentionDays: 90,
+          totals: { total: 126, cameras: 18 },
+          observations: [],
+          aggregateFlow: {
+            windowHours: 24, retentionDays: 30, bucketMinutes: 15, identityLinks: false,
+            cameras: 2, detections: 47, lastBucketAt: new Date().toISOString(),
+            buckets: [
+              { bucketStart: new Date().toISOString(), cameraId: 'qa-camera-1', jurisdiction: 'Albany, NY', vehicleType: 'sedan', detections: 31 },
+              { bucketStart: new Date().toISOString(), cameraId: 'qa-camera-1', jurisdiction: 'Albany, NY', vehicleType: 'pickup', detections: 16 },
+            ],
+          },
+          protectedArchive: { configured: false, enabled: false, retentionDays: 7, frames: [] },
+        }),
+      });
+      return;
+    }
     if (path === '/api/account/activity') {
       request.respond({ contentType: 'application/json', body: JSON.stringify({ events: [] }) });
       return;

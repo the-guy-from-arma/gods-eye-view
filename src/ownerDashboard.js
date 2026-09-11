@@ -23,6 +23,9 @@ const vehicleSearch = document.querySelector('[data-vehicle-search]');
 let dashboard = { accounts: [], layers: [], autopilot: false, siteMode: { mode: 'online' }, whatsNew: { enabled: false }, telemetry: {} };
 let vehicleAnalytics = { configured: false, enabled: false, observations: [], totals: {}, sources: [] };
 let vehicleSearchTimer;
+let motionSession = null;
+let motionTimer = null;
+let motionSampleActive = false;
 let pendingMode = null;
 let toastTimer;
 
@@ -248,6 +251,75 @@ function renderProtectedFrames() {
     : 'Protected Archive is staged and inactive.'));
 }
 
+function renderAggregateFlow() {
+  const flow = vehicleAnalytics.aggregateFlow || {};
+  document.querySelector('[data-flow-window]').textContent = `${flow.windowHours || 24} HOURS`;
+  document.querySelector('[data-flow-cameras]').textContent = String(flow.cameras || 0);
+  document.querySelector('[data-flow-detections]').textContent = String(flow.detections || 0);
+  document.querySelector('[data-flow-updated]').textContent = flow.lastBucketAt ? relativeAge(flow.lastBucketAt) : 'NO DATA';
+  const byCamera = new Map();
+  for (const bucket of flow.buckets || []) {
+    const summary = byCamera.get(bucket.cameraId) || {
+      cameraId: bucket.cameraId, jurisdiction: bucket.jurisdiction, detections: 0, types: new Map(), lastBucketAt: null,
+    };
+    summary.detections += Number(bucket.detections || 0);
+    summary.types.set(bucket.vehicleType, (summary.types.get(bucket.vehicleType) || 0) + Number(bucket.detections || 0));
+    if (!summary.lastBucketAt || new Date(bucket.bucketStart) > new Date(summary.lastBucketAt)) summary.lastBucketAt = bucket.bucketStart;
+    byCamera.set(bucket.cameraId, summary);
+  }
+  const summaries = [...byCamera.values()].sort((left, right) => right.detections - left.detections).slice(0, 20);
+  const maximum = Math.max(1, ...summaries.map((summary) => summary.detections));
+  const host = document.querySelector('[data-flow-list]');
+  const rows = summaries.map((summary) => {
+    const source = vehicleAnalytics.sources.find((item) => item.id === summary.cameraId);
+    const row = node('article', 'aggregate-flow-row');
+    const identity = node('div');
+    identity.append(node('strong', '', source?.name || summary.cameraId), node('small', '', summary.jurisdiction || source?.stateCode || 'JURISDICTION UNKNOWN'));
+    const meter = node('div');
+    const types = [...summary.types.entries()].sort((left, right) => right[1] - left[1]).slice(0, 3).map(([type, count]) => `${type.toUpperCase()} ${count}`).join(' · ');
+    meter.append(node('small', '', types || 'NO CLASS BREAKDOWN'));
+    const bar = node('span', 'flow-meter');
+    const fill = node('i');
+    fill.style.setProperty('--flow', `${Math.max(3, Math.round(summary.detections / maximum * 100))}%`);
+    bar.append(fill);
+    meter.append(bar);
+    row.append(identity, meter, node('strong', 'aggregate-flow-count', `${summary.detections} OBS.`));
+    return row;
+  });
+  host.replaceChildren(...rows);
+  if (!rows.length) host.append(node('p', 'empty-state', 'Aggregate flow builds as owner-requested frames are analyzed.'));
+}
+
+function paintMotionTracklets(motion) {
+  const tracklets = motion?.activeTracklets || [];
+  document.querySelector('[data-motion-session]').textContent = motionSession ? 'ACTIVE' : 'INACTIVE';
+  document.querySelector('[data-motion-frames]').textContent = String(motion?.frames || motionSession?.frames || 0);
+  document.querySelector('[data-motion-active]').textContent = String(tracklets.length);
+  const host = document.querySelector('[data-motion-tracklets]');
+  const rows = tracklets.map((tracklet) => {
+    const row = node('article', 'motion-tracklet-row');
+    row.append(
+      node('strong', '', String(tracklet.trackId).toUpperCase()),
+      node('span', '', `${String(tracklet.vehicleType).replaceAll('_', ' ').toUpperCase()} · ${String(tracklet.direction).toUpperCase()}`),
+      node('small', '', `${tracklet.samples} SAMPLES · ${tracklet.ageSeconds}S`),
+      node('strong', 'vehicle-confidence', `${Math.round(Number(tracklet.confidence || 0) * 100)}%`),
+    );
+    return row;
+  });
+  host.replaceChildren(...rows);
+  if (!rows.length) host.append(node('p', 'empty-state', motionSession ? 'No moving vehicle tracklets in the latest sample.' : 'Select one camera and start a bounded motion session.'));
+}
+
+function syncMotionControl() {
+  const button = document.querySelector('[data-motion-toggle]');
+  button.dataset.running = String(Boolean(motionSession));
+  button.textContent = motionSession ? 'STOP MOTION SESSION' : 'START MOTION SESSION';
+  button.disabled = motionSampleActive || (!motionSession && (!vehicleAnalytics.enabled || !vehicleAnalytics.configured || !vehicleCamera.value));
+  vehicleCamera.disabled = Boolean(motionSession);
+  vehicleState.disabled = Boolean(motionSession);
+  document.querySelector('[data-motion-interval]').disabled = Boolean(motionSession);
+}
+
 function paintVehicleAnalytics(payload) {
   vehicleAnalytics = { ...vehicleAnalytics, ...payload };
   const toggle = document.querySelector('[data-vehicle-enabled]');
@@ -268,6 +340,8 @@ function paintVehicleAnalytics(payload) {
   document.querySelector('[data-protected-archive-count]').textContent = String(archive.frames?.length || 0);
   renderVehicleObservations();
   renderProtectedFrames();
+  renderAggregateFlow();
+  syncMotionControl();
 }
 
 async function loadVehicleAnalytics() {
@@ -301,7 +375,7 @@ async function blobBase64(blob) {
   return btoa(binary);
 }
 
-async function analyzeVehicleCamera(source) {
+async function analyzeVehicleCamera(source, options = {}) {
   if (!source) throw new Error('Select a camera first');
   const frame = await fetch(`${source.frameUrl || `/api/cctv/frame/${encodeURIComponent(source.id)}`}?vehicleAnalysis=1`, { cache: 'no-store' });
   const mimeType = String(frame.headers.get('content-type') || '').split(';')[0].toLowerCase();
@@ -317,10 +391,49 @@ async function analyzeVehicleCamera(source) {
       provider: source.provider,
       jurisdiction: [source.city, source.stateCode].filter(Boolean).join(', '),
       stateCode: source.stateCode,
+      motionSessionId: options.motionSessionId || undefined,
       mimeType,
       imageBase64: await blobBase64(blob),
     }),
   });
+}
+
+async function stopMotionSession({ silent = false } = {}) {
+  clearTimeout(motionTimer);
+  motionTimer = null;
+  const ending = motionSession;
+  motionSession = null;
+  syncMotionControl();
+  paintMotionTracklets(null);
+  if (!ending) return;
+  await api('/api/account/admin/vehicle-analytics/motion/stop', {
+    method: 'POST', body: JSON.stringify({ sessionId: ending.id, cameraId: ending.cameraId }),
+  }).catch(() => {});
+  if (!silent) showStatus('ANONYMOUS MOTION SESSION ENDED · MEMORY RELEASED');
+}
+
+async function runMotionSample() {
+  if (!motionSession || motionSampleActive) return;
+  const source = vehicleAnalytics.sources.find((item) => item.id === motionSession.cameraId);
+  if (!source) return stopMotionSession();
+  motionSampleActive = true;
+  syncMotionControl();
+  try {
+    const result = await analyzeVehicleCamera(source, { motionSessionId: motionSession.id });
+    if (result.motion) {
+      motionSession.frames = result.motion.frames;
+      paintMotionTracklets(result.motion);
+    }
+    showStatus(result.duplicate
+      ? 'MOTION SAMPLE UNCHANGED · WAITING FOR A NEW FRAME'
+      : `${result.motion?.activeTracklets?.length || 0} ANONYMOUS TRACKLETS · SINGLE CAMERA`);
+  } catch (error) {
+    showStatus(`MOTION SAMPLE FAILED · ${error.message}`, true);
+  } finally {
+    motionSampleActive = false;
+    syncMotionControl();
+    if (motionSession) motionTimer = setTimeout(runMotionSample, motionSession.intervalMs);
+  }
 }
 
 function paintAutopilot(enabled) {
@@ -509,7 +622,26 @@ document.querySelector('[data-protected-archive-enabled]').addEventListener('cli
   } catch (error) { showStatus(error.message, true); } finally { control.disabled = false; }
 });
 
-vehicleState.addEventListener('change', refreshVehicleCameraOptions);
+vehicleState.addEventListener('change', () => {
+  refreshVehicleCameraOptions();
+  syncMotionControl();
+});
+vehicleCamera.addEventListener('change', syncMotionControl);
+document.querySelector('[data-motion-toggle]').addEventListener('click', async () => {
+  if (motionSession) return stopMotionSession();
+  const source = vehicleAnalytics.sources.find((item) => item.id === vehicleCamera.value);
+  if (!source) return showStatus('SELECT ONE CAMERA TO START A MOTION SESSION', true);
+  motionSession = {
+    id: `motion-${crypto.randomUUID()}`,
+    cameraId: source.id,
+    intervalMs: Number(document.querySelector('[data-motion-interval]').value || 15) * 1000,
+    frames: 0,
+  };
+  paintMotionTracklets({ frames: 0, activeTracklets: [] });
+  syncMotionControl();
+  showStatus(`ANONYMOUS MOTION ACTIVE · ${source.name} · MEMORY ONLY`);
+  await runMotionSample();
+});
 document.querySelector('[data-vehicle-analyze]').addEventListener('click', async (event) => {
   const button = event.currentTarget;
   const source = vehicleAnalytics.sources.find((item) => item.id === vehicleCamera.value);
@@ -547,6 +679,11 @@ document.querySelector('[data-vehicle-refresh]').addEventListener('click', () =>
 vehicleSearch.addEventListener('input', () => {
   clearTimeout(vehicleSearchTimer);
   vehicleSearchTimer = setTimeout(() => loadVehicleAnalytics().catch((error) => showStatus(error.message, true)), 280);
+});
+
+window.addEventListener('pagehide', () => {
+  clearTimeout(motionTimer);
+  motionSession = null;
 });
 
 accountSearch.addEventListener('input', renderAccounts);

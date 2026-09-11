@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.31] — 2026-09-10 — Anonymous vehicle motion and aggregate flow
+
+- Added owner-only, memory-only vehicle motion tracklets for one selected camera
+  at a time. Tracklet identifiers are random, expire after ten minutes of
+  inactivity, and cannot transfer between cameras.
+- Added configurable 15/30/60-second sampling sessions with live direction,
+  sample count, session age, and confidence readouts in Owner Command.
+- Added PostgreSQL-backed 15-minute aggregate traffic-flow buckets containing
+  only camera-level vehicle-class detection volume and confidence totals. No
+  plate text, visual embedding, raw frame, or cross-camera identity link is
+  created.
+- Added a 24-hour owner flow display ranking sampled camera activity and vehicle
+  class mix, with explicit labeling that the data is observational volume rather
+  than unique-vehicle counts.
+- Added regression coverage proving that tracklets remain camera-scoped and
+  lose continuity after their in-memory session expires.
+- Advanced ThunderLink Oblivion to public build `0.3.31` and kernel
+  `TBSGE-KERNEL-030.032`; legal acceptance remains `0.3.02`.
+
 ## [0.3.30] — 2026-09-10 — Maryland and Delaware 511 cameras
 
 - Added Maryland CHART's official live-camera JSON catalog with strict state
