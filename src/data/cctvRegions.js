@@ -1,4 +1,5 @@
 export const CCTV_REGION_NAMES = Object.freeze({
+  MT: 'Montana', WY: 'Wyoming', ND: 'North Dakota', ID: 'Idaho',
   TX: 'Texas', 'CA-BC': 'British Columbia', 'CA-ON': 'Ontario', 'CA-NL': 'Newfoundland and Labrador',
   'CA-AB': 'Alberta', 'CA-MB': 'Manitoba', 'CA-NB': 'New Brunswick', 'CA-YT': 'Yukon',
   'AU-NSW': 'New South Wales', 'AU-QLD': 'Queensland',

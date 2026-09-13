@@ -1,5 +1,17 @@
 # Data Sources & Attribution
 
+## Montana, Wyoming, North Dakota and Idaho current road-condition cameras (0.3.34)
+
+The four additional live-view catalogs come from the official state traveler
+maps and NDDOT's published web-map service. See [northern 511 coverage](docs/northern-511-coverage.md)
+for endpoints, live checks, refresh policy and limitations. Images remain under
+their providers' terms; the application's MIT license does not license them.
+NDDOT data is provided **as-is, without liability to NDDOT**, as required by its
+[web-map services instructions](https://www.dot.nd.gov/construction-and-planning/planning-process/gis-and-mapping/web-map-services).
+Credits for MDT, WYDOT/State of Wyoming, NDDOT and ITD are included in the in-app
+data attribution panel. This addition is current road-condition viewing only,
+without image archives, identifier extraction or vehicle tracking.
+
 ## Texas, Canadian and Australian live road-condition cameras (0.3.33)
 
 See [live traffic coverage and access requirements](docs/live-traffic-coverage.md)

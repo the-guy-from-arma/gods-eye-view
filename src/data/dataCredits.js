@@ -27,6 +27,15 @@ import * as Cesium from 'cesium';
  */
 export const DATA_CREDITS = [
   {
+    key: 'northern-511-live-traffic',
+    html: 'Current public road-condition images: ' +
+      '<a href="https://www.511mt.net/" target="_blank" rel="noopener">Montana Department of Transportation</a> · ' +
+      '<a href="https://www.wyoroad.info/pls/Browse/WRR.Cameras" target="_blank" rel="noopener">WYDOT / State of Wyoming</a> · ' +
+      '<a href="https://www.dot.nd.gov/construction-and-planning/planning-process/gis-and-mapping/web-map-services" target="_blank" rel="noopener">NDDOT</a> · ' +
+      '<a href="https://511.idaho.gov/cctv" target="_blank" rel="noopener">Idaho Transportation Department / Idaho 511</a>. ' +
+      'NDDOT data is provided as-is, without liability to NDDOT. Provider terms apply; views may be delayed or unavailable. Not a historical archive.',
+  },
+  {
     key: 'international-live-traffic',
     html: 'Public road-condition snapshots: ' +
       '<a href="https://www.txdot.gov/discover/live-traffic-cameras.html" target="_blank" rel="noopener">TxDOT ITS</a> · ' +

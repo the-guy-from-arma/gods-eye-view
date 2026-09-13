@@ -248,7 +248,7 @@ export function createBattleMetricsProvider(options = {}) {
       response = await fetchImpl(url, {
         headers: {
           Accept: 'application/json',
-          'User-Agent': 'ThunderLink-Gods-Eye/0.3.33',
+          'User-Agent': 'ThunderLink-Gods-Eye/0.3.34',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         signal: AbortSignal.timeout(15_000),

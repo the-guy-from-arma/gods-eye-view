@@ -4,12 +4,16 @@ import { createHash } from 'node:crypto';
 // No replay endpoints, recording jobs, identifiers or analytics are attached.
 const TX_BASE = 'https://its.txdot.gov/its/DistrictIts/';
 const MAX_CATALOG_BYTES = 16 * 1024 * 1024;
-const MAX_FRAME_BYTES = 2 * 1024 * 1024;
+const MAX_FRAME_BYTES = 6 * 1024 * 1024;
 const MAX_FRAME_CACHE_BYTES = 32 * 1024 * 1024;
 const districtsLastGood = new Map();
 
 export const LIVE_TRAFFIC_PROVIDERS = Object.freeze([
   { key: 'tx', state: 'Texas', country: 'US', provider: 'TxDOT ITS', bounds: [25.7, 36.6, -106.7, -93.4] },
+  { key: 'mt', state: 'Montana', country: 'US', provider: 'Montana MDT 511', bounds: [44.35, 49.01, -116.06, -104.03] },
+  { key: 'wy', state: 'Wyoming', country: 'US', provider: 'WYDOT 511', bounds: [40.99, 45.01, -111.06, -104.04] },
+  { key: 'nd', state: 'North Dakota', country: 'US', provider: 'NDDOT 511', bounds: [45.93, 49.01, -104.06, -96.55] },
+  { key: 'id', state: 'Idaho', country: 'US', provider: 'Idaho 511', bounds: [41.98, 49.01, -117.25, -111.04] },
   { key: 'ca-bc', state: 'British Columbia', country: 'CA', provider: 'DriveBC', bounds: [48, 60.1, -139.1, -114] },
   { key: 'ca-on', state: 'Ontario', country: 'CA', provider: 'Ontario 511', base: 'https://511on.ca', bounds: [41.6, 57, -95.3, -74.2] },
   { key: 'ca-nl', state: 'Newfoundland and Labrador', country: 'CA', provider: 'Newfoundland and Labrador Transportation and Infrastructure', bounds: [46.5, 60.5, -67.9, -52.5] },
@@ -72,7 +76,7 @@ function camera(config, { id, name, lat, lon, url, refreshMs = 60_000, license =
     || lat < south || lat > north || lon < west || lon > east) return null;
   return {
     id: `live-traffic-${config.key}-${id}`, name: clean(name) || `${config.provider} camera`,
-    city: config.state, cityId: config.key === 'tx' ? 'us-tx' : config.key,
+    city: config.state, cityId: config.country === 'US' ? `us-${config.key}` : config.key,
     provider: config.provider, lat, lon, headingDeg: 0, headingConfidence: 'low',
     pitchDeg: -18, fovDeg: 44, rangeM: 145, mountHeightM: 8, groundElevationM: 0,
     feedType: 'image', url, snapshotUrl: url, frameEncoding,
@@ -91,6 +95,139 @@ export function normalizeTexasCamera(row, districtCode) {
     id, name: `${row.name || row.icd_Id} · ${districtCode}`, lat: row.latitude, lon: row.longitude,
     url: `${TX_BASE}GetCctvSnapshotByIcdId?${query}`, frameEncoding: 'txdot-json',
   });
+}
+
+export function normalizeMontanaCamera(feature) {
+  const p = feature?.properties || {};
+  const [lon, lat] = feature?.geometry?.coordinates || [];
+  // MDT includes neighboring states in its map. Do not label those as Montana.
+  if (/^(WY|ID|ND|SD|WA|BC|AB)\s/i.test(p.route || '') || (lat < 45 && lon > -111.05)) return [];
+  return (Array.isArray(p.cameras) ? p.cameras : []).flatMap((view) => {
+    const url = liveTrafficUrl(view.image, undefined, ['mt.cdn.iteris-atis.com']);
+    if (!url || !/^\/(camera_images|rwis_images)\/[\w.-]+\.jpg$/i.test(new URL(url).pathname)) return [];
+    const value = camera(definition('mt'), { id: view.id, lat, lon, url,
+      name: [p.description, view.name || view.description].filter(Boolean).join(' · '), refreshMs: 300_000 });
+    return value ? [value] : [];
+  });
+}
+
+export function normalizeNorthDakotaCamera(feature) {
+  const p = feature?.properties || {};
+  const [lon, lat] = feature?.geometry?.coordinates || [];
+  return (Array.isArray(p.Cameras) ? p.Cameras : []).flatMap((view) => {
+    const url = liveTrafficUrl(view.FullPath, undefined, ['www.dot.nd.gov']);
+    if (!url || !/^\/travel-info\/cameras\/[\w.@&%-]+\.jpg$/i.test(new URL(url).pathname)) return [];
+    const id = createHash('sha256').update(new URL(url).pathname).digest('hex').slice(0, 24);
+    const value = camera(definition('nd'), { id, name: view.Description, lat, lon, url, refreshMs: 300_000,
+      license: 'NDDOT data provided as-is, without liability to NDDOT; current road-condition image only' });
+    return value ? [value] : [];
+  });
+}
+
+export function normalizeIdahoCamera(row) {
+  if (row?.visible === false || (row?.state && row.state !== 'Idaho')) return [];
+  const point = String(row?.latLng?.geography?.wellKnownText || '')
+    .match(/^POINT\s*\(\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\)$/i);
+  if (!point || row.id === undefined || row.id === null) return [];
+  return (Array.isArray(row.images) ? row.images : []).flatMap((view) => {
+    if (view.disabled || view.blocked || view.id === undefined || view.id === null) return [];
+    const url = liveTrafficUrl(view.imageUrl, 'https://511.idaho.gov', ['511.idaho.gov']);
+    if (!url || !/^\/map\/Cctv\/\d+$/i.test(new URL(url).pathname)) return [];
+    const value = camera(definition('id'), { id: `${row.id}-${view.id}`, name: view.description || row.location,
+      lat: point[2], lon: point[1], url, refreshMs: 60_000 });
+    return value ? [value] : [];
+  });
+}
+
+export async function loadIdahoCameras(options = {}) {
+  options = { ...options, signal: options.signal
+    ? AbortSignal.any([options.signal, AbortSignal.timeout(45_000)]) : AbortSignal.timeout(45_000) };
+  const cameras = new Map(); const seenRows = new Set();
+  for (let start = 0; start < 10_000; start += 100) {
+    // Public camera-page pagination, not the separate key-gated developer API.
+    const query = encodeURIComponent(JSON.stringify({
+      columns: [{ data: null, name: '' }, { name: 'sortOrder', s: true }, { name: 'roadway', s: true }, { data: 3, name: '' }],
+      order: [{ column: 1, dir: 'asc' }], start, length: 100, search: { value: '' },
+    }));
+    const payload = await json(`https://511.idaho.gov/List/GetData/Cameras?query=${query}&lang=en`, options);
+    if (!Array.isArray(payload?.data) || !Number.isInteger(payload.recordsTotal) || payload.recordsTotal < 0) {
+      throw new Error('Unexpected Idaho public camera catalog');
+    }
+    const before = seenRows.size;
+    for (const row of payload.data) {
+      if (row.id !== undefined && row.id !== null) seenRows.add(row.id);
+      for (const item of normalizeIdahoCamera(row)) cameras.set(item.id, item);
+    }
+    if (seenRows.size >= payload.recordsTotal) return [...cameras.values()];
+    if (seenRows.size === before || payload.data.length < 100) {
+      return { cameras: [...cameras.values()], warning: `Idaho partial catalog: ${seenRows.size}/${payload.recordsTotal} locations` };
+    }
+  }
+  return { cameras: [...cameras.values()], warning: 'Idaho catalog reached pagination safety limit' };
+}
+
+// Minimal, bounded reader for WYDOT's public webcameras_v1_pkg protobuf schema.
+// No generated provider code is executed, and unknown fields are skipped.
+function protobufFields(buffer) {
+  let offset = 0; const fields = [];
+  const ensure = (length) => {
+    if (!Number.isSafeInteger(length) || length < 0 || offset + length > buffer.length) throw new Error('Invalid Wyoming camera feed');
+  };
+  const varint = () => {
+    let result = 0;
+    for (let shift = 0; shift < 49; shift += 7) {
+      ensure(1); const byte = buffer[offset++]; result += (byte & 127) * 2 ** shift;
+      if (!(byte & 128)) return result;
+    }
+    throw new Error('Invalid Wyoming camera varint');
+  };
+  while (offset < buffer.length) {
+    const tag = varint(); const number = Math.floor(tag / 8); const type = tag % 8;
+    if (!number || fields.length >= 50_000) throw new Error('Invalid Wyoming camera fields');
+    let value;
+    if (type === 0) value = varint();
+    else if (type === 1) { ensure(8); value = buffer.readDoubleLE(offset); offset += 8; }
+    else if (type === 2) { const length = varint(); ensure(length); value = buffer.subarray(offset, offset + length); offset += length; }
+    else if (type === 5) { ensure(4); offset += 4; continue; }
+    else throw new Error('Unsupported Wyoming camera wire type');
+    fields.push({ number, value });
+  }
+  return fields;
+}
+
+function wyomingPublicText(value) {
+  if (!Buffer.isBuffer(value) || value.length > 8192) return '';
+  const text = value.toString('utf8');
+  if (!/^[A-Za-z0-9+/\r\n]+=*$/.test(text)) return '';
+  // Public string-format mask shipped in WYDOT's unauthenticated 511 map JS.
+  // This is not an API credential or authorization token.
+  const mask = Buffer.from('EkhJp6wsgahsqkiw5nahFOSCwAND1zhZ');
+  return Buffer.from(Buffer.from(text, 'base64').map((byte, i) => byte ^ mask[i % mask.length])).toString('utf8');
+}
+
+export function parseWyomingCameras(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length > MAX_CATALOG_BYTES) throw new Error('Invalid Wyoming camera feed size');
+  const cameras = new Map();
+  for (const site of protobufFields(buffer).filter((field) => field.number === 1)) {
+    if (!Buffer.isBuffer(site.value)) throw new Error('Invalid Wyoming camera site');
+    const fields = protobufFields(site.value);
+    const get = (number) => fields.find((field) => field.number === number)?.value;
+    const siteId = get(1);
+    if (!Number.isSafeInteger(siteId)) continue;
+    for (const view of fields.filter((field) => field.number === 3)) {
+      if (!Buffer.isBuffer(view.value)) throw new Error('Invalid Wyoming camera view');
+      const image = protobufFields(view.value);
+      const item = (number) => image.find((field) => field.number === number)?.value;
+      if (!Number.isSafeInteger(item(1))) continue;
+      const url = liveTrafficUrl(wyomingPublicText(item(3)), undefined, ['www.wyoroad.info']);
+      if (!url || new URL(url).pathname !== '/web-cam/cache' || !new URL(url).searchParams.has('ref')) continue;
+      const result = camera(definition('wy'), { id: `${siteId}-${item(1)}`, lat: get(9), lon: get(8), url,
+        name: wyomingPublicText(item(2)) || wyomingPublicText(get(2)), refreshMs: 300_000 });
+      if (result) cameras.set(result.id, result);
+    }
+  }
+  if (!cameras.size) throw new Error('Wyoming camera catalog is empty or its format changed');
+  return [...cameras.values()];
 }
 
 export function normalizeDriveBcCamera(row) {
@@ -172,6 +309,30 @@ export async function loadTexasCameras(options = {}) {
 
 export async function loadLiveTrafficProvider(config, env = process.env, options = {}) {
   if (config.key === 'tx') return loadTexasCameras(options);
+  if (config.key === 'id') return loadIdahoCameras(options);
+  if (config.key === 'wy') {
+    const response = await request('https://map.wyoroad.info/wti511map-data/Msg-FFBK373B.pbf', options);
+    return parseWyomingCameras(response.body);
+  }
+  if (config.key === 'nd') {
+    const payload = await json('https://travelfiles.dot.nd.gov/geojson_nc/cameras.json', options);
+    if (!Array.isArray(payload.features)) throw new Error('Unexpected North Dakota camera catalog');
+    const cameras = [...new Map(payload.features.flatMap(normalizeNorthDakotaCamera).map((item) => [item.id, item])).values()];
+    if (!cameras.length) throw new Error('North Dakota camera catalog is empty or its format changed');
+    return cameras;
+  }
+  if (config.key === 'mt') {
+    const catalogs = ['cameras', 'rwis'];
+    const results = await Promise.allSettled(catalogs.map(async (type) => {
+      const payload = await json(`https://mt.cdn.iteris-atis.com/geojson/icons/metadata/icons.${type}.geojson`, options);
+      if (!Array.isArray(payload.features)) throw new Error('Unexpected Montana camera catalog');
+      return payload.features.flatMap(normalizeMontanaCamera);
+    }));
+    const cameras = [...new Map(results.flatMap((result) => result.status === 'fulfilled' ? result.value : []).map((item) => [item.id, item])).values()];
+    if (!cameras.length) throw new Error('Montana camera catalogs unavailable or empty');
+    const missing = catalogs.filter((_, i) => results[i].status === 'rejected');
+    return { cameras, warning: missing.length ? `Montana partial catalog: ${missing.join(', ')} unavailable` : '' };
+  }
   if (config.base) {
     if (config.envKey && !String(env[config.envKey] || '').trim()) throw new Error(`Developer access required: ${config.envKey}`);
     const url = new URL('/api/v2/get/cameras', config.base);
@@ -232,6 +393,7 @@ export async function loadLiveTrafficProvider(config, env = process.env, options
 export async function fetchLiveTrafficFrame(source, options = {}) {
   if (source?.framePolicy !== 'live-only') return null;
   const hosts = ['its.txdot.gov', 'www.drivebc.ca', '511on.ca', '511.alberta.ca', 'www.manitoba511.ca',
+    'mt.cdn.iteris-atis.com', 'www.wyoroad.info', 'www.dot.nd.gov', '511.idaho.gov',
     '511.gnb.ca', '511yukon.ca', 'www.gov.nl.ca', 'webcams.transport.nsw.gov.au', 'cameras.qldtraffic.qld.gov.au'];
   const url = liveTrafficUrl(source.snapshotUrl, undefined, hosts);
   if (!url) return null;
@@ -245,9 +407,12 @@ export async function fetchLiveTrafficFrame(source, options = {}) {
       body = Buffer.from(payload.snippet, 'base64'); contentType = 'image/jpeg';
     }
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType) || !body.length || body.length > MAX_FRAME_BYTES) return null;
-    if (contentType === 'image/jpeg' && (body[0] !== 0xff || body[1] !== 0xd8)) return null;
-    if (contentType === 'image/png' && body.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') return null;
-    if (contentType === 'image/webp' && (body.toString('ascii', 0, 4) !== 'RIFF' || body.toString('ascii', 8, 12) !== 'WEBP')) return null;
+    // MDT sometimes serves PNG bytes as image/jpeg. Use the validated binary
+    // signature, not that incorrect header; HTML/SVG/error pages stay rejected.
+    if (body[0] === 0xff && body[1] === 0xd8) contentType = 'image/jpeg';
+    else if (body.subarray(0, 8).toString('hex') === '89504e470d0a1a0a') contentType = 'image/png';
+    else if (body.toString('ascii', 0, 4) === 'RIFF' && body.toString('ascii', 8, 12) === 'WEBP') contentType = 'image/webp';
+    else return null;
     return { ok: true, body, contentType };
   } catch { return null; }
 }

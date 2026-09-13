@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.34] — 2026-09-13 — Montana, Wyoming, North Dakota and Idaho 511
+
+- Added official current-image catalogs for Montana MDT traffic and RWIS,
+  Wyoming WYDOT, North Dakota NDDOT and Idaho 511, with individual regional
+  toggles and multi-direction camera views. These connectors need no API keys.
+- Added bounded parsing of Wyoming's public map binary feed, complete Idaho
+  public-list pagination, duplicate suppression, geography/URL validation and
+  explicit failure/partial-catalog reporting.
+- Corrected PNG images mislabeled as JPEG by providers and allowed current
+  images up to 6 MiB; the shared latest-image RAM cache remains capped at 32 MiB.
+- Kept the new cameras live-only and excluded from owner analytics/archive
+  paths; no recordings, plate OCR, persistent identities or cross-camera matching.
+- Added provider credits, coverage documentation, regression tests and release
+  briefing. Advanced build to `0.3.34`, kernel to `TBSGE-KERNEL-030.035`.
+
 ## [0.3.33] — 2026-09-12 — International live traffic-camera viewing
 
 - Added dynamic discovery of all 25 public TxDOT district catalogs and decoding

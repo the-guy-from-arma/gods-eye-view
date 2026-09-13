@@ -1139,7 +1139,7 @@ function buildRegional511Query(start, length, state = '') {
 
 async function createRegional511Session(base) {
   const response = await fetch(`${base}/cctv`, {
-    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.33' },
+    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.34' },
     signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`session HTTP ${response.status}`);
