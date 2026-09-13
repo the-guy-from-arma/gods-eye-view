@@ -1,5 +1,23 @@
 # Data Sources & Attribution
 
+## Texas, Canadian and Australian live road-condition cameras (0.3.33)
+
+See [live traffic coverage and access requirements](docs/live-traffic-coverage.md)
+for the precise connected regions, checks, provider URLs and remaining gaps.
+TxDOT ITS, Ontario 511, Newfoundland and Labrador Transportation and Infrastructure,
+and optional provincial 511 adapters retain their respective provider terms.
+DriveBC imagery/data is supplied by the Province of British Columbia under the
+[Open Government Licence – British Columbia](https://www2.gov.bc.ca/gov/content/data/open-data/open-government-licence-bc).
+Transport for NSW camera data carries Creative Commons Attribution; Queensland
+Transport and Main Roads publishes its API data under Creative Commons Attribution
+4.0 as described in its linked API specification. Source images are unmodified
+apart from display scaling and existing viewer overlays. No imagery is bundled
+in Git or connected to an archive by this expansion. These are provider-refreshed
+snapshots, not guaranteed continuous video. Credits remain in the in-app data
+attribution panel. Missing developer access or offline imagery is not represented
+as complete live coverage.
+
+
 ThunderLink God's Eye's **code** is [MIT](LICENSE)-licensed. **The MIT grant covers the source code only — it does NOT extend to third-party data or visual assets.** Every third-party source keeps its own license and terms. This file documents the live and bundled data sources; bundled 3D-model provenance is recorded in [`public/models/README.md`](public/models/README.md).
 
 How to read this:

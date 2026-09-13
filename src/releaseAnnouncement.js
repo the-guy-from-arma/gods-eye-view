@@ -1,6 +1,6 @@
 export const RELEASE_ANNOUNCEMENT = Object.freeze({
-  id: 'thunderlink-whats-new-0.3.32',
-  range: '0.3.10 — 0.3.32',
+  id: 'thunderlink-whats-new-0.3.33',
+  range: '0.3.10 — 0.3.33',
   title: 'God’s Eye evolved',
   intro: 'A field briefing on the systems, live-data layers, reliability work, and owner controls added since build 0.3.10.',
   releases: Object.freeze([
@@ -27,6 +27,7 @@ export const RELEASE_ANNOUNCEMENT = Object.freeze({
     { version: '0.3.30', title: 'Maryland and Delaware 511', summary: '875 current official CHART and DelDOT cameras with state controls, provider health, and direct HLS playback.' },
     { version: '0.3.31', title: 'Anonymous vehicle motion', summary: 'Memory-only single-camera motion tracklets and durable aggregate traffic-flow buckets without plate data or cross-camera identity links.' },
     { version: '0.3.32', title: 'Keyless local motion parsing', summary: 'Anonymous camera motion now uses local grayscale frame differencing and connected-region mechanics without a generative-AI request or API key.' },
+    { version: '0.3.33', title: 'International road-condition cameras', summary: 'TxDOT district catalogs plus Canadian and Australian public camera connectors, grouped regional filters, and provider-paced current images. Coverage varies by region; key-required provinces remain unavailable until configured.' },
   ]),
   comingSoon: Object.freeze([
     { title: 'Scene Director', summary: 'Cinematic scene controls remain staged while visual-state transitions are hardened.' },

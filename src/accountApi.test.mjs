@@ -198,7 +198,7 @@ test('What’s New acknowledgement is scoped to the authenticated account and cu
   const briefing = JSON.parse(getRes.body);
   assert.equal(briefing.enabled, true);
   assert.equal(briefing.acknowledged, false);
-  assert.equal(briefing.announcementId, 'thunderlink-whats-new-0.3.32');
+  assert.equal(briefing.announcementId, 'thunderlink-whats-new-0.3.33');
 
   const postReq = request('POST', '/api/account/whats-new/acknowledge', { announcementId: briefing.announcementId });
   postReq.headers.cookie = 'gev_session=member-session';
@@ -477,6 +477,26 @@ test('owner motion samples use local region mechanics without an AI key or raw i
   assert.equal(payload.motion.activeTracklets.length, 1);
   assert.equal(payload.motion.activeTracklets[0].vehicleType, 'moving_object');
   assert.equal(JSON.stringify(calls).includes('GEMINI'), false);
+});
+
+test('new live-view sources cannot be submitted to analytics or protected retention', async () => {
+  for (const suffix of ['motion/sample', 'analyze']) {
+    const calls = [];
+    const pool = { async query(sql) {
+      calls.push(sql);
+      if (/FROM gev_sessions s JOIN gev_users/.test(sql)) return { rows: [{ id: 1, email: 'owner@example.com', email_verified_at: new Date() }] };
+      if (/key = 'vehicle_analytics_enabled'/.test(sql)) return { rows: [{ value: 'true' }] };
+      return { rows: [] };
+    } };
+    const middleware = createAccountApi({ pool, env: { OWNER_EMAIL: 'owner@example.com' } });
+    const req = request('POST', `/api/account/admin/vehicle-analytics/${suffix}`, { cameraId: 'live-traffic-ca-on-1-1', regions: [] });
+    req.headers.cookie = 'gev_session=owner-session';
+    const res = response();
+    await middleware(req, res, () => assert.fail('must not fall through'));
+    assert.equal(res.statusCode, 403);
+    assert.match(JSON.parse(res.body).error, /live-view only/);
+    assert.equal(calls.some((sql) => /INSERT INTO gev_vehicle/.test(sql)), false);
+  }
 });
 
 test('non-account paths fall through', async () => {

@@ -1,4 +1,5 @@
 import { createCipheriv } from 'node:crypto';
+import { LIVE_TRAFFIC_PROVIDERS, loadLiveTrafficProvider } from './cctvLiveTrafficProviders.js';
 
 /**
  * Keyless public U.S. state 511/DOT camera catalogs.
@@ -54,6 +55,7 @@ const IBI_PROVIDERS = [
 ];
 
 const PROVIDER_LABELS = {
+  ...Object.fromEntries(LIVE_TRAFFIC_PROVIDERS.map(({ key, provider }) => [key, provider])),
   az: 'Arizona 511 · ADOT',
   fl: 'Florida 511 · FDOT',
   ga: 'Georgia 511 · GDOT',
@@ -1137,7 +1139,7 @@ function buildRegional511Query(start, length, state = '') {
 
 async function createRegional511Session(base) {
   const response = await fetch(`${base}/cctv`, {
-    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.32' },
+    headers: { Accept: 'text/html', 'User-Agent': 'ThunderLink-Gods-Eye/0.3.33' },
     signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`session HTTP ${response.status}`);
@@ -1249,6 +1251,9 @@ export async function loadState511Cameras(env = process.env) {
   if (String(env.CCTV_STATE_511_ENABLED || '1').trim() === '0') return [];
   const enabled = enabledProviderKeys(env);
   const loaders = [
+    ...LIVE_TRAFFIC_PROVIDERS.filter((provider) => enabled.has(provider.key)).map((provider) => ({
+      key: provider.key, state: provider.state, load: () => loadLiveTrafficProvider(provider, env),
+    })),
     ...IBI_PROVIDERS.filter((provider) => enabled.has(provider.key)).map((provider) => ({
       key: provider.key, state: provider.state, load: () => loadIbiProvider(provider),
     })),

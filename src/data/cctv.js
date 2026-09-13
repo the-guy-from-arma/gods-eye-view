@@ -47,6 +47,7 @@
  * plus CCTV-specific methods (selectCamera, cycleCamera, focusNearest, etc.).
  */
 import * as Cesium from 'cesium';
+import { normalizeCctvRegion } from './cctvRegions.js';
 import { registerSpriteCollection, restoreSpriteOrder } from './spriteOrder.js';
 import {
   CCTV_ACTIVATION_RESULT,
@@ -341,7 +342,7 @@ function loadDisabledStateCodes() {
   if (typeof localStorage === 'undefined') return new Set();
   try {
     const value = JSON.parse(localStorage.getItem(CCTV_STATE_FILTER_STORAGE_KEY) || '[]');
-    return new Set((Array.isArray(value) ? value : []).map((code) => String(code).toUpperCase()).filter((code) => /^[A-Z]{2}$/.test(code)));
+    return new Set((Array.isArray(value) ? value : []).map(normalizeCctvRegion).filter(Boolean));
   } catch { return new Set(); }
 }
 
@@ -4170,8 +4171,8 @@ function clearRuntimeState() {
 }
 
 function setStateFilter(code, enabled) {
-  const normalized = String(code || '').trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(normalized)) return false;
+  const normalized = normalizeCctvRegion(code);
+  if (!normalized) return false;
   if (enabled) _disabledStateCodes.delete(normalized);
   else _disabledStateCodes.add(normalized);
   saveDisabledStateCodes();

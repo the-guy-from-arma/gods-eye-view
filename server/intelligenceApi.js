@@ -89,7 +89,7 @@ async function fetchJson(url, options = {}) {
     method: options.method || 'GET',
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'ThunderLink-Oblivion/0.3.32 (+public-intelligence-console)',
+      'User-Agent': 'ThunderLink-Oblivion/0.3.33 (+public-intelligence-console)',
       ...(options.headers || {}),
     },
     body: options.body,

@@ -54,6 +54,7 @@ import { newsEventsApiPlugin } from './server/newsEventsApi.js';
 import { gamingDataApiPlugin } from './server/gamingDataApi.js';
 import { ttsForFreeApiPlugin } from './server/ttsForFreeApi.js';
 import { getState511ProviderStatus, loadState511Cameras } from './server/cctv511Providers.js';
+import { createLiveTrafficFrameCache } from './server/cctvLiveTrafficProviders.js';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { defineConfig, loadEnv } from 'vite';
@@ -4479,6 +4480,7 @@ function normalizeSourceItem(item) {
     license: String(item.license || item.licenseNote || ''),
     sourceKind: String(item.sourceKind || item.kind || 'configured'),
     framePolicy: String(item.framePolicy || ''),
+    frameEncoding: String(item.frameEncoding || ''),
     stateCode: String(item.stateCode || '').trim().toUpperCase(),
     minFrameRefreshMs: Math.max(0, Number(item.minFrameRefreshMs) || 0),
     // Optional CAL badge input (cctv-v2 design §3b/§9.2, additive-only per the
@@ -4835,6 +4837,7 @@ export async function fetchCctvImageFromUpstream(url, {
  * @returns {import('vite').Plugin}
  */
 function cctvProxy() {
+  const liveTrafficFrame = createLiveTrafficFrameCache();
   /** @type {Map<string,{id:string,status:string,sourceKind:string,label:string,message:string,updatedAt:number}>} */
   const health = new Map();
   /** Cap on health map entries to prevent unbounded growth. Matches the CCTV
@@ -4969,6 +4972,7 @@ function cctvProxy() {
   return {
     name: 'cctv-proxy',
     configureServer(server) {
+      server.httpServer?.once('close', () => liveTrafficFrame.close());
       server.middlewares.use('/api/cctv', async (req, res) => {
         try {
           const sources = await getCctvSources();
@@ -5141,6 +5145,22 @@ function cctvProxy() {
           const heading = Number(url.searchParams.get('heading') || source?.headingDeg);
           const fov = Number(url.searchParams.get('fov') || source?.fovDeg);
           const pitch = Number(url.searchParams.get('pitch') || source?.pitchDeg);
+
+          // These road-condition providers are current-image viewers only.
+          // Do not replace unavailable traffic images with Street View or a fabricated scene.
+          if (source?.framePolicy === 'live-only') {
+            const frame = await liveTrafficFrame(source);
+            setHealth(cameraId, {
+              status: frame ? 'ok' : 'unavailable', sourceKind: 'snapshot',
+              label: source.provider, message: frame ? 'Provider-refreshed road-condition snapshot' : 'Public camera image temporarily unavailable',
+            });
+            res.writeHead(frame ? 200 : 503, {
+              'Content-Type': frame?.contentType || 'application/json', 'Cache-Control': 'no-store',
+              'X-CCTV-Source': frame ? 'upstream-image' : 'unavailable',
+            });
+            res.end(frame?.body || JSON.stringify({ error: 'Public camera image temporarily unavailable' }));
+            return;
+          }
 
           if (source?.framePolicy === 'metadata-only') {
             const svg = buildSyntheticCctvSvg({

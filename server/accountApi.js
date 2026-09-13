@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { isLiveTrafficCameraId } from '../src/data/cctvRegions.js';
 import { promisify } from 'node:util';
 import pg from 'pg';
 import {
@@ -865,6 +866,7 @@ export function createAccountApi(options = {}) {
         const jurisdiction = safeText(body.jurisdiction, 160);
         const sessionId = safeText(body.sessionId, 80);
         if (!cameraId) return json(res, 400, { error: 'Camera ID is required' });
+        if (isLiveTrafficCameraId(cameraId)) return json(res, 403, { error: 'This public traffic provider is live-view only' });
         if (!Array.isArray(body.regions) || body.regions.length > 48) return json(res, 400, { error: 'Motion regions are invalid' });
         const regions = body.regions.map((region) => ({
           vehicleType: 'moving_object',
@@ -919,6 +921,7 @@ export function createAccountApi(options = {}) {
         const mimeType = safeText(body.mimeType, 40).toLowerCase();
         const imageBase64 = String(body.imageBase64 || '').replace(/\s/g, '');
         if (!cameraId) return json(res, 400, { error: 'Camera ID is required' });
+        if (isLiveTrafficCameraId(cameraId)) return json(res, 403, { error: 'This public traffic provider is live-view only' });
         if (!/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64) || imageBase64.length < 100 || imageBase64.length > 6_500_000) {
           return json(res, 400, { error: 'Camera frame is missing or too large' });
         }

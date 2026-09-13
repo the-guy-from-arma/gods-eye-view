@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.33] — 2026-09-12 — International live traffic-camera viewing
+
+- Added dynamic discovery of all 25 public TxDOT district catalogs and decoding
+  of its JSON-wrapped JPEG snapshots, supplementing Austin municipal cameras.
+- Added DriveBC, Ontario 511, Newfoundland/Labrador, Queensland, and NSW public
+  camera adapters. Current successful-image checks cover five providers; NSW's
+  catalog works but sampled provider images are temporarily unavailable.
+- Added server-only developer-key adapters for Alberta, Manitoba, New Brunswick,
+  and Yukon. These report missing access without making unauthenticated requests.
+- Grouped persistent camera filters by United States, Canada and Australia, with
+  unambiguous province/state codes and readable region names in control tooltips.
+- Added bounded on-demand, latest-image RAM caching and strict provider URL/body
+  validation. New providers return unavailable errors rather than fallback scenes.
+- Kept these live-view cameras outside existing analysis/retention controls.
+- Documented exact coverage and remaining regional gaps in
+  `docs/live-traffic-coverage.md`; retained provider attribution.
+- Advanced public build to `0.3.33` and kernel to `TBSGE-KERNEL-030.034`.
+  Existing legal acceptance remains `0.3.02`.
+
 ## [0.3.32] — 2026-09-11 — Keyless local motion parsing
 
 - Replaced the anonymous motion session's Gemini dependency with deterministic

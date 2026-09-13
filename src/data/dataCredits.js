@@ -26,6 +26,21 @@ import * as Cesium from 'cesium';
  * @type {{ key: string, html: string }[]}
  */
 export const DATA_CREDITS = [
+  {
+    key: 'international-live-traffic',
+    html: 'Public road-condition snapshots: ' +
+      '<a href="https://www.txdot.gov/discover/live-traffic-cameras.html" target="_blank" rel="noopener">TxDOT ITS</a> · ' +
+      '<a href="https://www.drivebc.ca/" target="_blank" rel="noopener">DriveBC / Province of British Columbia</a> (Open Government Licence – British Columbia) · ' +
+      '<a href="https://511on.ca/" target="_blank" rel="noopener">Ontario 511</a> · ' +
+      '<a href="https://www.gov.nl.ca/ti/roads/cameras/" target="_blank" rel="noopener">Newfoundland and Labrador</a> · ' +
+      '<a href="https://511.alberta.ca/" target="_blank" rel="noopener">511 Alberta</a> · ' +
+      '<a href="https://www.manitoba511.ca/" target="_blank" rel="noopener">Manitoba 511</a> · ' +
+      '<a href="https://511.gnb.ca/" target="_blank" rel="noopener">New Brunswick 511</a> · ' +
+      '<a href="https://511yukon.ca/" target="_blank" rel="noopener">511 Yukon</a> · ' +
+      '<a href="https://data.nsw.gov.au/data/dataset/2-live-traffic-cameras" target="_blank" rel="noopener">Transport for NSW</a> (CC BY) · ' +
+      '<a href="https://qldtraffic.qld.gov.au/" target="_blank" rel="noopener">Queensland Transport and Main Roads</a> (CC BY 4.0). ' +
+      'Provider-refreshed images; availability and image timestamps vary. Not continuous video or a historical archive.',
+  },
   // ── Live sources ────────────────────────────────────────────────
   {
     key: 'opensky',

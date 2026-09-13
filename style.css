@@ -6683,6 +6683,14 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   scrollbar-width: thin;
 }
 
+.cctv-country-label {
+  grid-column: 1 / -1;
+  padding: 8px 0 3px;
+  color: #7eabb5;
+  font: 9px 'JetBrains Mono', monospace;
+  letter-spacing: 1.5px;
+}
+
 .cctv-state-toggle {
   padding: 5px 3px;
   text-align: center;

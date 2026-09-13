@@ -1,4 +1,5 @@
 import * as Cesium from 'cesium';
+import { CCTV_REGION_NAMES, cctvRegionCountry } from './data/cctvRegions.js';
 import { retroShader } from './styles/retro.js';
 import { animeShader } from './styles/anime.js';
 import { noirShader } from './styles/noir.js';
@@ -6776,16 +6777,29 @@ export class StyleManager {
       const signature = filters.map((item) => `${item.code}:${item.count}:${item.enabled ? 1 : 0}`).join('|');
       if (this._cctvStateToggles.dataset.signature !== signature) {
         this._cctvStateToggles.dataset.signature = signature;
-        this._cctvStateToggles.replaceChildren(...filters.map((item) => {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = `cctv-state-toggle${item.enabled ? ' active' : ''}`;
-          button.dataset.cctvState = item.code;
-          button.setAttribute('aria-pressed', item.enabled ? 'true' : 'false');
-          button.title = `${item.enabled ? 'Hide' : 'Show'} ${item.code} cameras`;
-          button.innerHTML = `${item.code} <small>${Number(item.count).toLocaleString()}</small>`;
-          return button;
-        }));
+        const controls = [];
+        for (const country of ['United States', 'Canada', 'Australia']) {
+          const regions = filters.filter((item) => cctvRegionCountry(item.code) === country);
+          if (!regions.length) continue;
+          const heading = document.createElement('span');
+          heading.className = 'cctv-country-label';
+          heading.textContent = country.toUpperCase();
+          controls.push(heading);
+          for (const item of regions) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `cctv-state-toggle${item.enabled ? ' active' : ''}`;
+            button.dataset.cctvState = item.code;
+            button.setAttribute('aria-pressed', item.enabled ? 'true' : 'false');
+            button.title = `${item.enabled ? 'Hide' : 'Show'} ${CCTV_REGION_NAMES[item.code] || item.code} cameras`;
+            button.append(document.createTextNode(`${item.code.replace(/^(CA|AU)-/, '')} `));
+            const count = document.createElement('small');
+            count.textContent = Number(item.count).toLocaleString();
+            button.append(count);
+            controls.push(button);
+          }
+        }
+        this._cctvStateToggles.replaceChildren(...controls);
       }
     }
 

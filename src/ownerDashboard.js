@@ -366,7 +366,8 @@ async function loadVehicleSources() {
   const response = await fetch('/api/cctv/sources', { cache: 'no-store' });
   if (!response.ok) throw new Error('CCTV catalog unavailable');
   const payload = await response.json();
-  vehicleAnalytics.sources = Array.isArray(payload.sources) ? payload.sources : [];
+  vehicleAnalytics.sources = Array.isArray(payload.sources)
+    ? payload.sources.filter((source) => source.framePolicy !== 'live-only') : [];
   const states = [...new Set(vehicleAnalytics.sources.map((source) => source.stateCode).filter(Boolean))].sort();
   vehicleState.replaceChildren(new Option('ALL AVAILABLE STATES', ''), ...states.map((state) => new Option(state, state)));
   refreshVehicleCameraOptions();
